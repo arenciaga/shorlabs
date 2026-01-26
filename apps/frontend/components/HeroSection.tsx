@@ -32,7 +32,7 @@ const HeroSection = () => {
                     {/* Beta Badge */}
                     <div className="inline-flex items-center px-3 py-1 rounded-full bg-blue-50 border border-blue-100">
                         <span className="text-xs font-medium text-blue-700">
-                            Currently in Beta
+                            100% Open Source
                         </span>
                     </div>
 

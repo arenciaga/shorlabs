@@ -76,10 +76,9 @@ const features = [
     },
 ];
 
-const FeatureSection = () => {
+export const FeatureSection = () => {
     return (
         <section id="features" className="relative w-full bg-white">
-            {/* Section Header */}
             <div className="w-full max-w-5xl mx-auto px-4 sm:px-6 pt-16 sm:pt-20 pb-8 sm:pb-12 text-center">
                 <h2 className="text-2xl sm:text-3xl font-semibold text-gray-900 tracking-tight">
                     Everything you need to ship backends
@@ -89,90 +88,6 @@ const FeatureSection = () => {
                 </p>
             </div>
 
-            {/* Features Grid */}
-            <div className="w-full max-w-5xl mx-auto px-4 sm:px-6 pb-16 sm:pb-24">
-                <div className="border-t border-gray-100">
-                    {features.map((feature, index) => {
-                        const Icon = feature.icon;
-                        const isEven = index % 2 === 1;
-                        const isLastRow = index >= features.length - 2;
-                        const isLeft = index % 2 === 0;
-
-                        return (
-                            <div
-                                key={feature.title}
-                                className={`
-                                    grid grid-cols-1 md:grid-cols-2
-                                    ${!isLastRow ? "border-b border-gray-100" : ""}
-                                `}
-                            >
-                                {/* Feature Item */}
-                                <div
-                                    className={`
-                                        py-6 sm:py-8 px-0 sm:px-6
-                                        ${isLeft ? "md:border-r border-gray-100" : ""}
-                                        ${index % 2 === 1 ? "md:col-start-2" : "md:col-start-1"}
-                                        ${index % 2 === 0 && index !== 0 ? "md:row-start-auto" : ""}
-                                    `}
-                                >
-                                    <div className="flex items-start gap-4">
-                                        <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center text-gray-400">
-                                            <Icon className="w-5 h-5" strokeWidth={1.5} />
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <div className="flex items-center gap-2">
-                                                <h3 className="text-sm font-medium text-gray-900">
-                                                    {feature.title}
-                                                </h3>
-                                                {feature.badge && (
-                                                    <span
-                                                        className={`
-                                                            inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium
-                                                            ${feature.badge === "Pro"
-                                                                ? "bg-gray-900 text-white"
-                                                                : "bg-gray-100 text-gray-600"
-                                                            }
-                                                        `}
-                                                    >
-                                                        {feature.badge}
-                                                    </span>
-                                                )}
-                                            </div>
-                                            <p className="mt-1 text-sm text-gray-500 leading-relaxed">
-                                                {feature.description}
-                                            </p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        );
-                    })}
-                </div>
-
-                {/* Proper 2-column grid */}
-                <div className="hidden">
-                    {/* This is the correct implementation */}
-                </div>
-            </div>
-        </section>
-    );
-};
-
-// Correct 2-column layout version
-const FeatureSectionV2 = () => {
-    return (
-        <section id="features" className="relative w-full bg-white">
-            {/* Section Header */}
-            <div className="w-full max-w-5xl mx-auto px-4 sm:px-6 pt-16 sm:pt-20 pb-8 sm:pb-12 text-center">
-                <h2 className="text-2xl sm:text-3xl font-semibold text-gray-900 tracking-tight">
-                    Everything you need to ship backends
-                </h2>
-                <p className="mt-3 text-gray-500 max-w-xl mx-auto">
-                    Focus on writing code. We handle the infrastructure, scaling, and operations.
-                </p>
-            </div>
-
-            {/* Features Grid - 2 columns */}
             <div className="w-full max-w-5xl mx-auto px-4 sm:px-6 pb-16 sm:pb-24">
                 <div className="grid grid-cols-1 md:grid-cols-2 border-t border-gray-100">
                     {features.map((feature, index) => {
@@ -196,24 +111,9 @@ const FeatureSectionV2 = () => {
                                         <Icon className="w-5 h-5" strokeWidth={1.5} />
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                        <div className="flex items-center gap-2">
-                                            <h3 className="text-sm font-medium text-gray-900">
-                                                {feature.title}
-                                            </h3>
-                                            {feature.badge && (
-                                                <span
-                                                    className={`
-                                                        inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium
-                                                        ${feature.badge === "Pro"
-                                                            ? "bg-gray-900 text-white"
-                                                            : "bg-gray-100 text-gray-600"
-                                                        }
-                                                    `}
-                                                >
-                                                    {feature.badge}
-                                                </span>
-                                            )}
-                                        </div>
+                                        <h3 className="text-sm font-medium text-gray-900">
+                                            {feature.title}
+                                        </h3>
                                         <p className="mt-1 text-sm text-gray-500 leading-relaxed">
                                             {feature.description}
                                         </p>
@@ -227,5 +127,3 @@ const FeatureSectionV2 = () => {
         </section>
     );
 };
-
-export { FeatureSectionV2 as FeatureSection };

@@ -54,7 +54,7 @@ const features = [
         icon: Terminal,
         title: "Runtime Logs",
         description:
-            "View real-time CloudWatch logs directly from the dashboard. Debug with ease.",
+            "View real-time logs directly from the dashboard. Debug issues as they happen.",
     },
     {
         icon: Github,
@@ -66,7 +66,7 @@ const features = [
         icon: DollarSign,
         title: "Pay-Per-Use",
         description:
-            "Built on AWS Lambda—pay only for actual compute time. No idle servers, no wasted money.",
+            "Only pay for actual compute time. No idle servers, no monthly bills for unused capacity.",
     },
     {
         icon: ServerOff,

@@ -527,13 +527,20 @@ def increment_user_usage(
 # DATABASE TOKEN STORAGE
 # ─────────────────────────────────────────────────────────────
 
-def save_github_token(user_id: str, token: str, metadata: dict = None) -> bool:
+def save_github_token(user_id: str, token: str, metadata: dict = None, installation_id: str = None, expires_at: str = None) -> bool:
     """
-    Save or update GitHub OAuth token for a user.
+    Save or update GitHub App installation token for a user.
+
+    Args:
+        user_id: Clerk user ID
+        token: GitHub App installation access token
+        metadata: Additional metadata (username, avatar_url, etc.)
+        installation_id: GitHub App installation ID (needed for token refresh)
+        expires_at: ISO format timestamp when token expires
     """
     table = get_or_create_table()
     now = datetime.utcnow().isoformat()
-    
+
     item = {
         "PK": f"USER#{user_id}",
         "SK": "GITHUB#TOKEN",
@@ -541,27 +548,62 @@ def save_github_token(user_id: str, token: str, metadata: dict = None) -> bool:
         "metadata": metadata or {},
         "updated_at": now,
     }
-    
+
+    # Add GitHub App specific fields
+    if installation_id:
+        item["installation_id"] = installation_id
+    if expires_at:
+        item["expires_at"] = expires_at
+
     table.put_item(Item=item)
     return True
 
 
 def get_github_token(user_id: str) -> Optional[str]:
     """
-    Get GitHub OAuth token for a user from DynamoDB.
+    Get GitHub App installation token for a user from DynamoDB.
+    Returns None if not found or token is expired.
     """
     table = get_or_create_table()
-    
+
     response = table.get_item(
         Key={
             "PK": f"USER#{user_id}",
             "SK": "GITHUB#TOKEN",
         }
     )
-    
+
     item = response.get("Item")
     if item:
         return item.get("token")
+    return None
+
+
+def get_github_installation(user_id: str) -> Optional[dict]:
+    """
+    Get complete GitHub App installation data including installation_id and token expiry.
+
+    Returns:
+        dict with keys: token, installation_id, expires_at, metadata
+        None if not found
+    """
+    table = get_or_create_table()
+
+    response = table.get_item(
+        Key={
+            "PK": f"USER#{user_id}",
+            "SK": "GITHUB#TOKEN",
+        }
+    )
+
+    item = response.get("Item")
+    if item:
+        return {
+            "token": item.get("token"),
+            "installation_id": item.get("installation_id"),
+            "expires_at": item.get("expires_at"),
+            "metadata": item.get("metadata", {})
+        }
     return None
 
 

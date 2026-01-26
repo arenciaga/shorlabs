@@ -89,7 +89,7 @@ export default function ImportRepositoryPage() {
         }
     }, [getToken, signOut, user, isConnected])
 
-    const connectGitHub = useCallback(async (code: string) => {
+    const connectGitHub = useCallback(async (installation_id: string, setup_action: string) => {
         setLoading(true)
         setError(null)
         try {
@@ -103,25 +103,28 @@ export default function ImportRepositoryPage() {
                     "Content-Type": "application/json",
                 },
                 body: JSON.stringify({
-                    code,
-                    installation_id: searchParams.get("installation_id"),
-                    setup_action: searchParams.get("setup_action")
+                    installation_id,
+                    setup_action
                 }),
             })
 
             if (!response.ok) {
                 const data = await response.json()
+                console.error("GitHub connection error:", data)
                 throw new Error(data.detail || "Failed to connect GitHub")
             }
 
-            // Success! 
+            const result = await response.json()
+            console.log("✅ GitHub connected:", result)
+
+            // Success!
             setIsConnected(true)
             router.replace("/new")
             // fetchRepos will be triggered by useEffect when isConnected becomes true
 
         } catch (err) {
             console.error("Failed to connect GitHub:", err)
-            setError(err instanceof Error ? err.message : "Failed to connect GitHub")
+            setError(err instanceof Error ? err.message : "Failed to connect GitHub. Please try again.")
             router.replace("/new")
             setLoading(false)
         }
@@ -155,13 +158,15 @@ export default function ImportRepositoryPage() {
         }
     }, [isConnected, userLoaded, fetchRepos])
 
-    // Handle OAuth callback
+    // Handle GitHub App installation callback
     useEffect(() => {
-        const code = searchParams.get("code")
-        if (code && userLoaded) {
-            // If we have a code, we try to connect regardless of current status
-            // (maybe user is re-connecting)
-            connectGitHub(code)
+        const installation_id = searchParams.get("installation_id")
+        const setup_action = searchParams.get("setup_action")
+
+        if (installation_id && userLoaded) {
+            // User just completed GitHub App installation
+            console.log("📥 GitHub App installation callback received:", { installation_id, setup_action })
+            connectGitHub(installation_id, setup_action || "install")
         }
     }, [searchParams, userLoaded, connectGitHub])
 

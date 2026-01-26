@@ -14,8 +14,8 @@ export default function SSOCallback() {
             const isNewUser = user.createdAt &&
                 (Date.now() - user.createdAt.getTime()) < 10000;
 
-            trackEvent('GitHub Auth Completed', {
-                auth_method: 'github',
+            trackEvent('Google Auth Completed', {
+                auth_method: 'google',
                 is_new_user: isNewUser,
                 user_tier: 'free'
             });

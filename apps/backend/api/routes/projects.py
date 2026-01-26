@@ -11,7 +11,7 @@ import boto3
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from api.auth import get_current_user_id, get_github_oauth_token
+from api.auth import get_current_user_id
 from api.db.dynamodb import (
     create_project,
     get_project,
@@ -292,10 +292,12 @@ async def create_new_project(
     user_id: str = Depends(get_current_user_id),
 ):
     """Create a new project and start deployment."""
+    from api.routes.github import get_or_refresh_token
+
     github_url = f"https://github.com/{request.github_repo}"
-    
+
     # Get GitHub token for private repos
-    github_token = await get_github_oauth_token(user_id)
+    github_token = await get_or_refresh_token(user_id)
     
     # Normalize root_directory
     root_directory = request.root_directory or "./"
@@ -575,15 +577,17 @@ async def redeploy_project(
     user_id: str = Depends(get_current_user_id),
 ):
     """Trigger a redeployment of the project."""
+    from api.routes.github import get_or_refresh_token
+
     # Use get_project_by_key for strong consistency to ensure we get the latest
     # compute settings (memory, timeout) if they were just updated.
     project = get_project_by_key(user_id, project_id)
-    
+
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
-    
+
     # Get GitHub token for private repos
-    github_token = await get_github_oauth_token(user_id)
+    github_token = await get_or_refresh_token(user_id)
     
     # Get root_directory and start_command from stored project
     root_directory = project.get("root_directory", "./")

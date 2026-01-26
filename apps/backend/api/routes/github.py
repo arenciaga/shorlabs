@@ -3,6 +3,7 @@ GitHub API routes - fetch user's repositories and handle OAuth.
 """
 import os
 import httpx
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Body
 from pydantic import BaseModel
 
@@ -20,13 +21,31 @@ FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:3000")
 REDIRECT_URI = f"{FRONTEND_URL}/new" 
 
 class ConnectRequest(BaseModel):
-    code: str
+    code: Optional[str] = None
+    installation_id: Optional[str] = None
+    setup_action: Optional[str] = None
 
 @router.get("/auth-url")
 async def get_auth_url():
     """Get the GitHub OAuth authorization URL."""
     if not GITHUB_CLIENT_ID:
         raise HTTPException(status_code=500, detail="GITHUB_CLIENT_ID not configured")
+        
+# GitHub App Slug (optional, for granular installation)
+GITHUB_APP_SLUG = os.environ.get("GITHUB_APP_SLUG")
+
+@router.get("/auth-url")
+async def get_auth_url():
+    """Get the GitHub OAuth authorization URL."""
+    if not GITHUB_CLIENT_ID:
+        raise HTTPException(status_code=500, detail="GITHUB_CLIENT_ID not configured")
+    
+    # If using GitHub App with a known slug, use the installation flow
+    # This enables the "Only select repositories" UI
+    if GITHUB_APP_SLUG:
+        return {
+            "url": f"https://github.com/apps/{GITHUB_APP_SLUG}/installations/new"
+        }
         
     return {
         "url": f"https://github.com/login/oauth/authorize?client_id={GITHUB_CLIENT_ID}&redirect_uri={REDIRECT_URI}&scope=repo,user"
@@ -41,6 +60,11 @@ async def connect_github(
     """Exchange OAuth code for access token and save it."""
     if not GITHUB_CLIENT_ID or not GITHUB_CLIENT_SECRET:
         raise HTTPException(status_code=500, detail="GitHub OAuth not configured")
+
+    if not payload.code:
+         # If we have installation_id but no code, we might need to rely on existing token?
+         # For now, require code to ensure fresh token.
+         raise HTTPException(status_code=400, detail="Authorization code required")
 
     async with httpx.AsyncClient() as client:
         # Exchange code for token
@@ -61,6 +85,7 @@ async def connect_github(
         data = response.json()
         if "error" in data:
             raise HTTPException(status_code=400, detail=data.get("error_description", "OAuth error"))
+
             
         access_token = data.get("access_token")
         if not access_token:

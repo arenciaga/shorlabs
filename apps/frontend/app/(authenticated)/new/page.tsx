@@ -9,7 +9,7 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://api.shorlabs.com"
 
 interface GitHubRepo {
     id: number
@@ -102,7 +102,11 @@ export default function ImportRepositoryPage() {
                     "Authorization": `Bearer ${token}`,
                     "Content-Type": "application/json",
                 },
-                body: JSON.stringify({ code }),
+                body: JSON.stringify({
+                    code,
+                    installation_id: searchParams.get("installation_id"),
+                    setup_action: searchParams.get("setup_action")
+                }),
             })
 
             if (!response.ok) {
@@ -171,7 +175,11 @@ export default function ImportRepositoryPage() {
             if (!response.ok) throw new Error("Failed to get auth URL")
 
             const data = await response.json()
-            window.location.href = data.url
+            if (data && data.url) {
+                window.location.href = data.url
+            } else {
+                throw new Error("Invalid auth URL response")
+            }
 
         } catch (err) {
             console.error("Failed to initiate GitHub connection:", err)

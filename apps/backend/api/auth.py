@@ -67,9 +67,26 @@ def get_current_user_id(authorization: Optional[str] = Header(None)) -> str:
 
 
 async def get_github_oauth_token(user_id: str) -> Optional[str]:
-    """Get GitHub OAuth token for a user from Clerk Backend API."""
+    """
+    Get GitHub OAuth token for a user.
+    
+    Strategy:
+    1. Check local DynamoDB token storage (new flow)
+    2. Fallback to Clerk Backend API (legacy flow)
+    """
+    # 1. Check DynamoDB (avoid circular import with inner import)
+    try:
+        from api.db.dynamodb import get_github_token
+        db_token = get_github_token(user_id)
+        if db_token:
+            return db_token
+    except Exception as e:
+        print(f"⚠️ Error checking DynamoDB token: {e}")
+
+    # 2. Fallback to Clerk
     if not CLERK_SECRET_KEY:
-        raise HTTPException(status_code=500, detail="CLERK_SECRET_KEY not configured")
+        # If we don't have Clerk key and DB failed/empty, we can't do anything
+        return None
     
     url = f"https://api.clerk.com/v1/users/{user_id}/oauth_access_tokens/github"
     
@@ -86,10 +103,9 @@ async def get_github_oauth_token(user_id: str) -> Optional[str]:
         return None  # User hasn't connected GitHub
     
     if response.status_code != 200:
-        raise HTTPException(
-            status_code=response.status_code,
-            detail=f"Clerk API error: {response.text}",
-        )
+        # Don't fail hard on Clerk errors if we are just checking
+        print(f"⚠️ Clerk API error: {response.status_code} {response.text}")
+        return None
     
     data = response.json()
     if data and len(data) > 0:

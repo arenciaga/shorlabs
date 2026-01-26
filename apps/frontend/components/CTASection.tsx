@@ -9,15 +9,15 @@ import { trackEvent } from "@/lib/amplitude";
 const CTASection = () => {
     const { signIn, isLoaded } = useSignIn();
 
-    const handleGitHubSignIn = async () => {
+    const handleGoogleSignIn = async () => {
         if (!isLoaded || !signIn) return;
 
-        trackEvent("GitHub Auth Started", {
+        trackEvent("Google Auth Started", {
             source: "cta_section",
         });
 
         await signIn.authenticateWithRedirect({
-            strategy: "oauth_github",
+            strategy: "oauth_google",
             redirectUrl: "/sso-callback",
             redirectUrlComplete: "/projects",
         });
@@ -36,11 +36,11 @@ const CTASection = () => {
                 <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
                     <SignedOut>
                         <Button
-                            onClick={handleGitHubSignIn}
+                            onClick={handleGoogleSignIn}
                             disabled={!isLoaded}
                             className="text-sm bg-gray-900 text-white hover:bg-gray-800 px-5 py-2.5 rounded-lg transition-colors"
                         >
-                            Get Started
+                            Continue with Google
                         </Button>
                     </SignedOut>
                     <SignedIn>

@@ -10,15 +10,15 @@ import { trackEvent } from "@/lib/amplitude";
 const HeroSection = () => {
     const { signIn, isLoaded } = useSignIn();
 
-    const handleGitHubSignIn = async () => {
+    const handleGoogleSignIn = async () => {
         if (!isLoaded || !signIn) return;
 
-        trackEvent("GitHub Auth Started", {
+        trackEvent("Google Auth Started", {
             source: "hero_section",
         });
 
         await signIn.authenticateWithRedirect({
-            strategy: "oauth_github",
+            strategy: "oauth_google",
             redirectUrl: "/sso-callback",
             redirectUrlComplete: "/projects",
         });
@@ -53,11 +53,11 @@ const HeroSection = () => {
                     <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 pt-2">
                         <SignedOut>
                             <Button
-                                onClick={handleGitHubSignIn}
+                                onClick={handleGoogleSignIn}
                                 disabled={!isLoaded}
                                 className="text-sm bg-gray-900 text-white hover:bg-gray-800 px-5 py-2.5 rounded-lg transition-colors"
                             >
-                                Continue with GitHub
+                                Continue with Google
                             </Button>
                         </SignedOut>
                         <SignedIn>

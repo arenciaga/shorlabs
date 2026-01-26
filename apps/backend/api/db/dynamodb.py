@@ -524,8 +524,36 @@ def increment_user_usage(
 
 
 # ─────────────────────────────────────────────────────────────
-# DATABASE TOKEN STORAGE
+# GITHUB CONNECTIONS TABLE
 # ─────────────────────────────────────────────────────────────
+
+GITHUB_CONNECTIONS_TABLE = "github-connections"
+
+
+def get_github_connections_table():
+    """Get or create the github-connections DynamoDB table."""
+    try:
+        table = dynamodb.Table(GITHUB_CONNECTIONS_TABLE)
+        table.load()
+        return table
+    except dynamodb.meta.client.exceptions.ResourceNotFoundException:
+        pass
+
+    print(f"📦 Creating DynamoDB table: {GITHUB_CONNECTIONS_TABLE}")
+    table = dynamodb.create_table(
+        TableName=GITHUB_CONNECTIONS_TABLE,
+        KeySchema=[
+            {"AttributeName": "user_id", "KeyType": "HASH"},
+        ],
+        AttributeDefinitions=[
+            {"AttributeName": "user_id", "AttributeType": "S"},
+        ],
+        BillingMode="PAY_PER_REQUEST",
+    )
+    table.wait_until_exists()
+    print(f"✅ Created DynamoDB table: {GITHUB_CONNECTIONS_TABLE}")
+    return table
+
 
 def save_github_token(user_id: str, token: str, metadata: dict = None, installation_id: str = None, expires_at: str = None) -> bool:
     """
@@ -538,12 +566,11 @@ def save_github_token(user_id: str, token: str, metadata: dict = None, installat
         installation_id: GitHub App installation ID (needed for token refresh)
         expires_at: ISO format timestamp when token expires
     """
-    table = get_or_create_table()
+    table = get_github_connections_table()
     now = datetime.utcnow().isoformat()
 
     item = {
-        "PK": f"USER#{user_id}",
-        "SK": "GITHUB#TOKEN",
+        "user_id": user_id,
         "token": token,
         "metadata": metadata or {},
         "updated_at": now,
@@ -564,13 +591,10 @@ def get_github_token(user_id: str) -> Optional[str]:
     Get GitHub App installation token for a user from DynamoDB.
     Returns None if not found or token is expired.
     """
-    table = get_or_create_table()
+    table = get_github_connections_table()
 
     response = table.get_item(
-        Key={
-            "PK": f"USER#{user_id}",
-            "SK": "GITHUB#TOKEN",
-        }
+        Key={"user_id": user_id}
     )
 
     item = response.get("Item")
@@ -587,13 +611,10 @@ def get_github_installation(user_id: str) -> Optional[dict]:
         dict with keys: token, installation_id, expires_at, metadata
         None if not found
     """
-    table = get_or_create_table()
+    table = get_github_connections_table()
 
     response = table.get_item(
-        Key={
-            "PK": f"USER#{user_id}",
-            "SK": "GITHUB#TOKEN",
-        }
+        Key={"user_id": user_id}
     )
 
     item = response.get("Item")

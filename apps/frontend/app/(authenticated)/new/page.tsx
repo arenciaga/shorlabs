@@ -130,26 +130,31 @@ export default function ImportRepositoryPage() {
         }
     }, [getToken, router])
 
+    // Check connection status - defined outside useEffect so it can be reused
+    const checkConnection = useCallback(async () => {
+        if (!userLoaded || !user) return
+        try {
+            const token = await getToken()
+            console.log("🔍 Checking GitHub connection...")
+            const response = await fetch(`${API_BASE_URL}/api/github/status`, {
+                headers: { Authorization: `Bearer ${token}` }
+            })
+            if (response.ok) {
+                const data = await response.json()
+                console.log("✅ Connection status:", data)
+                setIsConnected(data.connected)
+            } else {
+                console.error("❌ Connection check failed:", response.status)
+            }
+        } catch (err) {
+            console.error("❌ Failed to check GitHub status:", err)
+        }
+    }, [userLoaded, user, getToken])
+
     // Check connection status on load
     useEffect(() => {
-        const checkConnection = async () => {
-            if (!userLoaded || !user) return
-            try {
-                const token = await getToken()
-                const response = await fetch(`${API_BASE_URL}/api/github/status`, {
-                    headers: { Authorization: `Bearer ${token}` }
-                })
-                if (response.ok) {
-                    const data = await response.json()
-                    setIsConnected(data.connected)
-                }
-            } catch (err) {
-                console.error("Failed to check GitHub status:", err)
-            }
-        }
-
         checkConnection()
-    }, [userLoaded, user, getToken])
+    }, [checkConnection])
 
     // Trigger repo fetch when connected
     useEffect(() => {

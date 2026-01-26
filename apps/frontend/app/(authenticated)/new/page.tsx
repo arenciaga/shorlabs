@@ -164,11 +164,33 @@ export default function ImportRepositoryPage() {
         const setup_action = searchParams.get("setup_action")
 
         if (installation_id && userLoaded) {
-            // User just completed GitHub App installation
+            // User just completed GitHub App installation (in popup)
             console.log("📥 GitHub App installation callback received:", { installation_id, setup_action })
             connectGitHub(installation_id, setup_action || "install")
+
+            // If we're in a popup, notify the parent window and close
+            if (window.opener) {
+                window.opener.postMessage({ type: 'github-connected' }, window.location.origin)
+                window.close()
+            }
         }
     }, [searchParams, userLoaded, connectGitHub])
+
+    // Listen for messages from popup window
+    useEffect(() => {
+        const handleMessage = (event: MessageEvent) => {
+            // Verify the origin
+            if (event.origin !== window.location.origin) return
+
+            if (event.data.type === 'github-connected') {
+                // Refresh connection status
+                checkConnection()
+            }
+        }
+
+        window.addEventListener('message', handleMessage)
+        return () => window.removeEventListener('message', handleMessage)
+    }, [checkConnection])
 
     const handleConnectGitHub = async () => {
         try {

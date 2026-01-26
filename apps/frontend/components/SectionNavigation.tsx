@@ -4,13 +4,11 @@ import { Button } from "@/components/ui/button";
 import { Menu, X, Github } from "lucide-react";
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { SignedIn, SignedOut, useSignIn } from "@clerk/nextjs";
 import { trackEvent } from "@/lib/amplitude";
 
 export default function SectionNavigation() {
     const [open, setOpen] = useState(false);
     const [scrolled, setScrolled] = useState(false);
-    const { signIn, isLoaded } = useSignIn();
 
     useEffect(() => {
         const handleScroll = () => {
@@ -20,15 +18,7 @@ export default function SectionNavigation() {
         return () => window.removeEventListener("scroll", handleScroll);
     }, []);
 
-    const handleGitHubSignIn = async () => {
-        if (!isLoaded || !signIn) return;
-        trackEvent('GitHub Auth Started', { source: 'navigation' });
-        await signIn.authenticateWithRedirect({
-            strategy: "oauth_github",
-            redirectUrl: "/sso-callback",
-            redirectUrlComplete: "/projects",
-        });
-    };
+
 
     return (
         <header
@@ -76,22 +66,13 @@ export default function SectionNavigation() {
                         >
                             <Github className="w-5 h-5" strokeWidth={1.5} />
                         </a>
-                        <SignedOut>
+                        <Link href="mailto:kashyaparyan093@gmail.com">
                             <Button
-                                onClick={handleGitHubSignIn}
-                                disabled={!isLoaded}
                                 className="text-sm bg-gray-900 text-white hover:bg-gray-800 px-4 py-2 rounded-lg transition-colors"
                             >
-                                Continue with GitHub
+                                Contact Us
                             </Button>
-                        </SignedOut>
-                        <SignedIn>
-                            <Link href="/projects">
-                                <Button className="text-sm bg-gray-900 text-white hover:bg-gray-800 px-4 py-2 rounded-lg transition-colors">
-                                    Go to Projects
-                                </Button>
-                            </Link>
-                        </SignedIn>
+                        </Link>
                     </div>
 
                     {/* Mobile Menu Button */}
@@ -134,22 +115,11 @@ export default function SectionNavigation() {
                         Pricing
                     </a>
                     <div className="pt-2 border-t border-gray-100">
-                        <SignedOut>
-                            <Button
-                                onClick={handleGitHubSignIn}
-                                disabled={!isLoaded}
-                                className="w-full text-sm bg-gray-900 text-white hover:bg-gray-800 py-2.5 rounded-lg transition-colors"
-                            >
-                                Continue with GitHub
+                        <Link href="mailto:kashyaparyan093@gmail.com" className="w-full">
+                            <Button className="w-full text-sm bg-gray-900 text-white hover:bg-gray-800 py-2.5 rounded-lg transition-colors">
+                                Contact Us
                             </Button>
-                        </SignedOut>
-                        <SignedIn>
-                            <Link href="/projects" className="block">
-                                <Button className="w-full text-sm bg-gray-900 text-white hover:bg-gray-800 py-2.5 rounded-lg transition-colors">
-                                    Go to Projects
-                                </Button>
-                            </Link>
-                        </SignedIn>
+                        </Link>
                     </div>
                 </nav>
             </div>

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { useUser, useAuth, useClerk } from "@clerk/nextjs"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Github, Search, ArrowLeft, Lock, Globe, Loader2, AlertCircle, GitBranch, ArrowUpRight } from "lucide-react"
 import Link from "next/link"
 
@@ -46,12 +46,11 @@ export default function ImportRepositoryPage() {
     const [error, setError] = useState<string | null>(null)
     const [searchQuery, setSearchQuery] = useState("")
 
-    const githubAccount = user?.externalAccounts.find(
-        (account) => (account.provider as string) === "oauth_github" || (account.provider as string) === "github"
-    )
+    const [isConnected, setIsConnected] = useState(false)
+    const searchParams = useSearchParams()
 
     const fetchRepos = useCallback(async () => {
-        if (!githubAccount) {
+        if (!user || !isConnected) {
             setLoading(false)
             return
         }
@@ -88,27 +87,95 @@ export default function ImportRepositoryPage() {
         } finally {
             setLoading(false)
         }
-    }, [getToken, signOut, githubAccount])
+    }, [getToken, signOut, user, isConnected])
 
-    useEffect(() => {
-        if (userLoaded) {
-            fetchRepos()
-        }
-    }, [userLoaded, fetchRepos])
-
-    const handleConnectGitHub = async () => {
-        if (!user) return
+    const connectGitHub = useCallback(async (code: string) => {
+        setLoading(true)
+        setError(null)
         try {
-            const externalAccount = await user.createExternalAccount({
-                strategy: "oauth_github",
-                redirectUrl: "/new",
+            const token = await getToken()
+            if (!token) return
+
+            const response = await fetch(`${API_BASE_URL}/api/github/connect`, {
+                method: "POST",
+                headers: {
+                    "Authorization": `Bearer ${token}`,
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ code }),
             })
-            if (externalAccount.verification?.externalVerificationRedirectURL) {
-                window.location.href = externalAccount.verification.externalVerificationRedirectURL.toString()
+
+            if (!response.ok) {
+                const data = await response.json()
+                throw new Error(data.detail || "Failed to connect GitHub")
             }
+
+            // Success! 
+            setIsConnected(true)
+            router.replace("/new")
+            // fetchRepos will be triggered by useEffect when isConnected becomes true
+
         } catch (err) {
             console.error("Failed to connect GitHub:", err)
-            setError("Failed to connect GitHub. Please try again.")
+            setError(err instanceof Error ? err.message : "Failed to connect GitHub")
+            router.replace("/new")
+            setLoading(false)
+        }
+    }, [getToken, router])
+
+    // Check connection status on load
+    useEffect(() => {
+        const checkConnection = async () => {
+            if (!userLoaded || !user) return
+            try {
+                const token = await getToken()
+                const response = await fetch(`${API_BASE_URL}/api/github/status`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                })
+                if (response.ok) {
+                    const data = await response.json()
+                    setIsConnected(data.connected)
+                }
+            } catch (err) {
+                console.error("Failed to check GitHub status:", err)
+            }
+        }
+
+        checkConnection()
+    }, [userLoaded, user, getToken])
+
+    // Trigger repo fetch when connected
+    useEffect(() => {
+        if (isConnected && userLoaded) {
+            fetchRepos()
+        }
+    }, [isConnected, userLoaded, fetchRepos])
+
+    // Handle OAuth callback
+    useEffect(() => {
+        const code = searchParams.get("code")
+        if (code && userLoaded) {
+            // If we have a code, we try to connect regardless of current status
+            // (maybe user is re-connecting)
+            connectGitHub(code)
+        }
+    }, [searchParams, userLoaded, connectGitHub])
+
+    const handleConnectGitHub = async () => {
+        try {
+            const token = await getToken()
+            const response = await fetch(`${API_BASE_URL}/api/github/auth-url`, {
+                headers: { Authorization: `Bearer ${token}` }
+            })
+
+            if (!response.ok) throw new Error("Failed to get auth URL")
+
+            const data = await response.json()
+            window.location.href = data.url
+
+        } catch (err) {
+            console.error("Failed to initiate GitHub connection:", err)
+            setError("Failed to initiate connection. Please try again.")
         }
     }
 
@@ -168,7 +235,7 @@ export default function ImportRepositoryPage() {
                     <div className="flex items-center justify-center py-20">
                         <Loader2 className="h-6 w-6 animate-spin text-zinc-400" />
                     </div>
-                ) : !githubAccount ? (
+                ) : !isConnected ? (
                     // Connect GitHub CTA
                     <div className="bg-white rounded-2xl border border-zinc-200 p-12 text-center hover:shadow-lg hover:shadow-zinc-900/5 transition-shadow">
                         <div className="w-16 h-16 rounded-2xl bg-zinc-900 flex items-center justify-center mx-auto mb-6">
@@ -200,13 +267,13 @@ export default function ImportRepositoryPage() {
                                     </div>
                                     <div>
                                         <p className="font-semibold text-zinc-900">
-                                            {githubAccount.username || user?.username}
+                                            {user?.username || user?.primaryEmailAddress?.emailAddress}
                                         </p>
-                                        <p className="text-xs text-zinc-500">GitHub Account</p>
+                                        <p className="text-xs text-zinc-500">GitHub Connected</p>
                                     </div>
                                 </div>
                                 <a
-                                    href={`https://github.com/${githubAccount.username}`}
+                                    href="https://github.com"
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="text-sm text-zinc-500 hover:text-zinc-900 transition-colors flex items-center gap-1"

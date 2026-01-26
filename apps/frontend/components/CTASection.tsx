@@ -6,23 +6,9 @@ import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { trackEvent } from "@/lib/amplitude";
 
+import { GoogleSignInButton } from "@/components/GoogleSignInButton";
+
 const CTASection = () => {
-    const { signIn, isLoaded } = useSignIn();
-
-    const handleGoogleSignIn = async () => {
-        if (!isLoaded || !signIn) return;
-
-        trackEvent("Google Auth Started", {
-            source: "cta_section",
-        });
-
-        await signIn.authenticateWithRedirect({
-            strategy: "oauth_google",
-            redirectUrl: "/sso-callback",
-            redirectUrlComplete: "/projects",
-        });
-    };
-
     return (
         <section className="relative w-full bg-white overflow-hidden py-24 sm:py-32">
             <div className="w-full max-w-4xl mx-auto px-4 sm:px-6 text-center">
@@ -35,13 +21,7 @@ const CTASection = () => {
 
                 <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
                     <SignedOut>
-                        <Button
-                            onClick={handleGoogleSignIn}
-                            disabled={!isLoaded}
-                            className="text-sm bg-gray-900 text-white hover:bg-gray-800 px-5 py-2.5 rounded-lg transition-colors"
-                        >
-                            Continue with Google
-                        </Button>
+                        <GoogleSignInButton source="cta_section" />
                     </SignedOut>
                     <SignedIn>
                         <Link href="/projects">

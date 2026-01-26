@@ -7,23 +7,9 @@ import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { trackEvent } from "@/lib/amplitude";
 
+import { GoogleSignInButton } from "@/components/GoogleSignInButton";
+
 const HeroSection = () => {
-    const { signIn, isLoaded } = useSignIn();
-
-    const handleGoogleSignIn = async () => {
-        if (!isLoaded || !signIn) return;
-
-        trackEvent("Google Auth Started", {
-            source: "hero_section",
-        });
-
-        await signIn.authenticateWithRedirect({
-            strategy: "oauth_google",
-            redirectUrl: "/sso-callback",
-            redirectUrlComplete: "/projects",
-        });
-    };
-
     return (
         <section className="relative w-full bg-white overflow-hidden">
             {/* Hero Content */}
@@ -52,13 +38,7 @@ const HeroSection = () => {
                     {/* CTA Buttons */}
                     <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 pt-2">
                         <SignedOut>
-                            <Button
-                                onClick={handleGoogleSignIn}
-                                disabled={!isLoaded}
-                                className="text-sm bg-gray-900 text-white hover:bg-gray-800 px-5 py-2.5 rounded-lg transition-colors"
-                            >
-                                Continue with Google
-                            </Button>
+                            <GoogleSignInButton source="hero_section" />
                         </SignedOut>
                         <SignedIn>
                             <Link href="/projects">

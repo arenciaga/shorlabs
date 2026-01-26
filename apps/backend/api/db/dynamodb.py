@@ -522,3 +522,46 @@ def increment_user_usage(
             "functions": {function_name: {"requests": requests, "gb_seconds": gb_seconds}} if function_name else {},
         })
 
+
+# ─────────────────────────────────────────────────────────────
+# DATABASE TOKEN STORAGE
+# ─────────────────────────────────────────────────────────────
+
+def save_github_token(user_id: str, token: str, metadata: dict = None) -> bool:
+    """
+    Save or update GitHub OAuth token for a user.
+    """
+    table = get_or_create_table()
+    now = datetime.utcnow().isoformat()
+    
+    item = {
+        "PK": f"USER#{user_id}",
+        "SK": "GITHUB#TOKEN",
+        "token": token,
+        "metadata": metadata or {},
+        "updated_at": now,
+    }
+    
+    table.put_item(Item=item)
+    return True
+
+
+def get_github_token(user_id: str) -> Optional[str]:
+    """
+    Get GitHub OAuth token for a user from DynamoDB.
+    """
+    table = get_or_create_table()
+    
+    response = table.get_item(
+        Key={
+            "PK": f"USER#{user_id}",
+            "SK": "GITHUB#TOKEN",
+        }
+    )
+    
+    item = response.get("Item")
+    if item:
+        return item.get("token")
+    return None
+
+

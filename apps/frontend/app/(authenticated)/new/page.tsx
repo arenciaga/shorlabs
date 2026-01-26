@@ -89,12 +89,16 @@ export default function ImportRepositoryPage() {
         }
     }, [getToken, signOut, user, isConnected])
 
-    const connectGitHub = useCallback(async (installation_id: string, setup_action: string) => {
+    const connectGitHub = useCallback(async (installation_id: string, setup_action: string): Promise<boolean> => {
         setLoading(true)
         setError(null)
         try {
             const token = await getToken()
-            if (!token) return
+            if (!token) {
+                throw new Error("No auth token available")
+            }
+
+            console.log("📤 Calling /api/github/connect with installation_id:", installation_id)
 
             const response = await fetch(`${API_BASE_URL}/api/github/connect`, {
                 method: "POST",
@@ -117,16 +121,24 @@ export default function ImportRepositoryPage() {
             const result = await response.json()
             console.log("✅ GitHub connected:", result)
 
-            // Success!
-            setIsConnected(true)
-            router.replace("/new")
-            // fetchRepos will be triggered by useEffect when isConnected becomes true
+            // Only update state if we're NOT in a popup (parent window handles its own state)
+            if (!window.opener) {
+                setIsConnected(true)
+                router.replace("/new")
+            }
+
+            return true  // Success
 
         } catch (err) {
             console.error("Failed to connect GitHub:", err)
             setError(err instanceof Error ? err.message : "Failed to connect GitHub. Please try again.")
-            router.replace("/new")
+
+            // Only update state if we're NOT in a popup
+            if (!window.opener) {
+                router.replace("/new")
+            }
             setLoading(false)
+            throw err  // Re-throw so the caller knows it failed
         }
     }, [getToken, router])
 
@@ -171,13 +183,29 @@ export default function ImportRepositoryPage() {
         if (installation_id && userLoaded) {
             // User just completed GitHub App installation (in popup)
             console.log("📥 GitHub App installation callback received:", { installation_id, setup_action })
-            connectGitHub(installation_id, setup_action || "install")
 
-            // If we're in a popup, notify the parent window and close
-            if (window.opener) {
-                window.opener.postMessage({ type: 'github-connected' }, window.location.origin)
-                window.close()
+            // Call connectGitHub and wait for it to complete before notifying parent
+            const handleCallback = async () => {
+                try {
+                    await connectGitHub(installation_id, setup_action || "install")
+
+                    // If we're in a popup, notify the parent window and close AFTER connection succeeds
+                    if (window.opener) {
+                        console.log("✅ Connection complete, notifying parent window")
+                        window.opener.postMessage({ type: 'github-connected' }, window.location.origin)
+                        window.close()
+                    }
+                } catch (err) {
+                    console.error("❌ GitHub connection failed in popup:", err)
+                    // Still notify parent so it can show an error
+                    if (window.opener) {
+                        window.opener.postMessage({ type: 'github-connection-failed' }, window.location.origin)
+                        window.close()
+                    }
+                }
             }
+
+            handleCallback()
         }
     }, [searchParams, userLoaded, connectGitHub])
 

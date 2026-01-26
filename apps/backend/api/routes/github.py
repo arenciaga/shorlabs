@@ -94,32 +94,54 @@ async def get_or_refresh_token(user_id: str) -> Optional[str]:
 
     Returns:
         Valid GitHub installation token, or None if not connected
+
+    Raises:
+        HTTPException: If token refresh fails due to installation removal
     """
     installation = get_github_installation(user_id)
     if not installation:
+        print(f"[GitHub] No installation found for user {user_id}")
         return None
 
     # Check if token is expired
     if installation.get("expires_at"):
-        expires_at = datetime.fromisoformat(installation["expires_at"].replace("Z", "+00:00"))
-        # Refresh if expired or expiring in next 5 minutes
-        if datetime.now(expires_at.tzinfo) >= expires_at - timedelta(minutes=5):
-            installation_id = installation.get("installation_id")
-            if installation_id:
-                try:
-                    # Refresh token
-                    token_data = await generate_installation_token(installation_id)
-                    save_github_token(
-                        user_id,
-                        token_data["token"],
-                        metadata=installation.get("metadata"),
-                        installation_id=installation_id,
-                        expires_at=token_data["expires_at"]
-                    )
-                    return token_data["token"]
-                except Exception as e:
-                    print(f"⚠️ Failed to refresh token: {e}")
+        try:
+            expires_at = datetime.fromisoformat(installation["expires_at"].replace("Z", "+00:00"))
+            # Refresh if expired or expiring in next 5 minutes
+            if datetime.now(expires_at.tzinfo) >= expires_at - timedelta(minutes=5):
+                installation_id = installation.get("installation_id")
+                if installation_id:
+                    print(f"[GitHub] Token expired/expiring, refreshing for installation {installation_id}")
+                    try:
+                        # Refresh token
+                        token_data = await generate_installation_token(installation_id)
+                        save_github_token(
+                            user_id,
+                            token_data["token"],
+                            metadata=installation.get("metadata"),
+                            installation_id=installation_id,
+                            expires_at=token_data["expires_at"]
+                        )
+                        print(f"[GitHub] Token refreshed successfully, expires at {token_data['expires_at']}")
+                        return token_data["token"]
+                    except HTTPException as e:
+                        # Installation may have been removed
+                        print(f"[GitHub] Token refresh failed (installation may be removed): {e.detail}")
+                        raise HTTPException(
+                            status_code=401,
+                            detail="GitHub installation removed or permissions revoked. Please reconnect."
+                        )
+                    except Exception as e:
+                        print(f"[GitHub] Unexpected error refreshing token: {type(e).__name__}: {e}")
+                        raise HTTPException(
+                            status_code=401,
+                            detail="Failed to refresh GitHub token. Please reconnect."
+                        )
+                else:
+                    print(f"[GitHub] Token expired but no installation_id stored")
                     return None
+        except ValueError as e:
+            print(f"[GitHub] Error parsing expires_at timestamp: {e}")
 
     return installation.get("token")
 
@@ -128,14 +150,16 @@ async def get_auth_url():
     """Get the GitHub OAuth authorization URL."""
     if not GITHUB_CLIENT_ID:
         raise HTTPException(status_code=500, detail="GITHUB_CLIENT_ID not configured")
-    
+
     # If using GitHub App with a known slug, use the installation flow
     # This enables the "Only select repositories" UI
     if GITHUB_APP_SLUG:
+        # Note: The GitHub App must have its "Setup URL" configured to FRONTEND_URL/new
+        # in the GitHub App settings for the redirect to work after installation
         return {
             "url": f"https://github.com/apps/{GITHUB_APP_SLUG}/installations/new"
         }
-        
+
     return {
         "url": f"https://github.com/login/oauth/authorize?client_id={GITHUB_CLIENT_ID}&redirect_uri={REDIRECT_URI}&scope=repo,user"
     }
@@ -154,36 +178,66 @@ async def connect_github(
         raise HTTPException(status_code=400, detail="installation_id required")
 
     try:
-        # Generate installation access token
-        token_data = await generate_installation_token(payload.installation_id)
+        # Step 1: Get installation info using App JWT (NOT installation token)
+        # This gives us the account info (username, avatar, etc.)
+        app_jwt = generate_github_app_jwt()
 
-        # Get user info using the installation token
         async with httpx.AsyncClient() as client:
-            user_resp = await client.get(
-                "https://api.github.com/user",
+            install_resp = await client.get(
+                f"https://api.github.com/app/installations/{payload.installation_id}",
                 headers={
-                    "Authorization": f"Bearer {token_data['token']}",
+                    "Authorization": f"Bearer {app_jwt}",
                     "Accept": "application/vnd.github+json",
                     "X-GitHub-Api-Version": "2022-11-28",
                 },
             )
 
-            if user_resp.status_code != 200:
+            if install_resp.status_code != 200:
+                print(f"[GitHub] Failed to get installation info: {install_resp.status_code} - {install_resp.text}")
                 raise HTTPException(
                     status_code=400,
-                    detail=f"Failed to fetch user info: {user_resp.text}"
+                    detail=f"Failed to get installation info: {install_resp.text}"
                 )
 
-            user_data = user_resp.json()
+            install_data = install_resp.json()
+            account = install_data.get("account", {})
+            print(f"[GitHub] Installation found for account: {account.get('login')}")
 
-        # Save installation data to DynamoDB
+        # Step 2: Generate installation access token
+        token_data = await generate_installation_token(payload.installation_id)
+
+        # Step 3: Validate that we can actually access repositories
+        async with httpx.AsyncClient() as client:
+            repos_resp = await client.get(
+                "https://api.github.com/installation/repositories",
+                headers={
+                    "Authorization": f"Bearer {token_data['token']}",
+                    "Accept": "application/vnd.github+json",
+                    "X-GitHub-Api-Version": "2022-11-28",
+                },
+                params={"per_page": 1},  # Just check access, don't fetch all
+            )
+
+            if repos_resp.status_code != 200:
+                print(f"[GitHub] Token cannot access repos: {repos_resp.status_code} - {repos_resp.text}")
+                raise HTTPException(
+                    status_code=400,
+                    detail="Installation token cannot access repositories. Please check app permissions."
+                )
+
+            repos_data = repos_resp.json()
+            total_count = repos_data.get("total_count", 0)
+            print(f"[GitHub] Successfully validated access to {total_count} repositories")
+
+        # Step 4: Save installation data to DynamoDB with correct account info
         save_github_token(
             user_id,
             token_data["token"],
             metadata={
-                "username": user_data.get("login"),
-                "github_id": user_data.get("id"),
-                "avatar_url": user_data.get("avatar_url"),
+                "username": account.get("login"),
+                "github_id": account.get("id"),
+                "avatar_url": account.get("avatar_url"),
+                "account_type": account.get("type"),  # "User" or "Organization"
             },
             installation_id=payload.installation_id,
             expires_at=token_data["expires_at"]
@@ -191,12 +245,15 @@ async def connect_github(
 
         return {
             "status": "connected",
-            "username": user_data.get("login"),
-            "installation_id": payload.installation_id
+            "username": account.get("login"),
+            "installation_id": payload.installation_id,
+            "repository_count": total_count,
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
-        print(f"❌ Error connecting GitHub: {e}")
+        print(f"[GitHub] Error connecting: {type(e).__name__}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -259,7 +316,14 @@ async def list_github_repos(user_id: str = Depends(get_current_user_id)):
 async def github_connection_status(user_id: str = Depends(get_current_user_id)):
     """Check if user has connected their GitHub App."""
     installation = get_github_installation(user_id)
-    return {"connected": installation is not None}
+
+    if not installation:
+        return {"connected": False}
+
+    return {
+        "connected": True,
+        "username": installation.get("metadata", {}).get("username"),
+    }
 
 
 @router.get("/repos/{repo:path}/contents")

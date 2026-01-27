@@ -1,12 +1,11 @@
 "use client";
 
-import { useSignIn, SignedIn, SignedOut } from "@clerk/nextjs";
+import { SignedIn, SignedOut } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
-import { ArrowRight } from "lucide-react";
 import Link from "next/link";
-import { trackEvent } from "@/lib/amplitude";
 
 import { GoogleSignInButton } from "@/components/GoogleSignInButton";
+import { GitHubButton } from "@/components/GitHubButton";
 
 const CTASection = () => {
     return (
@@ -31,15 +30,7 @@ const CTASection = () => {
                         </Link>
                     </SignedIn>
 
-                    <Link href="https://github.com/aryankashyap0/shorlabs" target="_blank">
-                        <Button
-                            variant="outline"
-                            className="group text-sm text-gray-700 border-gray-200 hover:border-gray-300 hover:bg-gray-50 px-5 py-2.5 rounded-lg transition-colors"
-                        >
-                            View on GitHub
-                            <ArrowRight className="w-4 h-4 ml-1.5 opacity-60 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" />
-                        </Button>
-                    </Link>
+                    <GitHubButton />
                 </div>
             </div>
         </section>

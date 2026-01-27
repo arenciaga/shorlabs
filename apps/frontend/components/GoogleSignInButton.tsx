@@ -59,11 +59,12 @@ export const GoogleSignInButton = ({
             className={`
                 inline-flex items-center justify-center gap-2.5
                 h-10 px-6
-                bg-zinc-900 text-white font-medium text-sm
+                bg-white text-gray-700 font-medium text-sm
                 rounded-full
+                border border-gray-300
                 shadow-sm
-                hover:bg-zinc-800
-                active:bg-zinc-950
+                hover:bg-gray-50 hover:border-gray-400
+                active:bg-gray-100
                 disabled:opacity-50 disabled:cursor-not-allowed
                 transition-all duration-150
                 cursor-pointer

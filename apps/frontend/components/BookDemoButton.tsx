@@ -2,6 +2,8 @@
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { getCalApi } from "@calcom/embed-react";
+import { useEffect } from "react";
 
 interface BookDemoButtonProps {
     className?: string;
@@ -12,8 +14,15 @@ interface BookDemoButtonProps {
 const BookDemoButton = ({
     className,
     size = "default",
-    children = "Contact"
+    children = "Schedule a Call"
 }: BookDemoButtonProps) => {
+    useEffect(() => {
+        (async function () {
+            const cal = await getCalApi({ namespace: "shorlabs-demo" });
+            cal("ui", { hideEventTypeDetails: false, layout: "month_view" });
+        })();
+    }, []);
+
     return (
         <Button
             className={cn(
@@ -21,11 +30,11 @@ const BookDemoButton = ({
                 className
             )}
             size={size}
-            asChild
+            data-cal-namespace="shorlabs-demo"
+            data-cal-link="aryan-kashyap/shorlabs-demo"
+            data-cal-config='{"layout":"month_view","useSlotsViewOnSmallScreen":"true"}'
         >
-            <a href="mailto:kashyaparyan093@gmail.com" className="no-underline">
-                {children}
-            </a>
+            {children}
         </Button>
     );
 };

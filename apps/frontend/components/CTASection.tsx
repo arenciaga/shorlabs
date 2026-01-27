@@ -6,6 +6,7 @@ import Link from "next/link";
 
 import { GoogleSignInButton } from "@/components/GoogleSignInButton";
 import { GitHubButton } from "@/components/GitHubButton";
+import { BookDemoButton } from "@/components/BookDemoButton";
 
 const CTASection = () => {
     return (
@@ -31,6 +32,8 @@ const CTASection = () => {
                     </SignedIn>
 
                     <GitHubButton />
+
+                    <BookDemoButton>Schedule a Call</BookDemoButton>
                 </div>
             </div>
         </section>

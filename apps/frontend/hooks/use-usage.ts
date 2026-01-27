@@ -52,10 +52,11 @@ const fetcher = async (url: string, token: string): Promise<Usage> => {
 }
 
 export function useUsage(isPro: boolean = false): UseUsageReturn {
-    const { getToken } = useAuth()
+    const { getToken, isLoaded } = useAuth()
 
+    // Only fetch when auth is loaded - setting key to null prevents SWR from fetching
     const { data, error, mutate, isLoading, isValidating } = useSWR<Usage>(
-        [`${API_BASE_URL}/api/projects/usage`, getToken],
+        isLoaded ? [`${API_BASE_URL}/api/projects/usage`, getToken] : null,
         async ([url, tokenGetter]) => {
             const token = await (tokenGetter as () => Promise<string | null>)()
             if (!token) {
@@ -88,8 +89,10 @@ export function useUsage(isPro: boolean = false): UseUsageReturn {
 
     return {
         usage: adjustedUsage,
-        loading: isLoading,
-        error,
+        // Show loading if auth isn't loaded yet OR if SWR is loading
+        loading: !isLoaded || isLoading,
+        // Don't show error if auth isn't loaded yet
+        error: isLoaded ? error : undefined,
         refresh: () => mutate(),
         isValidating,
     }

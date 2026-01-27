@@ -48,7 +48,7 @@ export default function ProjectsPage() {
     const { isOpen: upgradeOpen, openUpgradeModal, closeUpgradeModal } = useUpgradeModal()
 
     // Fetch real usage metrics with tier-appropriate limits
-    const { usage, loading: usageLoading, error: usageError } = useUsage(isPro ?? false)
+    const { usage, loading: usageLoading, error: usageError, isValidating } = useUsage(isPro ?? false)
 
     const fetchProjects = useCallback(async () => {
         try {
@@ -177,8 +177,8 @@ export default function ProjectsPage() {
                                 </p>
                             </div>
 
-                            {/* Loading State */}
-                            {usageLoading ? (
+                            {/* Loading State - show skeleton while loading or validating with no data */}
+                            {(usageLoading || (isValidating && !usage)) ? (
                                 <div className="divide-y divide-zinc-100 animate-pulse">
                                     <div className="px-5 py-4">
                                         <div className="h-4 bg-zinc-200 rounded w-3/4 mb-2"></div>
@@ -189,8 +189,8 @@ export default function ProjectsPage() {
                                         <div className="h-1 bg-zinc-200 rounded-full"></div>
                                     </div>
                                 </div>
-                            ) : usageError ? (
-                                /* Error State */
+                            ) : usageError && !usage ? (
+                                /* Error State - only show if we have NO data at all */
                                 <div className="px-5 py-6 text-center">
                                     <AlertCircle className="h-8 w-8 text-red-500 mx-auto mb-2" />
                                     <p className="text-sm text-zinc-600 mb-2">Failed to load usage</p>

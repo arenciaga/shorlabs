@@ -34,6 +34,7 @@ interface UseUsageReturn {
     loading: boolean
     error: Error | undefined
     refresh: () => void
+    isValidating: boolean
 }
 
 const fetcher = async (url: string, token: string): Promise<Usage> => {
@@ -53,7 +54,7 @@ const fetcher = async (url: string, token: string): Promise<Usage> => {
 export function useUsage(isPro: boolean = false): UseUsageReturn {
     const { getToken } = useAuth()
 
-    const { data, error, mutate, isLoading } = useSWR<Usage>(
+    const { data, error, mutate, isLoading, isValidating } = useSWR<Usage>(
         [`${API_BASE_URL}/api/projects/usage`, getToken],
         async ([url, tokenGetter]) => {
             const token = await (tokenGetter as () => Promise<string | null>)()
@@ -66,6 +67,8 @@ export function useUsage(isPro: boolean = false): UseUsageReturn {
             refreshInterval: 60000, // Refresh every 60 seconds
             revalidateOnFocus: true,
             dedupingInterval: 30000, // Prevent duplicate requests within 30 seconds
+            errorRetryCount: 3, // Retry up to 3 times on error
+            errorRetryInterval: 5000, // Wait 5 seconds between retries
         }
     )
 
@@ -88,5 +91,6 @@ export function useUsage(isPro: boolean = false): UseUsageReturn {
         loading: isLoading,
         error,
         refresh: () => mutate(),
+        isValidating,
     }
 }

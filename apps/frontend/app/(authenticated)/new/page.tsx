@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react"
 import { useUser, useAuth, useClerk } from "@clerk/nextjs"
 import { useRouter, useSearchParams } from "next/navigation"
-import { Github, Search, ArrowLeft, Lock, Globe, Loader2, AlertCircle, GitBranch, ArrowUpRight } from "lucide-react"
+import { Github, Search, ArrowLeft, Lock, Globe, Loader2, AlertCircle, GitBranch, ArrowUpRight, RefreshCw } from "lucide-react"
 import Link from "next/link"
 
 import { Button } from "@/components/ui/button"
@@ -19,6 +19,15 @@ interface GitHubRepo {
     language: string | null
     updated_at: string
 }
+
+// State machine for page loading states - prevents UI flicker
+type PageState =
+    | { status: 'initializing' }
+    | { status: 'checking_connection' }
+    | { status: 'not_connected' }
+    | { status: 'loading_repos' }
+    | { status: 'ready'; repos: GitHubRepo[] }
+    | { status: 'error'; message: string }
 
 const LANGUAGE_COLORS: Record<string, string> = {
     TypeScript: "bg-blue-500",
@@ -41,57 +50,86 @@ export default function ImportRepositoryPage() {
     const { user, isLoaded: userLoaded } = useUser()
     const { getToken } = useAuth()
     const { signOut } = useClerk()
-    const [repos, setRepos] = useState<GitHubRepo[]>([])
-    const [loading, setLoading] = useState(true)
-    const [error, setError] = useState<string | null>(null)
-    const [searchQuery, setSearchQuery] = useState("")
-
-    const [isConnected, setIsConnected] = useState(false)
     const searchParams = useSearchParams()
 
-    const fetchRepos = useCallback(async () => {
-        if (!user || !isConnected) {
-            setLoading(false)
+    // Single state machine for the entire page
+    const [pageState, setPageState] = useState<PageState>({ status: 'initializing' })
+    const [searchQuery, setSearchQuery] = useState("")
+
+    // Consolidated initialization function - checks connection AND fetches repos in sequence
+    const initializePage = useCallback(async () => {
+        if (!userLoaded) {
+            setPageState({ status: 'initializing' })
             return
         }
 
-        setLoading(true)
-        setError(null)
+        if (!user) {
+            // User not logged in - will be handled by auth middleware
+            return
+        }
+
+        setPageState({ status: 'checking_connection' })
+
         try {
-            const token = await getToken({ skipCache: true })
+            const token = await getToken()
             if (!token) {
                 signOut({ redirectUrl: "/sign-in" })
                 return
             }
 
-            const response = await fetch(`${API_BASE_URL}/api/github/repos`, {
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                },
+            // Step 1: Check GitHub connection status
+            console.log("🔍 Checking GitHub connection...")
+            const statusRes = await fetch(`${API_BASE_URL}/api/github/status`, {
+                headers: { Authorization: `Bearer ${token}` }
             })
 
-            if (!response.ok) {
-                const data = await response.json()
-                if (response.status === 401 && data.detail === "Token expired") {
+            if (!statusRes.ok) {
+                throw new Error('Failed to check connection status')
+            }
+
+            const statusData = await statusRes.json()
+            console.log("✅ Connection status:", statusData)
+
+            if (!statusData.connected) {
+                setPageState({ status: 'not_connected' })
+                return
+            }
+
+            // Step 2: Connected - now fetch repos before showing connected UI
+            setPageState({ status: 'loading_repos' })
+
+            const reposRes = await fetch(`${API_BASE_URL}/api/github/repos`, {
+                headers: { Authorization: `Bearer ${token}` }
+            })
+
+            if (!reposRes.ok) {
+                const data = await reposRes.json()
+                if (reposRes.status === 401 && data.detail === "Token expired") {
                     signOut({ redirectUrl: "/sign-in" })
                     return
                 }
-                throw new Error(data.detail || "Failed to fetch repos")
+                throw new Error(data.detail || 'Failed to fetch repositories')
             }
 
-            const data = await response.json()
-            setRepos(data)
-        } catch (err) {
-            console.error("Failed to fetch repos:", err)
-            setError(err instanceof Error ? err.message : "Failed to fetch repositories")
-        } finally {
-            setLoading(false)
-        }
-    }, [getToken, signOut, user, isConnected])
+            const repos = await reposRes.json()
+            setPageState({ status: 'ready', repos })
 
+        } catch (err) {
+            console.error("❌ Page initialization failed:", err)
+            setPageState({
+                status: 'error',
+                message: err instanceof Error ? err.message : 'Something went wrong'
+            })
+        }
+    }, [userLoaded, user, getToken, signOut])
+
+    // Run initialization when dependencies change
+    useEffect(() => {
+        initializePage()
+    }, [initializePage])
+
+    // Handle GitHub App installation callback (in popup)
     const connectGitHub = useCallback(async (installation_id: string, setup_action: string): Promise<boolean> => {
-        setLoading(true)
-        setError(null)
         try {
             const token = await getToken()
             if (!token) {
@@ -123,73 +161,37 @@ export default function ImportRepositoryPage() {
 
             // Only update state if we're NOT in a popup (parent window handles its own state)
             if (!window.opener) {
-                setIsConnected(true)
                 router.replace("/new")
+                // Re-initialize to load repos
+                initializePage()
             }
 
-            return true  // Success
+            return true
 
         } catch (err) {
             console.error("Failed to connect GitHub:", err)
-            setError(err instanceof Error ? err.message : "Failed to connect GitHub. Please try again.")
-
-            // Only update state if we're NOT in a popup
             if (!window.opener) {
-                router.replace("/new")
+                setPageState({
+                    status: 'error',
+                    message: err instanceof Error ? err.message : "Failed to connect GitHub. Please try again."
+                })
             }
-            setLoading(false)
-            throw err  // Re-throw so the caller knows it failed
+            throw err
         }
-    }, [getToken, router])
+    }, [getToken, router, initializePage])
 
-    // Check connection status - defined outside useEffect so it can be reused
-    const checkConnection = useCallback(async () => {
-        if (!userLoaded || !user) return
-        try {
-            const token = await getToken()
-            console.log("🔍 Checking GitHub connection...")
-            const response = await fetch(`${API_BASE_URL}/api/github/status`, {
-                headers: { Authorization: `Bearer ${token}` }
-            })
-            if (response.ok) {
-                const data = await response.json()
-                console.log("✅ Connection status:", data)
-                setIsConnected(data.connected)
-            } else {
-                console.error("❌ Connection check failed:", response.status)
-            }
-        } catch (err) {
-            console.error("❌ Failed to check GitHub status:", err)
-        }
-    }, [userLoaded, user, getToken])
-
-    // Check connection status on load
-    useEffect(() => {
-        checkConnection()
-    }, [checkConnection])
-
-    // Trigger repo fetch when connected
-    useEffect(() => {
-        if (isConnected && userLoaded) {
-            fetchRepos()
-        }
-    }, [isConnected, userLoaded, fetchRepos])
-
-    // Handle GitHub App installation callback
+    // Handle GitHub App installation callback from URL params
     useEffect(() => {
         const installation_id = searchParams.get("installation_id")
         const setup_action = searchParams.get("setup_action")
 
         if (installation_id && userLoaded) {
-            // User just completed GitHub App installation (in popup)
             console.log("📥 GitHub App installation callback received:", { installation_id, setup_action })
 
-            // Call connectGitHub and wait for it to complete before notifying parent
             const handleCallback = async () => {
                 try {
                     await connectGitHub(installation_id, setup_action || "install")
 
-                    // If we're in a popup, notify the parent window and close AFTER connection succeeds
                     if (window.opener) {
                         console.log("✅ Connection complete, notifying parent window")
                         window.opener.postMessage({ type: 'github-connected' }, window.location.origin)
@@ -197,7 +199,6 @@ export default function ImportRepositoryPage() {
                     }
                 } catch (err) {
                     console.error("❌ GitHub connection failed in popup:", err)
-                    // Still notify parent so it can show an error
                     if (window.opener) {
                         window.opener.postMessage({ type: 'github-connection-failed' }, window.location.origin)
                         window.close()
@@ -212,18 +213,17 @@ export default function ImportRepositoryPage() {
     // Listen for messages from popup window
     useEffect(() => {
         const handleMessage = (event: MessageEvent) => {
-            // Verify the origin
             if (event.origin !== window.location.origin) return
 
             if (event.data.type === 'github-connected') {
-                // Refresh connection status
-                checkConnection()
+                // Re-run full initialization to get fresh state and repos
+                initializePage()
             }
         }
 
         window.addEventListener('message', handleMessage)
         return () => window.removeEventListener('message', handleMessage)
-    }, [checkConnection])
+    }, [initializePage])
 
     const handleConnectGitHub = async () => {
         try {
@@ -236,7 +236,6 @@ export default function ImportRepositoryPage() {
 
             const data = await response.json()
             if (data && data.url) {
-                // Open GitHub installation in a popup window
                 const width = 600
                 const height = 800
                 const left = window.screenX + (window.outerWidth - width) / 2
@@ -253,7 +252,10 @@ export default function ImportRepositoryPage() {
 
         } catch (err) {
             console.error("Failed to initiate GitHub connection:", err)
-            setError("Failed to initiate connection. Please try again.")
+            setPageState({
+                status: 'error',
+                message: "Failed to initiate connection. Please try again."
+            })
         }
     }
 
@@ -261,6 +263,8 @@ export default function ImportRepositoryPage() {
         router.push(`/new/configure?repo=${encodeURIComponent(repoFullName)}`)
     }
 
+    // Derive values from state for rendering
+    const repos = pageState.status === 'ready' ? pageState.repos : []
     const filteredRepos = repos.filter(repo =>
         repo.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         repo.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -297,23 +301,30 @@ export default function ImportRepositoryPage() {
                     <p className="text-sm text-zinc-500 mt-1">Import a Git repository to deploy</p>
                 </div>
 
-                {/* Error State */}
-                {error && (
-                    <div className="flex items-start gap-3 text-sm bg-red-50 p-4 rounded-2xl border border-red-100 mb-6">
-                        <AlertCircle className="h-5 w-5 text-red-500 shrink-0 mt-0.5" />
-                        <div>
-                            <p className="font-medium text-red-900">Something went wrong</p>
-                            <p className="text-red-600 mt-0.5">{error}</p>
-                        </div>
-                    </div>
-                )}
-
-                {/* Main Content */}
-                {!userLoaded ? (
+                {/* Main Content - State Machine Rendering */}
+                {(pageState.status === 'initializing' || pageState.status === 'checking_connection') ? (
+                    // Full page spinner while initializing or checking connection
                     <div className="flex items-center justify-center py-20">
                         <Loader2 className="h-6 w-6 animate-spin text-zinc-400" />
                     </div>
-                ) : !isConnected ? (
+                ) : pageState.status === 'error' ? (
+                    // Error state with retry
+                    <div className="bg-white rounded-2xl border border-zinc-200 p-12 text-center">
+                        <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-4">
+                            <AlertCircle className="h-6 w-6 text-red-500" />
+                        </div>
+                        <h2 className="text-lg font-semibold text-zinc-900 mb-2">Something went wrong</h2>
+                        <p className="text-sm text-zinc-500 mb-6 max-w-sm mx-auto">{pageState.message}</p>
+                        <Button
+                            onClick={() => initializePage()}
+                            variant="outline"
+                            className="rounded-full"
+                        >
+                            <RefreshCw className="h-4 w-4 mr-2" />
+                            Try Again
+                        </Button>
+                    </div>
+                ) : pageState.status === 'not_connected' ? (
                     // Connect GitHub CTA
                     <div className="bg-white rounded-2xl border border-zinc-200 p-12 text-center hover:shadow-lg hover:shadow-zinc-900/5 transition-shadow">
                         <div className="w-16 h-16 rounded-2xl bg-zinc-900 flex items-center justify-center mx-auto mb-6">
@@ -334,7 +345,7 @@ export default function ImportRepositoryPage() {
                         </Button>
                     </div>
                 ) : (
-                    // Repository List
+                    // Connected states: loading_repos OR ready
                     <div className="space-y-6">
                         {/* GitHub Account Card */}
                         <div className="bg-white rounded-2xl border border-zinc-200 overflow-hidden hover:shadow-lg hover:shadow-zinc-900/5 transition-shadow">
@@ -374,8 +385,8 @@ export default function ImportRepositoryPage() {
                                 </div>
                             </div>
 
-                            {/* Loading state */}
-                            {loading ? (
+                            {/* Loading state - show skeleton when loading repos */}
+                            {pageState.status === 'loading_repos' ? (
                                 <div className="divide-y divide-zinc-100">
                                     {[1, 2, 3, 4, 5].map(i => (
                                         <div key={i} className="px-4 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">

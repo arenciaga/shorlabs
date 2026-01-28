@@ -902,12 +902,11 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                             <StartCommandInput
                                 value={editingStartCommand ? startCommandValue : (project.start_command || "")}
                                 onChange={setStartCommandValue}
-                                showPortWarning={false}
-                                readOnly={!editingStartCommand}
-                                isEditing={editingStartCommand}
+                                disabled={!editingStartCommand}
                                 onStartEdit={startEditingStartCommand}
-                                onCancelEdit={() => setEditingStartCommand(false)}
+                                isEditMode={editingStartCommand}
                                 onSave={saveStartCommand}
+                                onCancel={() => setEditingStartCommand(false)}
                                 isSaving={savingStartCommand}
                             />
 

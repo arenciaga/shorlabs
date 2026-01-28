@@ -509,7 +509,6 @@ function ConfigureProjectContent() {
                         <StartCommandInput
                             value={startCommand}
                             onChange={setStartCommand}
-                            showPortWarning={true}
                         />
                     </div>
                 )}

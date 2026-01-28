@@ -22,7 +22,8 @@ import {
     Clock,
     Check,
     Sparkles,
-    HardDrive
+    HardDrive,
+    Lock
 } from "lucide-react"
 import Link from "next/link"
 
@@ -69,6 +70,7 @@ function ConfigureProjectContent() {
     const { isOpen: upgradeOpen, openUpgradeModal, closeUpgradeModal } = useUpgradeModal()
 
     const repoFullName = searchParams.get("repo") || ""
+    const isPrivateRepo = searchParams.get("private") === "true"
     const [, repoName] = repoFullName.split("/")
 
     const [projectName, setProjectName] = useState(repoName || "")
@@ -403,24 +405,29 @@ function ConfigureProjectContent() {
                     )}
                 </div>
 
-                {/* Source Card */}
-                <div className="bg-white rounded-2xl border border-zinc-200 p-4 sm:p-5 mb-6">
-                    <div className="flex items-center gap-2 text-zinc-500 mb-3">
-                        <Github className="h-4 w-4" />
-                        <span className="text-xs font-medium uppercase tracking-wider">Importing from GitHub</span>
-                    </div>
-                    <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
-                        <div className="w-12 h-12 rounded-xl bg-zinc-900 flex items-center justify-center shrink-0">
-                            <Github className="h-6 w-6 text-white" />
+                {/* Source Card - Compact inline layout */}
+                <div className="bg-white rounded-2xl border border-zinc-200 px-4 py-3 mb-6">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-lg bg-zinc-900 flex items-center justify-center shrink-0">
+                            <Github className="h-5 w-5 text-white" />
                         </div>
                         <div className="flex-1 min-w-0">
-                            <div className="font-semibold text-zinc-900 truncate text-base sm:text-lg">{repoFullName}</div>
-                            <div className="flex items-center gap-2 text-sm text-zinc-500 mt-0.5">
-                                <GitBranch className="h-3.5 w-3.5" />
+                            <div className="font-semibold text-zinc-900 truncate">{repoFullName}</div>
+                            <div className="flex items-center gap-2 text-xs text-zinc-500 mt-0.5">
+                                <GitBranch className="h-3 w-3" />
                                 <span>main</span>
                                 <span className="text-zinc-300">•</span>
-                                <Globe className="h-3.5 w-3.5" />
-                                <span>Public</span>
+                                {isPrivateRepo ? (
+                                    <>
+                                        <Lock className="h-3 w-3" />
+                                        <span>Private</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <Globe className="h-3 w-3" />
+                                        <span>Public</span>
+                                    </>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -460,52 +467,55 @@ function ConfigureProjectContent() {
                 {/* General Section */}
                 {activeSection === "general" && (
                     <div className="space-y-6">
-                        {/* Project Name */}
-                        <div className="bg-white rounded-2xl border border-zinc-200 overflow-hidden ">
-                            <div className="flex items-center gap-3 px-4 sm:px-6 py-4 border-b border-zinc-100">
-                                <FileText className="h-5 w-5 text-zinc-400" />
-                                <h3 className="font-semibold text-zinc-900">Project Name</h3>
-                            </div>
-                            <div className="p-4 sm:p-6">
-                                <Input
-                                    value={projectName}
-                                    onChange={(e) => setProjectName(e.target.value)}
-                                    placeholder="my-awesome-project"
-                                    className="h-12 text-sm border-zinc-200 rounded-xl font-medium"
-                                />
-                                <p className="text-sm text-zinc-500 mt-3">
-                                    This will be your project&apos;s display name and will be used in your deployment URL.
-                                </p>
-                            </div>
-                        </div>
-
-                        {/* Root Directory */}
-                        <div className="bg-white rounded-2xl border border-zinc-200 overflow-hidden ">
-                            <div className="flex items-center gap-3 px-4 sm:px-6 py-4 border-b border-zinc-100">
-                                <Folder className="h-5 w-5 text-zinc-400" />
-                                <h3 className="font-semibold text-zinc-900">Root Directory</h3>
-                            </div>
-                            <div className="p-4 sm:p-6">
-                                <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                                    <div className="flex-1 flex items-center gap-3 bg-zinc-50 rounded-xl px-4 py-3.5 border border-zinc-100 min-w-0">
-                                        <Folder className="h-4 w-4 text-zinc-400 shrink-0" />
-                                        <span className="font-mono text-sm text-zinc-700 truncate">{rootDirectory}</span>
-                                    </div>
-                                    <Button
-                                        variant="outline"
-                                        onClick={openDirectoryPicker}
-                                        className="h-12 rounded-xl shrink-0 px-5 w-full sm:w-auto"
-                                    >
-                                        Edit
-                                    </Button>
+                        {/* Project Name + Root Directory - Side by side */}
+                        <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+                            {/* Project Name - Takes 3 columns */}
+                            <div className="lg:col-span-3 bg-white rounded-2xl border border-zinc-200 overflow-hidden">
+                                <div className="flex items-center gap-3 px-4 sm:px-6 py-4 border-b border-zinc-100">
+                                    <FileText className="h-5 w-5 text-zinc-400" />
+                                    <h3 className="font-semibold text-zinc-900">Project Name</h3>
                                 </div>
-                                <p className="text-sm text-zinc-500 mt-3">
-                                    The directory where your app is located. Useful for monorepos with multiple projects.
-                                </p>
+                                <div className="p-4 sm:p-6">
+                                    <Input
+                                        value={projectName}
+                                        onChange={(e) => setProjectName(e.target.value)}
+                                        placeholder="my-awesome-project"
+                                        className="h-12 text-sm border-zinc-200 rounded-xl font-medium"
+                                    />
+                                    <p className="text-xs text-zinc-500 mt-2">
+                                        Used in your deployment URL
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Root Directory - Takes 2 columns */}
+                            <div className="lg:col-span-2 bg-white rounded-2xl border border-zinc-200 overflow-hidden">
+                                <div className="flex items-center gap-3 px-4 sm:px-6 py-4 border-b border-zinc-100">
+                                    <Folder className="h-5 w-5 text-zinc-400" />
+                                    <h3 className="font-semibold text-zinc-900">Root Directory</h3>
+                                </div>
+                                <div className="p-4 sm:p-6">
+                                    <div className="flex items-center gap-3">
+                                        <div className="flex-1 flex items-center gap-3 bg-zinc-50 rounded-xl px-4 py-3.5 border border-zinc-100 min-w-0">
+                                            <Folder className="h-4 w-4 text-zinc-400 shrink-0" />
+                                            <span className="font-mono text-sm text-zinc-700 truncate">{rootDirectory}</span>
+                                        </div>
+                                        <Button
+                                            variant="outline"
+                                            onClick={openDirectoryPicker}
+                                            className="h-12 rounded-xl shrink-0 px-4"
+                                        >
+                                            Edit
+                                        </Button>
+                                    </div>
+                                    <p className="text-xs text-zinc-500 mt-2">
+                                        For monorepo projects
+                                    </p>
+                                </div>
                             </div>
                         </div>
 
-                        {/* Start Command */}
+                        {/* Start Command - Full width */}
                         <StartCommandInput
                             value={startCommand}
                             onChange={setStartCommand}
@@ -529,16 +539,20 @@ function ConfigureProjectContent() {
 
                 {/* Environment Section */}
                 {activeSection === "environment" && (
-                    <div className="space-y-6">
-                        {/* Environment Variables */}
-                        <EnvironmentVariablesEditor
-                            envVars={envVars}
-                            onChange={setEnvVars}
-                            showImport={true}
-                        />
+                    <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+                        {/* Environment Variables - Takes 3 columns */}
+                        <div className="lg:col-span-3">
+                            <EnvironmentVariablesEditor
+                                envVars={envVars}
+                                onChange={setEnvVars}
+                                showImport={true}
+                            />
+                        </div>
 
-                        {/* Security Note */}
-                        <EnvironmentVariablesSecurityNote />
+                        {/* Security Note - Takes 2 columns */}
+                        <div className="lg:col-span-2">
+                            <EnvironmentVariablesSecurityNote />
+                        </div>
                     </div>
                 )}
             </div>

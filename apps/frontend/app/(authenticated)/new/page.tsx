@@ -259,8 +259,8 @@ export default function ImportRepositoryPage() {
         }
     }
 
-    const handleImport = (repoFullName: string) => {
-        router.push(`/new/configure?repo=${encodeURIComponent(repoFullName)}`)
+    const handleImport = (repo: GitHubRepo) => {
+        router.push(`/new/configure?repo=${encodeURIComponent(repo.full_name)}&private=${repo.private}`)
     }
 
     // Derive values from state for rendering
@@ -484,7 +484,7 @@ export default function ImportRepositoryPage() {
 
                                             {/* Import Button */}
                                             <Button
-                                                onClick={() => handleImport(repo.full_name)}
+                                                onClick={() => handleImport(repo)}
                                                 variant="outline"
                                                 className="rounded-full h-9 px-5 text-sm shrink-0 border-zinc-200 hover:bg-zinc-900 hover:text-white hover:border-zinc-900 transition-all w-full sm:w-auto"
                                             >

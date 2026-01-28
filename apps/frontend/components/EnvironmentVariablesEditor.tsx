@@ -385,14 +385,14 @@ export function EnvironmentVariablesEditor({
 /** Security note component for environment variables */
 export function EnvironmentVariablesSecurityNote() {
     return (
-        <div className="bg-white rounded-2xl border border-zinc-200 p-6">
-            <div className="flex items-start gap-4">
-                <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center shrink-0">
-                    <Settings2 className="h-5 w-5 text-emerald-600" />
+        <div className="bg-white rounded-2xl border border-zinc-200 p-6 h-full flex flex-col justify-center">
+            <div className="flex flex-col items-center text-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-emerald-50 flex items-center justify-center shrink-0">
+                    <Settings2 className="h-6 w-6 text-emerald-600" />
                 </div>
                 <div>
-                    <h4 className="font-semibold text-zinc-900 mb-1">Encrypted & Secure</h4>
-                    <p className="text-sm text-zinc-500">
+                    <h4 className="font-semibold text-zinc-900 mb-2">Encrypted & Secure</h4>
+                    <p className="text-sm text-zinc-500 leading-relaxed">
                         All environment variables are encrypted at rest and in transit. They are never exposed in build logs or the client-side bundle.
                     </p>
                 </div>

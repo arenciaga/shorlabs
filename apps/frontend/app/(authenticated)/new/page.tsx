@@ -9,7 +9,7 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://api.shorlabs.com"
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 
 interface GitHubRepo {
     id: number
@@ -310,9 +310,9 @@ export default function ImportRepositoryPage() {
                 ) : pageState.status === 'error' ? (
                     // Error state - show reconnect button if GitHub token issue
                     pageState.message.toLowerCase().includes('token') ||
-                    pageState.message.toLowerCase().includes('expired') ||
-                    pageState.message.toLowerCase().includes('invalid') ||
-                    pageState.message.toLowerCase().includes('reconnect') ? (
+                        pageState.message.toLowerCase().includes('expired') ||
+                        pageState.message.toLowerCase().includes('invalid') ||
+                        pageState.message.toLowerCase().includes('reconnect') ? (
                         // GitHub connection issue - show Connect button
                         <div className="bg-white rounded-2xl border border-zinc-200 p-12 text-center hover:shadow-lg hover:shadow-zinc-900/5 transition-shadow">
                             <div className="w-16 h-16 rounded-2xl bg-zinc-900 flex items-center justify-center mx-auto mb-6">

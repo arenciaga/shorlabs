@@ -429,7 +429,10 @@ async def get_runtime_logs(
     if project.get("user_id") != user_id:
         raise HTTPException(status_code=403, detail="Not authorized")
     
-    project_name = extract_project_name(project["github_url"])
+    # Use stored function_name if available (new deployments), otherwise derive from github_url (old deployments)
+    project_name = project.get("function_name")
+    if not project_name:
+        project_name = extract_project_name(project["github_url"])
     logs = get_lambda_logs(project_name)
     
     return {

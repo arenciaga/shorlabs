@@ -1,32 +1,31 @@
 "use client";
 
 import { useState } from "react";
-import Image from "next/image";
 
 const steps = [
     {
         number: "01",
         title: "Connect",
         description: "Link your GitHub account and select a repository.",
-        image: "/images/1.png",
+        video: "/1.mp4",
     },
     {
         number: "02",
         title: "Configure",
         description: "Set project name, directory, and start command.",
-        image: "/images/2.png",
+        video: "/2.mp4",
     },
     {
         number: "03",
         title: "Customize",
         description: "Choose memory, timeout, and add environment variables.",
-        image: "/images/3.png",
+        video: "/3.mp4",
     },
     {
         number: "04",
         title: "Deploy",
         description: "One click. Your backend is live.",
-        image: "/images/4.png",
+        video: "/4.mp4",
     },
 ];
 
@@ -52,8 +51,8 @@ const HowItWorksSection = () => {
 
             {/* Main Content */}
             <div className="w-full max-w-5xl mx-auto px-4 sm:px-6 pb-16 sm:pb-24">
-                {/* Mobile & Tablet: Steps above image */}
-                {/* Desktop: Steps on left, image on right */}
+                {/* Mobile & Tablet: Steps above video */}
+                {/* Desktop: Steps on left, video on right */}
                 <div className="flex flex-col lg:flex-row lg:gap-12">
 
                     {/* Steps Navigation */}
@@ -127,17 +126,20 @@ const HowItWorksSection = () => {
                         </div>
                     </div>
 
-                    {/* Image Display */}
+                    {/* Video Display */}
                     <div className="lg:w-2/3">
                         <div className="relative rounded-xl sm:rounded-2xl overflow-hidden bg-white border border-gray-200 shadow-sm">
-                            <Image
-                                src={steps[activeStep].image}
-                                alt={`Step ${steps[activeStep].number}: ${steps[activeStep].title}`}
-                                width={1200}
-                                height={675}
+                            <video
+                                key={steps[activeStep].video}
+                                src={steps[activeStep].video}
+                                autoPlay
+                                muted
+                                loop
+                                playsInline
                                 className="w-full h-auto"
-                                priority={activeStep === 0}
-                            />
+                            >
+                                Your browser does not support the video tag.
+                            </video>
                         </div>
 
                         {/* Description - Mobile & Tablet only */}

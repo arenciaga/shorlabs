@@ -49,9 +49,7 @@ const HeroSection = () => {
                                 </Button>
                             </Link>
                         ) : (
-                            <div className="w-full sm:w-auto">
-                                <GoogleSignInButton source="hero_section" />
-                            </div>
+                            <GoogleSignInButton source="hero_section" className="w-full sm:w-auto" />
                         )}
 
                         <GitHubButton className="w-full sm:w-auto" />

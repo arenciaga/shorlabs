@@ -47,7 +47,7 @@ const CTASection = () => {
                                 </Button>
                             </Link>
                         ) : (
-                            <GoogleSignInButton source="cta_section" />
+                            <GoogleSignInButton source="cta_section" className="w-full sm:w-auto" />
                         )}
 
                         <GitHubButton className="w-full sm:w-auto" />

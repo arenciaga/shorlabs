@@ -14,8 +14,9 @@ from decimal import Decimal
 import boto3
 from boto3.dynamodb.conditions import Key
 
-# Table name
+# Table names
 TABLE_NAME = os.environ.get("DYNAMODB_TABLE", "shorlabs-projects")
+DEPLOYMENTS_TABLE_NAME = os.environ.get("DEPLOYMENTS_TABLE", "shorlabs-deployments")
 
 # Shorlabs domain for custom URLs
 SHORLABS_DOMAIN = os.environ.get("SHORLABS_DOMAIN", "shorlabs.com")
@@ -25,7 +26,12 @@ dynamodb = boto3.resource("dynamodb")
 
 
 def get_or_create_table():
-    """Get or create the DynamoDB table."""
+    """
+    Backwards-compatible helper for the *projects* table.
+    
+    NOTE: Deployments now live in a separate table. For deployments, use
+    get_or_create_deployments_table instead.
+    """
     try:
         table = dynamodb.Table(TABLE_NAME)
         table.load()
@@ -58,6 +64,39 @@ def get_or_create_table():
     )
     table.wait_until_exists()
     print(f"✅ Created DynamoDB table: {TABLE_NAME}")
+    return table
+
+
+def get_or_create_deployments_table():
+    """
+    Get or create the dedicated deployments table.
+    
+    Schema:
+      - PK: project_id (HASH)
+      - SK: sort key, e.g. "DEPLOY#<ts>#<deploy_id>"
+    """
+    try:
+        table = dynamodb.Table(DEPLOYMENTS_TABLE_NAME)
+        table.load()
+        return table
+    except dynamodb.meta.client.exceptions.ResourceNotFoundException:
+        pass
+
+    print(f"📦 Creating DynamoDB deployments table: {DEPLOYMENTS_TABLE_NAME}")
+    table = dynamodb.create_table(
+        TableName=DEPLOYMENTS_TABLE_NAME,
+        KeySchema=[
+            {"AttributeName": "project_id", "KeyType": "HASH"},
+            {"AttributeName": "SK", "KeyType": "RANGE"},
+        ],
+        AttributeDefinitions=[
+            {"AttributeName": "project_id", "AttributeType": "S"},
+            {"AttributeName": "SK", "AttributeType": "S"},
+        ],
+        BillingMode="PAY_PER_REQUEST",
+    )
+    table.wait_until_exists()
+    print(f"✅ Created DynamoDB deployments table: {DEPLOYMENTS_TABLE_NAME}")
     return table
 
 
@@ -284,16 +323,18 @@ def delete_project(project_id: str) -> bool:
     project = get_project(project_id)
     if not project:
         return False
+    
+    projects_table = get_or_create_table()
+    deployments_table = get_or_create_deployments_table()
 
-    table = get_or_create_table()
-
-    # Delete all deployments
+    # Delete all deployments for this project from the deployments table
     deployments = list_deployments(project_id)
-    for d in deployments:
-        table.delete_item(Key={"PK": d["PK"], "SK": d["SK"]})
+    with deployments_table.batch_writer() as batch:
+        for d in deployments:
+            batch.delete_item(Key={"project_id": d["project_id"], "SK": d["SK"]})
 
-    # Delete project
-    table.delete_item(Key={"PK": project["PK"], "SK": project["SK"]})
+    # Delete project from projects table
+    projects_table.delete_item(Key={"PK": project["PK"], "SK": project["SK"]})
     return True
 
 
@@ -306,17 +347,16 @@ def create_deployment(
     project_id: str,
     build_id: str,
 ) -> dict:
-    """Create a new deployment record."""
-    table = get_or_create_table()
+    """Create a new deployment record in the deployments table."""
+    table = get_or_create_deployments_table()
     deploy_id = generate_deploy_id()
     now = datetime.utcnow().isoformat()
     timestamp = int(time.time())
 
     item = {
-        "PK": f"PROJECT#{project_id}",
+        "project_id": project_id,
         "SK": f"DEPLOY#{timestamp}#{deploy_id}",
         "deploy_id": deploy_id,
-        "project_id": project_id,
         "build_id": build_id,
         "status": "IN_PROGRESS",
         "logs_url": None,
@@ -329,9 +369,9 @@ def create_deployment(
 
 def list_deployments(project_id: str) -> list:
     """List all deployments for a project (newest first)."""
-    table = get_or_create_table()
+    table = get_or_create_deployments_table()
     response = table.query(
-        KeyConditionExpression=Key("PK").eq(f"PROJECT#{project_id}")
+        KeyConditionExpression=Key("project_id").eq(project_id)
         & Key("SK").begins_with("DEPLOY#"),
         ScanIndexForward=False,  # Newest first
     )
@@ -355,11 +395,11 @@ def get_deployment(project_id: str, deploy_id: str) -> Optional[dict]:
 
 def update_deployment(project_id: str, deploy_id: str, updates: dict) -> Optional[dict]:
     """Update a deployment."""
-    table = get_or_create_table()
+    table = get_or_create_deployments_table()
 
-    # Find the deployment
+    # Find the deployment (by deploy_id within the project's deployments)
     deployments = list_deployments(project_id)
-    deployment = next((d for d in deployments if d["deploy_id"] == deploy_id), None)
+    deployment = next((d for d in deployments if d.get("deploy_id") == deploy_id), None)
     if not deployment:
         return None
 
@@ -368,7 +408,7 @@ def update_deployment(project_id: str, deploy_id: str, updates: dict) -> Optiona
     expr_values = {f":{k}": v for k, v in updates.items()}
 
     response = table.update_item(
-        Key={"PK": deployment["PK"], "SK": deployment["SK"]},
+        Key={"project_id": deployment["project_id"], "SK": deployment["SK"]},
         UpdateExpression=update_expr,
         ExpressionAttributeNames=expr_names,
         ExpressionAttributeValues=expr_values,

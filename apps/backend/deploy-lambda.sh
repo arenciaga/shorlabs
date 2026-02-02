@@ -13,19 +13,8 @@ echo -e "${GREEN}Shorlabs Backend - Lambda Deployment${NC}"
 echo -e "${GREEN}Single Lambda + SQS Architecture${NC}"
 echo -e "${GREEN}========================================${NC}\n"
 
-# Read environment variables from .env file
-if [ -f .env ]; then
-    # Load simple variables (excluding multi-line ones)
-    export $(cat .env | grep -v '^#' | grep -v 'GITHUB_PRIVATE_KEY' | xargs)
-
-    # Load GITHUB_PRIVATE_KEY separately (handles multi-line)
-    GITHUB_PRIVATE_KEY=$(grep 'GITHUB_PRIVATE_KEY=' .env | cut -d '=' -f 2- | tr -d '"')
-    export GITHUB_PRIVATE_KEY
-
-    echo -e "${GREEN}✓ Loaded environment variables from .env${NC}\n"
-else
-    echo -e "${YELLOW}Note: .env file not found, using shell environment variables${NC}"
-fi
+# Note: Environment variables must be set in the shell before running this script
+# The script will use existing shell environment variables
 
 # Configuration
 AWS_REGION="us-east-1"

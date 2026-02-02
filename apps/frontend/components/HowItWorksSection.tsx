@@ -136,7 +136,10 @@ const HowItWorksSection = () => {
                                 muted
                                 loop
                                 playsInline
+                                preload="metadata"
                                 className="w-full h-auto"
+                                width={1920}
+                                height={1080}
                             >
                                 Your browser does not support the video tag.
                             </video>

@@ -46,8 +46,8 @@ export function AmplitudeProvider({ children }: AmplitudeProviderProps) {
         initAmplitude({
             apiKey,
             sessionReplayOptions: {
-                // Capture 100% of sessions in development, adjust for production
-                sampleRate: process.env.NODE_ENV === 'production' ? 1.0 : 1.0,
+                // Capture 10% of sessions in production to reduce overhead
+                sampleRate: process.env.NODE_ENV === 'production' ? 0.1 : 1.0,
                 privacyConfig: {
                     defaultMaskLevel: 'medium',
                     // Block sensitive elements from recording

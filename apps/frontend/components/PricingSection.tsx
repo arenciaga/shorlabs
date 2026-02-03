@@ -67,56 +67,55 @@ const PricingSection = () => {
 
             {/* Pricing Cards */}
             <div className="w-full max-w-4xl mx-auto px-4 sm:px-6 pb-16 sm:pb-24">
-                <div className="bg-gray-50 rounded-xl sm:rounded-2xl border border-gray-100 p-4 sm:p-6 lg:p-8">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-                        {plans.map((plan) => (
-                            <Card
-                                key={plan.name}
-                                className="bg-white border-gray-100 shadow-none"
-                            >
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+                    {plans.map((plan) => (
+                        <div key={plan.name} className="dark">
+                            <Card className="h-full border-gray-800">
                                 <CardHeader>
-                                    <CardTitle className="text-lg text-gray-900">
+                                    <CardTitle className="text-xl">
                                         {plan.name}
                                     </CardTitle>
-                                    <CardDescription>
-                                        {plan.description}
-                                    </CardDescription>
                                 </CardHeader>
 
                                 <CardContent className="flex flex-col gap-6">
                                     {/* Price */}
                                     <div>
-                                        <div className="mb-1">
-                                            <span className="text-3xl sm:text-4xl font-semibold text-gray-900">
+                                        <div className="flex items-baseline gap-1">
+                                            <span className="text-4xl sm:text-5xl font-medium">
                                                 {plan.price}
                                             </span>
                                             {plan.period && (
-                                                <span className="text-gray-400 text-sm">
+                                                <span className="text-muted-foreground text-sm">
                                                     {plan.period}
                                                 </span>
                                             )}
                                         </div>
-                                        <p className="text-sm text-gray-400">
+                                        <CardDescription className="mt-2">
                                             {plan.subtext}
-                                        </p>
+                                        </CardDescription>
                                     </div>
 
+                                    {/* Description */}
+                                    <p className="text-sm">
+                                        {plan.description}
+                                    </p>
+
                                     {/* Features */}
-                                    <ul className="space-y-3">
+                                    <ul className="space-y-4 pt-2">
                                         {plan.features.map((feature) => (
                                             <li
                                                 key={feature}
-                                                className="flex items-center gap-3 text-sm text-gray-600"
+                                                className="flex items-center gap-3 text-sm text-muted-foreground"
                                             >
-                                                <Check className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                                                <Check className="w-4 h-4 flex-shrink-0" />
                                                 {feature}
                                             </li>
                                         ))}
                                     </ul>
                                 </CardContent>
                             </Card>
-                        ))}
-                    </div>
+                        </div>
+                    ))}
                 </div>
             </div>
         </section>

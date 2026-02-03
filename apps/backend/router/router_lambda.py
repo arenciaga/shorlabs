@@ -29,6 +29,12 @@ dynamodb = boto3.resource('dynamodb', config=dynamodb_config)
 TABLE_NAME = 'shorlabs-projects'
 RESERVED_SUBDOMAINS = {'www', 'api', 'app', 'admin', 'dashboard', 'docs'}
 
+# Subdomains that should be proxied to external services (not user projects)
+EXTERNAL_SUBDOMAINS = {
+    'accounts': 'accounts.clerk.services',
+    'clerk': 'frontend-api.clerk.services',
+}
+
 
 def handler(event, context):
     """
@@ -51,9 +57,26 @@ def handler(event, context):
     
     subdomain = parts[0].lower()
     
-    # Skip reserved subdomains
+    # Skip reserved subdomains (return error)
     if subdomain in RESERVED_SUBDOMAINS:
         return _error_response(400, "Reserved", f"'{subdomain}' is a reserved subdomain")
+
+    # Proxy external subdomains (like accounts -> Clerk)
+    if subdomain in EXTERNAL_SUBDOMAINS:
+        external_domain = EXTERNAL_SUBDOMAINS[subdomain]
+        request['origin'] = {
+            'custom': {
+                'domainName': external_domain,
+                'port': 443,
+                'protocol': 'https',
+                'sslProtocols': ['TLSv1.2'],
+                'readTimeout': 30,
+                'keepaliveTimeout': 5,
+                'customHeaders': {}
+            }
+        }
+        request['headers']['host'] = [{'key': 'Host', 'value': external_domain}]
+        return request
     
     # Look up project by subdomain in DynamoDB
     project = _lookup_project_by_subdomain(subdomain)

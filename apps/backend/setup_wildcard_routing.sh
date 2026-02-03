@@ -169,6 +169,21 @@ if [ -n "$EXISTING_DIST" ] && [ "$EXISTING_DIST" != "None" ]; then
     echo -e "${GREEN}✓ CloudFront distribution already exists: $EXISTING_DIST${NC}"
     CF_DOMAIN=$(aws cloudfront get-distribution --id $EXISTING_DIST \
         --query 'Distribution.DomainName' --output text)
+
+    # Update CloudFront to use the new Lambda version
+    echo "Updating CloudFront to use Lambda version $VERSION..."
+    ETAG=$(aws cloudfront get-distribution-config --id $EXISTING_DIST --query "ETag" --output text)
+    CONFIG=$(aws cloudfront get-distribution-config --id $EXISTING_DIST --query "DistributionConfig" --output json)
+
+    # Replace the Lambda ARN with the new version
+    UPDATED_CONFIG=$(echo "$CONFIG" | sed "s|:function:$ROUTER_FUNCTION_NAME:[0-9]*|:function:$ROUTER_FUNCTION_NAME:$VERSION|g")
+
+    aws cloudfront update-distribution \
+        --id $EXISTING_DIST \
+        --if-match "$ETAG" \
+        --distribution-config "$UPDATED_CONFIG" > /dev/null
+
+    echo -e "${GREEN}✓ CloudFront updated to use Lambda version $VERSION${NC}"
 else
     echo "Creating CloudFront distribution..."
     

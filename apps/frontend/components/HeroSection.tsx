@@ -24,11 +24,9 @@ const HeroSection = () => {
                     </div>
 
                     {/* Headline */}
-                    <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-semibold text-gray-900 leading-[1.15] tracking-tight max-w-2xl">
-                        Deploy backends
-                        <br className="hidden sm:block" />
-                        <span className="sm:hidden"> </span>
-                        <span className="text-gray-900">without the hassle.</span>
+                    <h1 className="text-3xl sm:text-3xl md:text-4xl lg:text-5xl font-semibold text-gray-900 leading-[1.15] tracking-tight max-w-2xl">
+                        Deploy backends without the hassle.
+
                     </h1>
 
                     {/* Subtitle */}

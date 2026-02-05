@@ -42,11 +42,11 @@ h2,
 h3 {
     font-family: var(--font-family-serif);
     font-weight: 400;
-    letter-spacing: -0.02em;
 }
 
 h1 {
-    line-height: 1.1;
+    line-height: 1.2;
+    letter-spacing: -0.01em;
 }
 
 h2 {

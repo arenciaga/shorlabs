@@ -27,7 +27,7 @@ interface Project {
 }
 
 const STATUS_CONFIG: Record<string, { dot: string; label: string; bg: string }> = {
-    PENDING: { dot: "bg-zinc-400", label: "Queued", bg: "bg-zinc-50" },
+    PENDING: { dot: "bg-zinc-300", label: "Queued", bg: "bg-zinc-50" },
     CLONING: { dot: "bg-blue-500 animate-pulse", label: "Cloning", bg: "bg-blue-50" },
     PREPARING: { dot: "bg-blue-500 animate-pulse", label: "Preparing", bg: "bg-blue-50" },
     UPLOADING: { dot: "bg-blue-500 animate-pulse", label: "Uploading", bg: "bg-blue-50" },

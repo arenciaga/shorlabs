@@ -228,10 +228,10 @@ export function StartCommandInput({
                         <Button
                             onClick={onSave}
                             disabled={isSaving || !value.trim()}
-                            className="bg-zinc-900 hover:bg-zinc-800 rounded-full"
+                            className="bg-zinc-900 hover:bg-zinc-800 text-white rounded-full"
                         >
                             {isSaving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                            Save
+                            <span>Save</span>
                         </Button>
                     </div>
                 )}

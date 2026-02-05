@@ -1,14 +1,16 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+@import "../styles/fonts.css";
 
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-  /* Geist Design System Tokens */
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  /* Instrument Font Family - Matching White House Website */
+  --font-sans: var(--font-instrument-sans);
+  --font-serif: var(--font-instrument-serif);
+  --font-mono: var(--font-mono);
 
-  /* Geist-inspired minimalist radius */
+  /* Clean minimalist radius */
   --radius-sm: 4px;
   --radius-md: 6px;
   --radius-lg: 8px;

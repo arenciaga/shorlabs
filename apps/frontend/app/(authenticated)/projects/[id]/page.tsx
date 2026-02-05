@@ -50,6 +50,7 @@ import { UpgradeModal, useUpgradeModal } from "@/components/upgrade-modal"
 import { ComputeSettings } from "@/components/ComputeSettings"
 import { StartCommandInput } from "@/components/StartCommandInput"
 import { DeploymentLogs } from "@/components/DeploymentLogs"
+import { EnvironmentVariablesEditor } from "@/components/EnvironmentVariablesEditor"
 import { trackEvent } from "@/lib/amplitude"
 
 
@@ -911,129 +912,18 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                             />
 
                             {/* Environment Variables */}
-                            <div className="bg-white rounded-2xl border border-zinc-200 overflow-hidden">
-                                <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-100">
-                                    <div className="flex items-center gap-3">
-                                        <Settings2 className="h-5 w-5 text-zinc-400" />
-                                        <h3 className="font-semibold text-zinc-900">Environment Variables</h3>
-                                    </div>
-                                    {!editingEnvVars && (
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={startEditingEnvVars}
-                                            className="text-zinc-500 hover:text-zinc-900"
-                                        >
-                                            Edit
-                                        </Button>
-                                    )}
-                                </div>
-
-                                <div className="p-6">
-                                    {editingEnvVars ? (
-                                        <div className="space-y-3">
-                                            {envVarsList.map((env, index) => (
-                                                <div key={index} className="flex gap-2">
-                                                    <Input
-                                                        placeholder="KEY"
-                                                        value={env.key}
-                                                        onChange={(e) => {
-                                                            const newVars = [...envVarsList]
-                                                            newVars[index].key = e.target.value.toUpperCase()
-                                                            setEnvVarsList(newVars)
-                                                        }}
-                                                        className="flex-1 font-mono text-sm h-10 rounded-xl"
-                                                    />
-                                                    <Input
-                                                        placeholder="Value"
-                                                        value={env.value}
-                                                        type={env.visible ? "text" : "password"}
-                                                        onChange={(e) => {
-                                                            const newVars = [...envVarsList]
-                                                            newVars[index].value = e.target.value
-                                                            setEnvVarsList(newVars)
-                                                        }}
-                                                        className="flex-1 font-mono text-sm h-10 rounded-xl"
-                                                    />
-                                                    <Button
-                                                        type="button"
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        onClick={() => {
-                                                            const newVars = [...envVarsList]
-                                                            newVars[index].visible = !newVars[index].visible
-                                                            setEnvVarsList(newVars)
-                                                        }}
-                                                        className="h-10 w-10 rounded-xl"
-                                                    >
-                                                        {env.visible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                                                    </Button>
-                                                    <Button
-                                                        type="button"
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        onClick={() => setEnvVarsList(envVarsList.filter((_, i) => i !== index))}
-                                                        className="h-10 w-10 text-zinc-400 hover:text-red-500 rounded-xl"
-                                                    >
-                                                        <X className="h-4 w-4" />
-                                                    </Button>
-                                                </div>
-                                            ))}
-                                            <Button
-                                                type="button"
-                                                variant="outline"
-                                                onClick={() => setEnvVarsList([...envVarsList, { key: "", value: "", visible: true }])}
-                                                className="w-full rounded-xl border-dashed"
-                                            >
-                                                <Plus className="h-4 w-4 mr-2" />
-                                                Add Variable
-                                            </Button>
-                                            <div className="flex gap-2 pt-3 border-t border-zinc-100">
-                                                <Button
-                                                    variant="outline"
-                                                    onClick={() => setEditingEnvVars(false)}
-                                                    className="rounded-full"
-                                                >
-                                                    Cancel
-                                                </Button>
-                                                <Button
-                                                    onClick={saveEnvVars}
-                                                    disabled={savingEnvVars}
-                                                    className="bg-zinc-900 hover:bg-zinc-800 rounded-full"
-                                                >
-                                                    {savingEnvVars && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                                                    Save Variables
-                                                </Button>
-                                            </div>
-                                        </div>
-                                    ) : Object.keys(project.env_vars || {}).length > 0 ? (
-                                        <div className="space-y-2">
-                                            {Object.entries(project.env_vars).map(([key]) => (
-                                                <div key={key} className="flex items-center gap-3 px-4 py-3 bg-zinc-50 rounded-xl font-mono text-sm border border-zinc-100">
-                                                    <span className="text-zinc-900 font-medium">{key}</span>
-                                                    <span className="text-zinc-300">=</span>
-                                                    <span className="text-zinc-500">••••••••</span>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    ) : (
-                                        <div className="text-center py-8">
-                                            <div className="w-10 h-10 rounded-full bg-zinc-100 flex items-center justify-center mx-auto mb-3">
-                                                <Plus className="h-5 w-5 text-zinc-400" />
-                                            </div>
-                                            <p className="text-sm text-zinc-500">No environment variables</p>
-                                        </div>
-                                    )}
-                                </div>
-
-                                {!editingEnvVars && Object.keys(project.env_vars || {}).length > 0 && (
-                                    <div className="px-6 py-3 bg-blue-50 border-t border-blue-100">
-                                        <p className="text-xs text-blue-900">
-                                            Redeploy to apply changes
-                                        </p>
-                                    </div>
-                                )}
-                            </div>
+                            <EnvironmentVariablesEditor
+                                envVars={envVarsList}
+                                onChange={setEnvVarsList}
+                                showImport={true}
+                                readOnly={!editingEnvVars}
+                                existingEnvVars={project.env_vars}
+                                onStartEdit={startEditingEnvVars}
+                                isEditing={editingEnvVars}
+                                onCancelEdit={() => setEditingEnvVars(false)}
+                                onSave={saveEnvVars}
+                                isSaving={savingEnvVars}
+                            />
 
                             {/* Danger Zone */}
                             <div className="bg-white rounded-2xl border border-red-200 overflow-hidden">

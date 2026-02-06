@@ -74,12 +74,17 @@ export default function SectionNavigation() {
                         >
                             <Github className="w-5 h-5" strokeWidth={1.5} />
                         </a>
-                        <BookDemoButton
-                            className="text-sm px-4 py-2 rounded-lg"
-                            size="sm"
+                        <Link
+                            href="/sign-in"
+                            className="text-sm text-gray-600 hover:text-gray-900 transition-colors"
                         >
-                            Schedule a Call
-                        </BookDemoButton>
+                            Sign In
+                        </Link>
+                        <Link href="/create-account">
+                            <Button className="text-sm bg-gray-900 text-white hover:bg-gray-800 px-4 py-2 rounded-lg">
+                                Create Account
+                            </Button>
+                        </Link>
                     </div>
 
                     {/* Mobile Menu Button */}
@@ -121,10 +126,19 @@ export default function SectionNavigation() {
                     >
                         Pricing
                     </a>
-                    <div className="pt-2 border-t border-gray-100">
-                        <BookDemoButton className="w-full text-sm py-2.5 rounded-lg">
-                            Schedule a Call
-                        </BookDemoButton>
+                    <div className="pt-2 border-t border-gray-100 space-y-2">
+                        <Link
+                            href="/sign-in"
+                            onClick={() => setOpen(false)}
+                            className="block text-sm text-gray-600 hover:text-gray-900 py-2 transition-colors"
+                        >
+                            Sign In
+                        </Link>
+                        <Link href="/create-account" onClick={() => setOpen(false)}>
+                            <Button className="w-full text-sm bg-gray-900 text-white hover:bg-gray-800 py-2.5 rounded-lg">
+                                Create Account
+                            </Button>
+                        </Link>
                     </div>
                 </nav>
             </div>

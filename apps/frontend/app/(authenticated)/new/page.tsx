@@ -48,7 +48,7 @@ const LANGUAGE_COLORS: Record<string, string> = {
 export default function ImportRepositoryPage() {
     const router = useRouter()
     const { user, isLoaded: userLoaded } = useUser()
-    const { getToken } = useAuth()
+    const { getToken, orgId } = useAuth()
     const { signOut } = useClerk()
     const searchParams = useSearchParams()
 
@@ -79,7 +79,9 @@ export default function ImportRepositoryPage() {
 
             // Step 1: Check GitHub connection status
             console.log("🔍 Checking GitHub connection...")
-            const statusRes = await fetch(`${API_BASE_URL}/api/github/status`, {
+            const statusUrl = new URL(`${API_BASE_URL}/api/github/status`)
+            if (orgId) statusUrl.searchParams.append("org_id", orgId)
+            const statusRes = await fetch(statusUrl.toString(), {
                 headers: { Authorization: `Bearer ${token}` }
             })
 
@@ -98,7 +100,9 @@ export default function ImportRepositoryPage() {
             // Step 2: Connected - now fetch repos before showing connected UI
             setPageState({ status: 'loading_repos' })
 
-            const reposRes = await fetch(`${API_BASE_URL}/api/github/repos`, {
+            const reposUrl = new URL(`${API_BASE_URL}/api/github/repos`)
+            if (orgId) reposUrl.searchParams.append("org_id", orgId)
+            const reposRes = await fetch(reposUrl.toString(), {
                 headers: { Authorization: `Bearer ${token}` }
             })
 
@@ -121,7 +125,7 @@ export default function ImportRepositoryPage() {
                 message: err instanceof Error ? err.message : 'Something went wrong'
             })
         }
-    }, [userLoaded, user, getToken, signOut])
+    }, [userLoaded, user, getToken, signOut, orgId])
 
     // Run initialization when dependencies change
     useEffect(() => {
@@ -138,7 +142,9 @@ export default function ImportRepositoryPage() {
 
             console.log("📤 Calling /api/github/connect with installation_id:", installation_id)
 
-            const response = await fetch(`${API_BASE_URL}/api/github/connect`, {
+            const connectUrl = new URL(`${API_BASE_URL}/api/github/connect`)
+            if (orgId) connectUrl.searchParams.append("org_id", orgId)
+            const response = await fetch(connectUrl.toString(), {
                 method: "POST",
                 headers: {
                     "Authorization": `Bearer ${token}`,
@@ -178,7 +184,7 @@ export default function ImportRepositoryPage() {
             }
             throw err
         }
-    }, [getToken, router, initializePage])
+    }, [getToken, router, initializePage, orgId])
 
     // Handle GitHub App installation callback from URL params
     useEffect(() => {

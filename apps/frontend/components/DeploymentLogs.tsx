@@ -26,6 +26,7 @@ interface DeploymentLogsProps {
     projectId: string
     deployId: string
     buildId: string
+    orgId: string
     status: "IN_PROGRESS" | "SUCCEEDED" | "FAILED"
     isExpanded: boolean
     onToggle: () => void
@@ -50,6 +51,7 @@ export function DeploymentLogs({
     projectId,
     deployId,
     buildId,
+    orgId,
     status,
     isExpanded,
     onToggle,
@@ -77,8 +79,10 @@ export function DeploymentLogs({
         setError(null)
         try {
             const token = await getToken()
+            const url = new URL(`${API_BASE_URL}/api/deployments/${projectId}/${deployId}/logs`)
+            url.searchParams.append("org_id", orgId)
             const response = await fetch(
-                `${API_BASE_URL}/api/deployments/${projectId}/${deployId}/logs`,
+                url.toString(),
                 { headers: { Authorization: `Bearer ${token}` } }
             )
             if (!response.ok) {
@@ -91,7 +95,7 @@ export function DeploymentLogs({
         } finally {
             setLoading(false)
         }
-    }, [getToken, projectId, deployId])
+    }, [getToken, projectId, deployId, orgId])
 
     // Start SSE streaming (for in-progress builds)
     const startStreaming = useCallback(async () => {
@@ -104,7 +108,6 @@ export function DeploymentLogs({
 
         try {
             const token = await getToken()
-            const url = `${API_BASE_URL}/api/deployments/${projectId}/${deployId}/logs/stream`
 
             // Create EventSource with auth header via fetch
             // Note: EventSource doesn't support headers, so we'll poll instead
@@ -112,8 +115,10 @@ export function DeploymentLogs({
             const pollLogs = async () => {
                 while (isStreaming) {
                     try {
+                        const pollUrl = new URL(`${API_BASE_URL}/api/deployments/${projectId}/${deployId}/logs`)
+                        pollUrl.searchParams.append("org_id", orgId)
                         const response = await fetch(
-                            `${API_BASE_URL}/api/deployments/${projectId}/${deployId}/logs`,
+                            pollUrl.toString(),
                             { headers: { Authorization: `Bearer ${token}` } }
                         )
                         if (response.ok) {
@@ -148,7 +153,7 @@ export function DeploymentLogs({
             setError(err instanceof Error ? err.message : "Failed to start streaming")
             setIsStreaming(false)
         }
-    }, [getToken, projectId, deployId, onComplete, isStreaming])
+    }, [getToken, projectId, deployId, orgId, onComplete, isStreaming])
 
     // Load logs when expanded
     useEffect(() => {

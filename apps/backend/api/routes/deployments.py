@@ -5,11 +5,10 @@ import asyncio
 from typing import Optional
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import StreamingResponse
 
-from api.auth import get_current_user_id
-from api.db.dynamodb import get_project, get_deployment, list_deployments
+from api.db.dynamodb import get_project_by_key, get_deployment
 from deployer.aws.cloudwatch import get_build_logs, get_build_logs_stream
 
 router = APIRouter(prefix="/api/deployments", tags=["deployments"])
@@ -20,17 +19,18 @@ async def get_deployment_logs(
     project_id: str,
     deploy_id: str,
     user_id: str = Depends(get_current_user_id),
+    org_id: str = Query(...),
 ):
     """
     Fetch all logs for a deployment.
-    
+
     Returns build logs from CloudWatch for the associated CodeBuild build.
     """
-    # Verify project belongs to user
-    project = get_project(project_id)
+    # Verify project belongs to organization
+    project = get_project_by_key(org_id, project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
-    if project.get("user_id") != user_id:
+    if project.get("organization_id") != org_id:
         raise HTTPException(status_code=403, detail="Not authorized")
     
     # Get the deployment to find the build_id
@@ -62,17 +62,18 @@ async def stream_deployment_logs(
     project_id: str,
     deploy_id: str,
     user_id: str = Depends(get_current_user_id),
+    org_id: str = Query(...),
 ):
     """
     Server-Sent Events endpoint for real-time log streaming during active builds.
-    
+
     Streams log events as they happen until the build completes.
     """
-    # Verify project belongs to user
-    project = get_project(project_id)
+    # Verify project belongs to organization
+    project = get_project_by_key(org_id, project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
-    if project.get("user_id") != user_id:
+    if project.get("organization_id") != org_id:
         raise HTTPException(status_code=403, detail="Not authorized")
     
     # Get the deployment

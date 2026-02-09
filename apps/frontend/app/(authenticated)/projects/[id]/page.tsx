@@ -759,6 +759,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                                                         projectId={project.project_id}
                                                         deployId={deployment.deploy_id}
                                                         buildId={deployment.build_id}
+                                                        orgId={orgId!}
                                                         status={deployment.status}
                                                         isExpanded={true}
                                                         onToggle={() => setExpandedDeployId(null)}

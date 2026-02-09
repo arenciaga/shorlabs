@@ -1,13 +1,6 @@
 "use client";
 
-import { Check } from "lucide-react";
-import {
-    Card,
-    CardHeader,
-    CardTitle,
-    CardDescription,
-    CardContent,
-} from "@/components/ui/card";
+import { PricingCard } from "@/components/PricingCard";
 
 const plans = [
     {
@@ -69,50 +62,7 @@ const PricingSection = () => {
             <div className="w-full max-w-4xl mx-auto px-4 sm:px-6 pb-16 sm:pb-24">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                     {plans.map((plan) => (
-                        <Card key={plan.name} className="h-full border-gray-200">
-                            <CardHeader>
-                                <CardTitle className="text-xl text-gray-900">
-                                    {plan.name}
-                                </CardTitle>
-                            </CardHeader>
-
-                            <CardContent className="flex flex-col gap-6">
-                                {/* Price */}
-                                <div>
-                                    <div className="flex items-baseline gap-1">
-                                        <span className="text-4xl sm:text-5xl font-medium text-gray-900">
-                                            {plan.price}
-                                        </span>
-                                        {plan.period && (
-                                            <span className="text-muted-foreground text-sm">
-                                                {plan.period}
-                                            </span>
-                                        )}
-                                    </div>
-                                    <CardDescription className="mt-2">
-                                        {plan.subtext}
-                                    </CardDescription>
-                                </div>
-
-                                {/* Description */}
-                                <p className="text-sm text-gray-900">
-                                    {plan.description}
-                                </p>
-
-                                {/* Features */}
-                                <ul className="space-y-4 pt-2">
-                                    {plan.features.map((feature) => (
-                                        <li
-                                            key={feature}
-                                            className="flex items-center gap-3 text-sm text-muted-foreground"
-                                        >
-                                            <Check className="w-4 h-4 flex-shrink-0" />
-                                            {feature}
-                                        </li>
-                                    ))}
-                                </ul>
-                            </CardContent>
-                        </Card>
+                        <PricingCard key={plan.name} {...plan} />
                     ))}
                 </div>
             </div>

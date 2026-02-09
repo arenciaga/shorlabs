@@ -10,36 +10,36 @@ interface UpgradeModalProps {
 }
 
 export function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
+    if (!isOpen) return null
+
     return (
-        <>
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
             {/* Backdrop */}
             <div
-                className={`fixed inset-0 bg-black/40 z-50 transition-opacity duration-200 ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
-                    }`}
+                className="absolute inset-0 bg-black/40"
                 onClick={onClose}
             />
 
-            {/* Slide-out Panel */}
-            <div
-                className={`fixed top-0 right-0 h-full w-full max-w-[420px] bg-white z-50 shadow-xl transform transition-transform duration-200 ease-out flex flex-col ${isOpen ? 'translate-x-0' : 'translate-x-full'
-                    }`}
-            >
+            {/* Modal */}
+            <div className="relative w-full h-full bg-white overflow-y-auto">
                 {/* Header */}
-                <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100">
-                    <h2 className="text-lg font-semibold text-gray-900">
-                        Upgrade
-                    </h2>
-                    <button
-                        onClick={onClose}
-                        className="p-1.5 -m-1.5 rounded-md hover:bg-gray-100 transition-colors"
-                    >
-                        <X className="w-5 h-5 text-gray-400" />
-                    </button>
+                <div className="sticky top-0 z-10 bg-white border-b border-gray-100">
+                    <div className="max-w-5xl mx-auto flex items-center justify-between px-6 py-5">
+                        <h2 className="text-lg font-semibold text-gray-900">
+                            Upgrade
+                        </h2>
+                        <button
+                            onClick={onClose}
+                            className="p-1.5 -m-1.5 rounded-md hover:bg-gray-100 transition-colors"
+                        >
+                            <X className="w-5 h-5 text-gray-400" />
+                        </button>
+                    </div>
                 </div>
 
                 {/* Content */}
                 <div
-                    className="flex-1 overflow-y-auto p-6"
+                    className="max-w-5xl mx-auto p-6"
                     onClick={(e) => {
                         const target = e.target as HTMLElement;
                         if (target.closest('button')) {
@@ -50,10 +50,10 @@ export function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
                     <PricingTable
                         appearance={{
                             variables: {
-                                colorPrimary: '#000000', // pure black
+                                colorPrimary: '#000000',
                                 colorBackground: '#ffffff',
-                                colorText: '#3f3f46', // zinc-700
-                                colorTextSecondary: '#71717a', // zinc-500
+                                colorText: '#3f3f46',
+                                colorTextSecondary: '#71717a',
                                 fontFamily: 'inherit',
                                 borderRadius: '12.5px',
                             },
@@ -71,7 +71,7 @@ export function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
                     />
                 </div>
             </div>
-        </>
+        </div>
     )
 }
 

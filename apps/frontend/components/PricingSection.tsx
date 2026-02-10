@@ -7,8 +7,6 @@ const plans = [
         name: "Hobby",
         description: "Perfect for personal projects and testing.",
         price: "$0",
-        period: "",
-        subtext: "Always free",
         features: [
             "Unlimited Projects",
             "1 GB Memory",
@@ -20,10 +18,10 @@ const plans = [
     },
     {
         name: "Pro",
-        description: "Built for production workloads and commercial applications",
+        description: "Built for production workloads and commercial applications.",
         price: "$20",
-        period: "/month",
-        subtext: "Only billed monthly",
+        period: "/ month",
+        highlighted: true,
         features: [
             "Unlimited Projects",
             "Up to 4 GB Memory",
@@ -60,7 +58,7 @@ const PricingSection = () => {
 
             {/* Pricing Cards */}
             <div className="w-full max-w-4xl mx-auto px-4 sm:px-6 pb-16 sm:pb-24">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {plans.map((plan) => (
                         <PricingCard key={plan.name} {...plan} />
                     ))}

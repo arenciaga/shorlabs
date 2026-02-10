@@ -51,6 +51,7 @@ import { ComputeSettings } from "@/components/ComputeSettings"
 import { StartCommandInput } from "@/components/StartCommandInput"
 import { DeploymentLogs } from "@/components/DeploymentLogs"
 import { EnvironmentVariablesEditor } from "@/components/EnvironmentVariablesEditor"
+import { useIsPro } from "@/hooks/use-is-pro"
 import { trackEvent } from "@/lib/amplitude"
 
 
@@ -105,7 +106,7 @@ const BUILD_STEPS = ["CLONING", "PREPARING", "UPLOADING", "BUILDING", "DEPLOYING
 export default function ProjectDetailPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params)
     const router = useRouter()
-    const { getToken, isLoaded, has, orgId } = useAuth()
+    const { getToken, isLoaded, orgId } = useAuth()
     const { signOut } = useClerk()
     const [data, setData] = useState<ProjectDetails | null>(null)
     const [loading, setLoading] = useState(true)
@@ -118,8 +119,8 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     const [redeploying, setRedeploying] = useState(false)
     const [activeTab, setActiveTab] = useState<"deployments" | "logs" | "compute" | "settings">("deployments")
 
-    // Pro tier check
-    const isPro = has?.({ plan: 'shorlabs_pro_user' }) ?? false
+    // Pro tier check via Autumn
+    const { isPro } = useIsPro()
     const { isOpen: upgradeModalOpen, openUpgradeModal, closeUpgradeModal } = useUpgradeModal()
 
     // Env vars editing state

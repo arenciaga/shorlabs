@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
 import { AmplitudeProvider } from "@/components/AmplitudeProvider";
+import { AutumnProviderWrapper } from "@/components/AutumnProviderWrapper";
 import "./globals.css";
 
 // Geist Sans - clean, modern sans-serif by Vercel
@@ -41,7 +42,9 @@ export default function RootLayout({
           suppressHydrationWarning
         >
           <AmplitudeProvider>
-            {children}
+            <AutumnProviderWrapper>
+              {children}
+            </AutumnProviderWrapper>
           </AmplitudeProvider>
         </body>
       </html>

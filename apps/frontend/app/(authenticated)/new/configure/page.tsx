@@ -39,6 +39,7 @@ import { UpgradeModal, useUpgradeModal } from "@/components/upgrade-modal"
 import { EnvironmentVariablesEditor, EnvironmentVariablesSecurityNote, type EnvVar } from "@/components/EnvironmentVariablesEditor"
 import { StartCommandInput } from "@/components/StartCommandInput"
 import { ComputeSettings } from "@/components/ComputeSettings"
+import { useIsPro } from "@/hooks/use-is-pro"
 import { trackEvent } from "@/lib/amplitude"
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
@@ -64,9 +65,9 @@ interface DirectoryState {
 function ConfigureProjectContent() {
     const router = useRouter()
     const searchParams = useSearchParams()
-    const { getToken, has, orgId } = useAuth()
+    const { getToken, orgId } = useAuth()
     const { signOut } = useClerk()
-    const isPro = has?.({ plan: 'shorlabs_pro_user' }) ?? false
+    const { isPro } = useIsPro()
     const { isOpen: upgradeOpen, openUpgradeModal, closeUpgradeModal } = useUpgradeModal()
 
     const repoFullName = searchParams.get("repo") || ""

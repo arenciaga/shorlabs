@@ -2,6 +2,7 @@
 
 import useSWR from "swr"
 import { useAuth } from "@clerk/nextjs"
+import { useIsPro } from "@/hooks/use-is-pro"
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 
@@ -53,14 +54,13 @@ const fetcher = async (url: string, token: string): Promise<Usage> => {
 
 /**
  * Hook to fetch organization-level usage metrics.
- * 
+ *
  * Usage is tracked per organization (the billing entity), not per user.
- * This aligns with industry standards where organizations pay for resources.
- * 
- * @param isPro - Whether the org has a Pro subscription (affects limits)
+ * Tier (free/pro) is determined automatically via Autumn's useIsPro hook.
  */
-export function useUsage(isPro: boolean = false): UseUsageReturn {
+export function useUsage(): UseUsageReturn {
     const { getToken, isLoaded, orgId } = useAuth()
+    const { isPro } = useIsPro()
 
     // Build URL with org_id parameter (usage is tracked per organization)
     const usageUrl = orgId
@@ -86,7 +86,7 @@ export function useUsage(isPro: boolean = false): UseUsageReturn {
         }
     )
 
-    // Override limits based on tier
+    // Override limits based on tier (now determined by Autumn)
     const limits = isPro ? PRO_LIMITS : FREE_LIMITS
     const adjustedUsage = data ? {
         ...data,

@@ -1,21 +1,16 @@
 "use client";
 
 import { Check } from "lucide-react";
-import {
-    Card,
-    CardHeader,
-    CardTitle,
-    CardDescription,
-    CardContent,
-} from "@/components/ui/card";
 
 interface PricingCardProps {
     name: string;
     description: string;
     price: string;
     period?: string;
-    subtext: string;
     features: string[];
+    highlighted?: boolean;
+    buttonText?: string;
+    onButtonClick?: () => void;
     className?: string;
 }
 
@@ -24,51 +19,69 @@ const PricingCard = ({
     description,
     price,
     period,
-    subtext,
     features,
+    highlighted = false,
+    buttonText,
+    onButtonClick,
     className,
 }: PricingCardProps) => {
+    const isCurrentPlan = buttonText === "Current plan";
+
     return (
-        <Card className={`h-full border-gray-200 ${className ?? ""}`}>
-            <CardHeader>
-                <CardTitle className="text-xl text-gray-900">{name}</CardTitle>
-            </CardHeader>
+        <div
+            className={`relative flex flex-col h-full rounded-xl border border-zinc-200 bg-white px-6 py-6 ${className ?? ""}`}
+        >
+            {/* Plan Name */}
+            <h3 className="text-lg font-semibold text-zinc-900">{name}</h3>
 
-            <CardContent className="flex flex-col gap-6">
-                {/* Price */}
-                <div>
-                    <div className="flex items-baseline gap-1">
-                        <span className="text-4xl sm:text-5xl font-medium text-gray-900">
-                            {price}
-                        </span>
-                        {period && (
-                            <span className="text-muted-foreground text-sm">
-                                {period}
-                            </span>
-                        )}
-                    </div>
-                    <CardDescription className="mt-2">
-                        {subtext}
-                    </CardDescription>
-                </div>
+            {/* Price */}
+            <div className="mt-4 flex items-baseline gap-1">
+                <span className="text-3xl font-semibold text-zinc-900">
+                    {price}
+                </span>
+                {period && (
+                    <span className="text-sm font-normal text-zinc-400">
+                        {period}
+                    </span>
+                )}
+            </div>
 
-                {/* Description */}
-                <p className="text-sm text-gray-900">{description}</p>
+            {/* Description */}
+            <p className="mt-2 text-[13px] leading-relaxed text-zinc-500">{description}</p>
 
-                {/* Features */}
-                <ul className="space-y-4 pt-2">
-                    {features.map((feature) => (
-                        <li
-                            key={feature}
-                            className="flex items-center gap-3 text-sm text-muted-foreground"
-                        >
-                            <Check className="w-4 h-4 flex-shrink-0" />
-                            {feature}
-                        </li>
-                    ))}
-                </ul>
-            </CardContent>
-        </Card>
+            {/* CTA Button */}
+            {buttonText && (
+                <button
+                    onClick={isCurrentPlan ? undefined : onButtonClick}
+                    disabled={isCurrentPlan}
+                    className={`mt-5 w-full rounded-full py-2.5 px-4 text-[13px] font-medium transition-all cursor-pointer
+                        ${highlighted && !isCurrentPlan
+                            ? 'bg-zinc-900 text-white hover:bg-zinc-800 active:bg-zinc-950'
+                            : isCurrentPlan
+                                ? 'bg-zinc-100 text-zinc-400 cursor-default'
+                                : 'border border-zinc-200 text-zinc-700 hover:bg-zinc-50 active:bg-zinc-100'
+                        }`}
+                >
+                    {buttonText}
+                </button>
+            )}
+
+            {/* Divider */}
+            <div className="mt-5 border-t border-zinc-100" />
+
+            {/* Features */}
+            <ul className="mt-5 space-y-3 flex-1">
+                {features.map((feature) => (
+                    <li
+                        key={feature}
+                        className="flex items-center gap-2.5 text-[13px] text-zinc-600"
+                    >
+                        <Check className="w-3.5 h-3.5 flex-shrink-0 text-zinc-400" strokeWidth={2.5} />
+                        {feature}
+                    </li>
+                ))}
+            </ul>
+        </div>
     );
 };
 

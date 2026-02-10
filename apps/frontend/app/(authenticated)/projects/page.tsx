@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { UpgradeModal, useUpgradeModal } from "@/components/upgrade-modal"
 import { useUsage } from "@/hooks/use-usage"
+import { useIsPro } from "@/hooks/use-is-pro"
 import { trackEvent } from "@/lib/amplitude"
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
@@ -38,8 +39,8 @@ const STATUS_CONFIG: Record<string, { dot: string; label: string; bg: string }> 
 }
 
 export default function ProjectsPage() {
-    const { getToken, isLoaded, has, orgId } = useAuth()
-    const isPro = has?.({ plan: 'shorlabs_pro_user' })
+    const { getToken, isLoaded, orgId } = useAuth()
+    const { isPro } = useIsPro()
     const { signOut } = useClerk()
     const [searchQuery, setSearchQuery] = useState("")
     const [projects, setProjects] = useState<Project[]>([])
@@ -48,7 +49,7 @@ export default function ProjectsPage() {
     const { isOpen: upgradeOpen, openUpgradeModal, closeUpgradeModal } = useUpgradeModal()
 
     // Fetch real usage metrics with tier-appropriate limits
-    const { usage, loading: usageLoading, error: usageError, isValidating } = useUsage(isPro ?? false)
+    const { usage, loading: usageLoading, error: usageError, isValidating } = useUsage()
 
     const fetchProjects = useCallback(async () => {
         try {

@@ -13,20 +13,6 @@ echo -e "${GREEN}Shorlabs Backend - Lambda Deployment${NC}"
 echo -e "${GREEN}Single Lambda + SQS Architecture${NC}"
 echo -e "${GREEN}========================================${NC}\n"
 
-# Read environment variables from .env file
-if [ -f .env ]; then
-    # Load simple variables (excluding multi-line ones)
-    export $(cat .env | grep -v '^#' | grep -v 'GITHUB_PRIVATE_KEY' | xargs)
-
-    # Load GITHUB_PRIVATE_KEY separately (handles multi-line)
-    GITHUB_PRIVATE_KEY=$(grep 'GITHUB_PRIVATE_KEY=' .env | cut -d '=' -f 2- | tr -d '"')
-    export GITHUB_PRIVATE_KEY
-
-    echo -e "${GREEN}✓ Loaded environment variables from .env${NC}\n"
-else
-    echo -e "${YELLOW}Note: .env file not found, using shell environment variables${NC}"
-fi
-
 # Configuration
 AWS_REGION="us-east-1"
 AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
@@ -34,11 +20,6 @@ ECR_REPOSITORY_NAME="shorlabs-backend"
 LAMBDA_FUNCTION_NAME="shorlabs-api"
 DEPLOY_QUEUE_NAME="shorlabs-deploy-queue.fifo"
 DLQ_NAME="shorlabs-deploy-dlq.fifo"
-
-# Prompt for frontend URL
-DEFAULT_URL=${FRONTEND_URL:-"http://localhost:3000"}
-read -p "Enter the FRONTEND_URL (e.g., https://yourdomain.com) [default: $DEFAULT_URL]: " FRONTEND_URL_INPUT
-FRONTEND_URL=${FRONTEND_URL_INPUT:-$DEFAULT_URL}
 
 # Step 1: Create/verify ECR repository
 echo -e "${YELLOW}Step 1: Setting up ECR repository...${NC}"
@@ -204,10 +185,9 @@ if [ "$FUNCTION_EXISTS" == "no" ]; then
         --role $ROLE_ARN \
         --timeout 900 \
         --memory-size 2048 \
-        --environment "Variables={CLERK_SECRET_KEY=$CLERK_SECRET_KEY,CLERK_ISSUER=$CLERK_ISSUER,FRONTEND_URL=$FRONTEND_URL,AWS_LWA_INVOKE_MODE=buffered,DEPLOY_QUEUE_URL=$DEPLOY_QUEUE_URL,GITHUB_CLIENT_ID=$GITHUB_CLIENT_ID,GITHUB_APP_SLUG=$GITHUB_APP_SLUG,GITHUB_APP_ID=$GITHUB_APP_ID,GITHUB_PRIVATE_KEY=$GITHUB_PRIVATE_KEY}" \
         --region $AWS_REGION \
         --query "FunctionArn" --output text
-    
+
     echo "Waiting for function to be active..."
     aws lambda wait function-active --function-name $LAMBDA_FUNCTION_NAME --region $AWS_REGION
 else
@@ -227,10 +207,9 @@ else
         --function-name $LAMBDA_FUNCTION_NAME \
         --timeout 900 \
         --memory-size 2048 \
-        --environment "Variables={CLERK_SECRET_KEY=$CLERK_SECRET_KEY,CLERK_ISSUER=$CLERK_ISSUER,FRONTEND_URL=$FRONTEND_URL,AWS_LWA_INVOKE_MODE=buffered,DEPLOY_QUEUE_URL=$DEPLOY_QUEUE_URL,GITHUB_CLIENT_ID=$GITHUB_CLIENT_ID,GITHUB_APP_SLUG=$GITHUB_APP_SLUG,GITHUB_APP_ID=$GITHUB_APP_ID,GITHUB_PRIVATE_KEY=$GITHUB_PRIVATE_KEY}" \
         --region $AWS_REGION \
         --query "FunctionArn" --output text
-    
+
     # Wait for config update
     aws lambda wait function-updated --function-name $LAMBDA_FUNCTION_NAME --region $AWS_REGION
 fi

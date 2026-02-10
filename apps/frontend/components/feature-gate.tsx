@@ -1,11 +1,11 @@
 'use client'
 
-import { useUser } from '@clerk/nextjs'
+import { useCustomer } from 'autumn-js/react'
 import { ReactNode } from 'react'
 
 interface FeatureGateProps {
     /**
-     * The feature key to check for (must match a feature defined in Clerk Dashboard)
+     * The feature key to check for (must match a feature defined in Autumn Dashboard)
      * e.g., "advancedAnalytics", "prioritySupport", "apiAccess"
      */
     feature: string
@@ -22,59 +22,46 @@ interface FeatureGateProps {
 
 /**
  * FeatureGate component for gating content based on subscription features.
- * 
+ *
+ * Uses Autumn's customer state to check feature access. Features are configured
+ * in the Autumn Dashboard and tracked per organization.
+ *
  * Usage:
  * ```tsx
  * <FeatureGate feature="advancedAnalytics">
  *   <AdvancedAnalyticsDashboard />
  * </FeatureGate>
- * 
- * <FeatureGate 
- *   feature="prioritySupport" 
+ *
+ * <FeatureGate
+ *   feature="prioritySupport"
  *   fallback={<UpgradePrompt />}
  * >
  *   <PrioritySupportWidget />
  * </FeatureGate>
  * ```
- * 
- * Note: Features must be configured in Clerk Dashboard under Subscription Plans.
- * Until Clerk Billing is enabled, this will show the fallback.
  */
 export function FeatureGate({ feature, children, fallback = null }: FeatureGateProps) {
-    const { user, isLoaded } = useUser()
+    const { customer, isLoading } = useCustomer()
 
     // Show nothing while loading
-    if (!isLoaded) {
+    if (isLoading) {
         return null
     }
 
-    // Check if user has the feature via Clerk's subscription metadata
-    // The feature will be available in user.publicMetadata.features or via useAuth
-    const hasFeature = checkUserFeature(user, feature)
+    // Check if customer has the feature via Autumn's feature map
+    const customerFeature = customer?.features?.[feature]
+
+    // Feature exists and either has remaining balance or is unlimited
+    const hasFeature = !!customerFeature && (
+        customerFeature.unlimited === true ||
+        (customerFeature.balance !== null && customerFeature.balance !== undefined && customerFeature.balance > 0)
+    )
 
     if (hasFeature) {
         return <>{children}</>
     }
 
     return <>{fallback}</>
-}
-
-/**
- * Helper function to check if user has a specific feature
- * This checks the user's subscription features from Clerk
- */
-function checkUserFeature(user: ReturnType<typeof useUser>['user'], feature: string): boolean {
-    if (!user) return false
-
-    // Clerk Billing stores features in publicMetadata.features array
-    // This is populated automatically when you configure subscription plans
-    const features = (user.publicMetadata as { features?: string[] })?.features
-
-    if (Array.isArray(features)) {
-        return features.includes(feature)
-    }
-
-    return false
 }
 
 /**

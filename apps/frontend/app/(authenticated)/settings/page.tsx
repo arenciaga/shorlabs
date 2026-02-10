@@ -2,8 +2,12 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useAuth, useUser } from '@clerk/nextjs'
-import { Github, Loader2, ExternalLink, Unplug, RefreshCw, AlertCircle } from 'lucide-react'
+import { useCustomer } from 'autumn-js/react'
+import { Github, Loader2, ExternalLink, Unplug, RefreshCw, AlertCircle, CreditCard, ArrowUpRight } from 'lucide-react'
+import { useIsPro } from '@/hooks/use-is-pro'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { UpgradeModal, useUpgradeModal } from '@/components/upgrade-modal'
 import {
     AlertDialog,
     AlertDialogAction,
@@ -29,11 +33,16 @@ interface GitHubConnection {
 export default function SettingsPage() {
     const { getToken, orgId, isLoaded: authLoaded } = useAuth()
     const { isLoaded: userLoaded } = useUser()
+    const { openBillingPortal, isLoading: isCustomerLoading } = useCustomer()
+    const { isPro, isCanceling, proProduct, isLoaded: isPlanLoaded } = useIsPro()
+    const { isOpen: upgradeOpen, openUpgradeModal, closeUpgradeModal } = useUpgradeModal()
 
+    const [activeTab, setActiveTab] = useState<"integrations" | "billing">("integrations")
     const [connection, setConnection] = useState<GitHubConnection | null>(null)
     const [loading, setLoading] = useState(true)
     const [disconnecting, setDisconnecting] = useState(false)
     const [error, setError] = useState<string | null>(null)
+    const [billingPortalLoading, setBillingPortalLoading] = useState(false)
 
     const fetchStatus = useCallback(async () => {
         try {
@@ -141,12 +150,39 @@ export default function SettingsPage() {
         <div className="min-h-screen bg-zinc-50">
             <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
                 {/* Header */}
-                <div className="mb-8">
+                <div className="mb-2">
                     <h1 className="text-2xl font-bold text-zinc-900 tracking-tight">Settings</h1>
                     <p className="text-sm text-zinc-500 mt-1">Manage your integrations and preferences</p>
                 </div>
 
-                {/* Integrations Section */}
+                {/* Tab Navigation */}
+                <div className="flex items-center gap-1 mb-6 border-b border-zinc-200">
+                    <button
+                        onClick={() => setActiveTab("integrations")}
+                        className={`px-3 sm:px-4 py-3 text-sm font-medium transition-colors relative whitespace-nowrap ${
+                            activeTab === "integrations" ? "text-zinc-900" : "text-zinc-500 hover:text-zinc-700"
+                        }`}
+                    >
+                        Integrations
+                        {activeTab === "integrations" && (
+                            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-zinc-900" />
+                        )}
+                    </button>
+                    <button
+                        onClick={() => setActiveTab("billing")}
+                        className={`px-3 sm:px-4 py-3 text-sm font-medium transition-colors relative whitespace-nowrap ${
+                            activeTab === "billing" ? "text-zinc-900" : "text-zinc-500 hover:text-zinc-700"
+                        }`}
+                    >
+                        Billing
+                        {activeTab === "billing" && (
+                            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-zinc-900" />
+                        )}
+                    </button>
+                </div>
+
+                {/* Integrations Tab */}
+                {activeTab === "integrations" && (
                 <div className="space-y-6">
                     <div>
                         <h2 className="text-sm font-semibold text-zinc-900 uppercase tracking-wider mb-4">Integrations</h2>
@@ -154,9 +190,9 @@ export default function SettingsPage() {
                         {/* GitHub Connection Card */}
                         <div className="bg-white rounded-2xl border border-zinc-200 overflow-hidden">
                             {/* Card Header */}
-                            <div className="px-6 py-5 flex items-center justify-between border-b border-zinc-100">
+                            <div className="px-4 py-4 sm:px-6 sm:py-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-zinc-100">
                                 <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 rounded-xl bg-zinc-900 flex items-center justify-center">
+                                    <div className="w-10 h-10 shrink-0 rounded-xl bg-zinc-900 flex items-center justify-center">
                                         <Github className="h-5 w-5 text-white" />
                                     </div>
                                     <div>
@@ -166,7 +202,7 @@ export default function SettingsPage() {
                                 </div>
 
                                 {!loading && connection && (
-                                    <span className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full ${
+                                    <span className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full self-start sm:self-auto ${
                                         connection.connected
                                             ? 'bg-emerald-50 text-emerald-700'
                                             : 'bg-zinc-100 text-zinc-500'
@@ -180,7 +216,7 @@ export default function SettingsPage() {
                             </div>
 
                             {/* Card Body */}
-                            <div className="px-6 py-5">
+                            <div className="px-4 py-4 sm:px-6 sm:py-5">
                                 {loading ? (
                                     <div className="flex items-center justify-center py-6">
                                         <Loader2 className="h-5 w-5 animate-spin text-zinc-400" />
@@ -226,7 +262,7 @@ export default function SettingsPage() {
                                         </div>
 
                                         {/* Actions */}
-                                        <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-zinc-100">
+                                        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pt-3 border-t border-zinc-100">
                                             <a
                                                 href={`https://github.com/${connection.username}`}
                                                 target="_blank"
@@ -237,7 +273,7 @@ export default function SettingsPage() {
                                                 View on GitHub
                                             </a>
 
-                                            <span className="text-zinc-200">|</span>
+                                            <span className="hidden sm:inline text-zinc-200">|</span>
 
                                             <a
                                                 href="https://github.com/apps/shorlabs/installations/new"
@@ -249,7 +285,7 @@ export default function SettingsPage() {
                                                 Manage permissions
                                             </a>
 
-                                            <span className="text-zinc-200">|</span>
+                                            <span className="hidden sm:inline text-zinc-200">|</span>
 
                                             <AlertDialog>
                                                 <AlertDialogTrigger asChild>
@@ -311,6 +347,129 @@ export default function SettingsPage() {
                         </div>
                     </div>
                 </div>
+                )}
+
+                {/* Billing Tab */}
+                {activeTab === "billing" && (
+                <div className="space-y-6">
+                    {/* Current Plan Card */}
+                    <div>
+                        <h2 className="text-sm font-semibold text-zinc-900 uppercase tracking-wider mb-4">Current Plan</h2>
+                        <div className="bg-white rounded-2xl border border-zinc-200 overflow-hidden">
+                            <div className="px-4 py-4 sm:px-6 sm:py-5">
+                                {!isPlanLoaded ? (
+                                    <div className="flex items-center justify-center py-6">
+                                        <Loader2 className="h-5 w-5 animate-spin text-zinc-400" />
+                                    </div>
+                                ) : (
+                                    <div className="space-y-5">
+                                        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-10 h-10 shrink-0 rounded-full" style={{ background: 'linear-gradient(135deg, #34d399, #a3e635, #facc15)' }} />
+                                                <div>
+                                                    <div className="flex flex-wrap items-center gap-2">
+                                                        <p className="font-semibold text-zinc-900">{isPro ? "Pro" : "Hobby"}</p>
+                                                        {isCanceling ? (
+                                                            <Badge className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700">
+                                                                Cancels at period end
+                                                            </Badge>
+                                                        ) : proProduct?.status === "trialing" ? (
+                                                            <Badge className="rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-700">
+                                                                Trial
+                                                            </Badge>
+                                                        ) : proProduct?.status === "past_due" ? (
+                                                            <Badge className="rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-medium text-red-700">
+                                                                Past due
+                                                            </Badge>
+                                                        ) : (
+                                                            <Badge className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
+                                                                Active
+                                                            </Badge>
+                                                        )}
+                                                    </div>
+                                                    <p className="text-sm text-zinc-500 mt-0.5">
+                                                        {isPro ? "$20" : "$0"} / month
+                                                        {isPro && proProduct?.current_period_end && (
+                                                            <> · Renews {new Date(proProduct.current_period_end).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</>
+                                                        )}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <Button
+                                                onClick={openUpgradeModal}
+                                                variant="outline"
+                                                size="sm"
+                                                className="w-full sm:w-auto rounded-full shrink-0"
+                                            >
+                                                Change Plan
+                                            </Button>
+                                        </div>
+
+                                        {/* Scheduled downgrade banner */}
+                                        {isCanceling && (
+                                            <div className="rounded-xl bg-amber-50 border border-amber-100 px-4 py-3">
+                                                <p className="text-sm text-amber-800">
+                                                    Your plan will change to <span className="font-medium">Hobby</span> at the end of the current billing period
+                                                    {proProduct?.current_period_end && (
+                                                        <> on {new Date(proProduct.current_period_end).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</>
+                                                    )}.
+                                                </p>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Payment & Invoices */}
+                    <div>
+                        <h2 className="text-sm font-semibold text-zinc-900 uppercase tracking-wider mb-4">Payment & Invoices</h2>
+                        <div className="bg-white rounded-2xl border border-zinc-200 overflow-hidden">
+                            <div className="px-4 py-4 sm:px-6 sm:py-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 shrink-0 rounded-xl bg-zinc-100 flex items-center justify-center">
+                                        <CreditCard className="h-5 w-5 text-zinc-400" />
+                                    </div>
+                                    <div className="min-w-0">
+                                        <p className="font-semibold text-zinc-900">Manage Billing</p>
+                                        <p className="text-xs text-zinc-500">Update payment method, view invoices, and manage your subscription</p>
+                                    </div>
+                                </div>
+                                <Button
+                                    onClick={async () => {
+                                        setBillingPortalLoading(true)
+                                        try {
+                                            await openBillingPortal({
+                                                returnUrl: window.location.href,
+                                            })
+                                        } catch (err) {
+                                            console.error("Failed to open billing portal:", err)
+                                        } finally {
+                                            setBillingPortalLoading(false)
+                                        }
+                                    }}
+                                    disabled={billingPortalLoading || isCustomerLoading}
+                                    variant="outline"
+                                    size="sm"
+                                    className="w-full sm:w-auto rounded-full shrink-0"
+                                >
+                                    {billingPortalLoading ? (
+                                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                    ) : (
+                                        <>
+                                            Open Portal
+                                            <ArrowUpRight className="h-3.5 w-3.5 ml-1.5" />
+                                        </>
+                                    )}
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                )}
+
+                <UpgradeModal isOpen={upgradeOpen} onClose={closeUpgradeModal} />
             </div>
         </div>
     )

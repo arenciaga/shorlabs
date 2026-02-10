@@ -15,7 +15,7 @@ const plans = [
             "Up to 30 Second Timeout",
             "512 MB Storage",
             "1M Requests/Month",
-            "100K GB-Seconds",
+            "10K GB-Seconds",
         ],
     },
     {

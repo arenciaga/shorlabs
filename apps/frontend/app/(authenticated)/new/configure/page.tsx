@@ -459,13 +459,18 @@ function ConfigureProjectContent() {
                     ) : (
                         <Button
                             onClick={handleDeploy}
-                            disabled={!projectName.trim() || !startCommand.trim() || deploying}
+                            disabled={!projectName.trim() || !startCommand.trim() || deploying || detectingFramework}
                             className="bg-zinc-900 hover:bg-zinc-800 text-white rounded-full h-11 px-6 shadow-lg shadow-zinc-900/10 disabled:bg-zinc-200 disabled:text-zinc-400 disabled:shadow-none w-full sm:w-auto"
                         >
                             {deploying ? (
                                 <>
                                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                                     Deploying...
+                                </>
+                            ) : detectingFramework ? (
+                                <>
+                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                    Detecting...
                                 </>
                             ) : (
                                 <>

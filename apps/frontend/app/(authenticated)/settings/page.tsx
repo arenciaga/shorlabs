@@ -390,7 +390,7 @@ export default function SettingsPage() {
                                                     <p className="text-sm text-zinc-500 mt-0.5">
                                                         {isPro ? "$20" : "$0"} / month
                                                         {isPro && proProduct?.current_period_end && (
-                                                            <> · Renews {new Date(proProduct.current_period_end).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</>
+                                                            <> · {proProduct.status === "trialing" ? "Trial ends" : "Renews"} {new Date(proProduct.current_period_end).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</>
                                                         )}
                                                     </p>
                                                 </div>

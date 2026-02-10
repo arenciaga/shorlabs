@@ -14,8 +14,8 @@ const plans = [
             "1 GB Memory",
             "Up to 30 Second Timeout",
             "512 MB Storage",
-            "1M Requests/Month",
-            "10K GB-Seconds",
+            "50K Requests/Month",
+            "20K GB-Seconds",
         ],
     },
     {
@@ -29,8 +29,8 @@ const plans = [
             "Up to 4 GB Memory",
             "Up to 300 Second Timeout",
             "2 GB Storage",
-            "10M Requests/Month",
-            "1M GB-Seconds",
+            "1M Requests/Month",
+            "400K GB-Seconds",
         ],
     },
 ];

@@ -328,8 +328,8 @@ async def get_org_usage_endpoint(
     This aligns with industry standards (Vercel, AWS, etc.) where organizations pay for usage.
     
     Limits:
-    - Free: 1M requests, 10K GB-seconds
-    - Pro: 10M requests, 1M GB-seconds
+    - Free: 50K requests, 20K GB-seconds
+    - Pro: 1M requests, 400K GB-seconds
     """
     # Get current billing period
     period = get_current_period()
@@ -345,8 +345,8 @@ async def get_org_usage_endpoint(
     # Free tier limits (default)
     # Pro limits are handled on frontend based on Clerk subscription
     # Frontend will override these if user has Pro plan
-    request_limit = 1_000_000  # 1M requests for Free tier
-    gb_seconds_limit = 10_000  # 10K GB-Seconds for Free tier
+    request_limit = 50_000  # 50K requests for Free tier
+    gb_seconds_limit = 20_000  # 20K GB-Seconds for Free tier
     
     return {
         "requests": {

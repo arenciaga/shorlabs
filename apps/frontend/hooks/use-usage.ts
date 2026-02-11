@@ -2,20 +2,8 @@
 
 import useSWR from "swr"
 import { useAuth } from "@clerk/nextjs"
-import { useIsPro } from "@/hooks/use-is-pro"
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
-
-// Tier limits
-const FREE_LIMITS = {
-    requests: 50_000,         // 50K requests
-    gbSeconds: 20_000,        // 20K GB-seconds
-}
-
-const PRO_LIMITS = {
-    requests: 1_000_000,      // 1M requests
-    gbSeconds: 400_000,       // 400K GB-seconds
-}
 
 interface Usage {
     requests: {
@@ -60,7 +48,6 @@ const fetcher = async (url: string, token: string): Promise<Usage> => {
  */
 export function useUsage(): UseUsageReturn {
     const { getToken, isLoaded, orgId } = useAuth()
-    const { isPro } = useIsPro()
 
     // Build URL with org_id parameter (usage is tracked per organization)
     const usageUrl = orgId
@@ -86,22 +73,8 @@ export function useUsage(): UseUsageReturn {
         }
     )
 
-    // Override limits based on tier (now determined by Autumn)
-    const limits = isPro ? PRO_LIMITS : FREE_LIMITS
-    const adjustedUsage = data ? {
-        ...data,
-        requests: {
-            ...data.requests,
-            limit: limits.requests,
-        },
-        gbSeconds: {
-            ...data.gbSeconds,
-            limit: limits.gbSeconds,
-        },
-    } : undefined
-
     return {
-        usage: adjustedUsage,
+        usage: data,
         // Show loading if auth isn't loaded yet OR no org selected OR if SWR is loading
         loading: !isLoaded || !orgId || isLoading,
         // Don't show error if auth isn't loaded yet or no org

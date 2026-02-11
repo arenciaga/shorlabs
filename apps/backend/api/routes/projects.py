@@ -10,6 +10,7 @@ from datetime import datetime
 import boto3
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
+import httpx
 
 from api.auth import get_current_user_id
 from api.db.dynamodb import (
@@ -22,7 +23,6 @@ from api.db.dynamodb import (
     create_deployment,
     list_deployments,
     update_deployment,
-    get_org_usage,
     get_current_period,
 )
 
@@ -34,6 +34,32 @@ from deployer.aws import (
 from deployer.aws.ecr import get_ecr_repo_name
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
+
+AUTUMN_BASE_URL = os.environ.get("AUTUMN_BASE_URL", "https://api.useautumn.com/v1").rstrip("/")
+
+
+def _fetch_autumn_customer(org_id: str) -> dict:
+    autumn_key = os.environ.get("AUTUMN_API_KEY")
+    if not autumn_key:
+        raise HTTPException(status_code=500, detail="AUTUMN_API_KEY not configured")
+
+    url = f"{AUTUMN_BASE_URL}/customers/{org_id}"
+    try:
+        resp = httpx.get(
+            url,
+            headers={"Authorization": f"Bearer {autumn_key}"},
+            timeout=15.0,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Failed to reach Autumn: {e}")
+
+    if resp.status_code >= 400:
+        raise HTTPException(status_code=resp.status_code, detail=f"Autumn error: {resp.text}")
+
+    data = resp.json()
+    if not isinstance(data, dict):
+        raise HTTPException(status_code=502, detail="Invalid Autumn response")
+    return data
 
 
 class CreateProjectRequest(BaseModel):
@@ -327,38 +353,52 @@ async def get_org_usage_endpoint(
     Usage is tracked per organization (the billing entity), not per user.
     This aligns with industry standards (Vercel, AWS, etc.) where organizations pay for usage.
     
-    Limits:
-    - Free: 50K requests, 20K GB-seconds
-    - Pro: 1M requests, 400K GB-seconds
+    Source of truth: Autumn (features: invocations, compute)
     """
-    # Get current billing period
     period = get_current_period()
-    
-    # Fetch usage from DynamoDB by organization
-    usage_data = get_org_usage(org_id, period)
-    
-    # Extract metrics, default to 0 if no data yet
-    current_requests = int(usage_data.get("requests", 0)) if usage_data else 0
-    current_gb_seconds = float(usage_data.get("gb_seconds", 0.0)) if usage_data else 0.0
-    last_updated = usage_data.get("last_updated") if usage_data else None
-    
-    # Free tier limits (default)
-    # Pro limits are handled on frontend based on Clerk subscription
-    # Frontend will override these if user has Pro plan
-    request_limit = 50_000  # 50K requests for Free tier
-    gb_seconds_limit = 20_000  # 20K GB-Seconds for Free tier
+
+    customer = _fetch_autumn_customer(org_id)
+    features = customer.get("features") or {}
+
+    inv = features.get("invocations") or {}
+    comp = features.get("compute") or {}
+
+    # Autumn fields: balance (remaining), usage (consumed), included_usage (grant)
+    # For the UI you described ("390,000 / 400,000 left"), we want:
+    #   current = remaining = balance
+    #   limit   = included_usage
+    inv_balance = inv.get("balance")
+    inv_included = inv.get("included_usage")
+    comp_balance = comp.get("balance")
+    comp_included = comp.get("included_usage")
+
+    if inv_included is not None and inv_balance is not None:
+        current_invocations = int(inv_balance or 0)
+        included_invocations = int(inv_included or 0)
+    else:
+        current_invocations = int(inv.get("usage", 0) or 0)
+        included_invocations = int(inv.get("included_usage", 0) or 0)
+
+    if comp_included is not None and comp_balance is not None:
+        current_compute = float(comp_balance or 0.0)
+        included_compute = float(comp_included or 0.0)
+    else:
+        current_compute = float(comp.get("usage", 0.0) or 0.0)
+        included_compute = float(comp.get("included_usage", 0.0) or 0.0)
+
+    last_updated = datetime.utcnow().isoformat()
     
     return {
         "requests": {
-            "current": current_requests,
-            "limit": request_limit,
+            "current": current_invocations,
+            "limit": included_invocations,
         },
         "gbSeconds": {
-            "current": round(current_gb_seconds, 2),
-            "limit": gb_seconds_limit,
+            "current": round(current_compute, 2),
+            "limit": included_compute,
         },
         "period": period,
-        "lastUpdated": last_updated or datetime.utcnow().isoformat(),
+        "lastUpdated": last_updated,
     }
 
 

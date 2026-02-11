@@ -1,37 +1,8 @@
 "use client";
 
-import { PricingCard } from "@/components/PricingCard";
-
-const plans = [
-    {
-        name: "Hobby",
-        description: "Perfect for personal projects and testing.",
-        price: "$0",
-        features: [
-            "Unlimited Projects",
-            "1 GB Memory",
-            "Up to 30 Second Timeout",
-            "512 MB Storage",
-            "50K Requests/Month",
-            "20K GB-Seconds",
-        ],
-    },
-    {
-        name: "Pro",
-        description: "Built for production workloads and commercial applications.",
-        price: "$20",
-        period: "/ month",
-        highlighted: true,
-        features: [
-            "Unlimited Projects",
-            "Up to 4 GB Memory",
-            "Up to 300 Second Timeout",
-            "2 GB Storage",
-            "1M Requests/Month",
-            "400K GB-Seconds",
-        ],
-    },
-];
+import { PricingCard } from "@/components/pricing-card";
+import { Badge } from "@/components/ui/badge";
+import { PLANS } from "@/lib/plans";
 
 const PricingSection = () => {
     return (
@@ -56,11 +27,22 @@ const PricingSection = () => {
                 </div>
             </div>
 
-            {/* Pricing Cards */}
+            {/* Pricing Cards - info only, no buttons (homepage users are typically not logged in) */}
             <div className="w-full max-w-4xl mx-auto px-4 sm:px-6 pb-16 sm:pb-24">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {plans.map((plan) => (
-                        <PricingCard key={plan.name} {...plan} />
+                    {PLANS.map((plan) => (
+                        <PricingCard
+                            key={plan.id}
+                            plan={plan}
+                            highlighted={plan.highlighted}
+                            renderBadge={() =>
+                                plan.highlighted ? (
+                                    <Badge className="rounded-full bg-gradient-to-r from-violet-500 to-blue-500 px-2 py-0.5 text-[10px] font-medium text-white">
+                                        14 day free trial
+                                    </Badge>
+                                ) : null
+                            }
+                        />
                     ))}
                 </div>
             </div>

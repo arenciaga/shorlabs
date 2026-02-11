@@ -2,61 +2,15 @@
 
 import { useState } from 'react'
 import { useCustomer } from 'autumn-js/react'
-import { Clock, Cpu, FolderOpen, Globe, HardDrive, Loader2, type LucideIcon, Zap } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 
+import { PricingCard } from '@/components/pricing-card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { useIsPro } from '@/hooks/use-is-pro'
+import { PLANS } from '@/lib/plans'
 import { cn } from '@/lib/utils'
-
-interface Feature {
-    label: string
-    icon: LucideIcon
-}
-
-const plans: {
-    id: string
-    name: string
-    description: string
-    price: string
-    period: string
-    highlighted?: boolean
-    features: Feature[]
-}[] = [
-    {
-        id: "hobby",
-        name: "Hobby",
-        description: "Perfect for personal projects and testing.",
-        price: "$0",
-        period: "/ month",
-        features: [
-            { label: "Unlimited Projects", icon: FolderOpen },
-            { label: "50K Requests/Month", icon: Globe },
-            { label: "20K GB-Seconds", icon: Zap },
-            { label: "1 GB Memory", icon: Cpu },
-            { label: "Up to 30s Timeout", icon: Clock },
-            { label: "512 MB Temp Disk", icon: HardDrive },
-        ],
-    },
-    {
-        id: "pro",
-        name: "Pro",
-        description: "Built for production workloads and commercial applications.",
-        price: "$20",
-        period: "/ month",
-        highlighted: true,
-        features: [
-            { label: "Unlimited Projects", icon: FolderOpen },
-            { label: "1M Requests/Month", icon: Globe },
-            { label: "400K GB-Seconds", icon: Zap },
-            { label: "Up to 4 GB Memory", icon: Cpu },
-            { label: "Up to 300s Timeout", icon: Clock },
-            { label: "2 GB Temp Disk", icon: HardDrive },
-        ],
-    },
-]
 
 interface UpgradeModalProps {
     isOpen: boolean
@@ -134,7 +88,7 @@ export function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
                     </SheetHeader>
 
                     <div className="mx-auto mt-6 grid max-w-xl grid-cols-1 gap-4 sm:grid-cols-2">
-                        {plans.map((plan) => {
+                        {PLANS.map((plan) => {
                             const isCurrent = plan.id === currentProductId
                             const isLoading = loadingPlan === plan.id
                             const isPro = plan.id === "pro"
@@ -152,46 +106,35 @@ export function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
                             }
 
                             return (
-                                <Card
+                                <PricingCard
                                     key={plan.id}
-                                    className={cn(
-                                        "h-full rounded-2xl border-zinc-200 bg-white shadow-none",
-                                        isCurrent && "border-zinc-400 ring-1 ring-zinc-400",
-                                    )}
-                                >
-                                    <CardHeader className="space-y-3 px-4 pb-2">
-                                        <div className="flex items-start justify-between gap-2">
-                                            <CardTitle className="text-lg font-semibold tracking-tight text-zinc-900">
-                                                {plan.name}
-                                            </CardTitle>
-                                            {isCurrent && isPro && isDowngradeScheduled ? (
+                                    plan={plan}
+                                    highlighted={isCurrent}
+                                    renderBadge={() => {
+                                        if (isCurrent && isPro && isDowngradeScheduled) {
+                                            return (
                                                 <Badge className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700">
                                                     Cancels at period end
                                                 </Badge>
-                                            ) : isCurrent ? (
+                                            )
+                                        }
+                                        if (isCurrent) {
+                                            return (
                                                 <Badge className="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-medium text-zinc-600">
                                                     Current
                                                 </Badge>
-                                            ) : plan.highlighted ? (
+                                            )
+                                        }
+                                        if (plan.highlighted) {
+                                            return (
                                                 <Badge className="rounded-full bg-gradient-to-r from-violet-500 to-blue-500 px-2 py-0.5 text-[10px] font-medium text-white">
                                                     14 day free trial
                                                 </Badge>
-                                            ) : null}
-                                        </div>
-
-                                        <div className="flex items-end gap-1">
-                                            <span className="text-2xl font-semibold leading-none text-zinc-900 sm:text-3xl">
-                                                {plan.price}
-                                            </span>
-                                            <span className="pb-0.5 text-xs text-zinc-500">{plan.period}</span>
-                                        </div>
-
-                                        <CardDescription className="text-xs leading-relaxed text-zinc-600">
-                                            {plan.description}
-                                        </CardDescription>
-                                    </CardHeader>
-
-                                    <CardContent className="flex flex-1 flex-col px-4  pt-0">
+                                            )
+                                        }
+                                        return null
+                                    }}
+                                    renderAction={() => (
                                         <Button
                                             type="button"
                                             onClick={() => handleSelectPlan(plan.id)}
@@ -210,23 +153,8 @@ export function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
                                                 buttonText
                                             )}
                                         </Button>
-
-                                        <ul className="mt-4 space-y-2">
-                                            {plan.features.map((feature) => {
-                                                const Icon = feature.icon
-                                                return (
-                                                    <li
-                                                        key={feature.label}
-                                                        className="flex items-center gap-2 text-xs text-zinc-600"
-                                                    >
-                                                        <Icon className="size-3.5 shrink-0 text-zinc-400" strokeWidth={2} />
-                                                        {feature.label}
-                                                    </li>
-                                                )
-                                            })}
-                                        </ul>
-                                    </CardContent>
-                                </Card>
+                                    )}
+                                />
                             )
                         })}
                     </div>

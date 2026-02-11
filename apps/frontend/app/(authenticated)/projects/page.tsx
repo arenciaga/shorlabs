@@ -338,41 +338,44 @@ export default function ProjectsPage() {
                                             href={`/projects/${project.project_id}`}
                                             className="group block"
                                         >
-                                            <div className="bg-white border border-zinc-200 rounded-xl overflow-hidden transition-all duration-200 hover:border-zinc-300 hover:shadow-lg hover:shadow-zinc-200/50">
-                                                <div className="p-5 pb-4">
-                                                    <div className="flex items-start justify-between mb-3">
-                                                        <div className="flex items-center gap-3">
-                                                            <div className="w-9 h-9 rounded-lg bg-zinc-900 flex items-center justify-center shrink-0">
-                                                                <span className="text-white font-semibold text-sm">
-                                                                    {project.name.charAt(0).toUpperCase()}
-                                                                </span>
-                                                            </div>
-                                                            <div className="min-w-0">
-                                                                <h3 className="font-semibold text-zinc-900 group-hover:text-black transition-colors truncate">
-                                                                    {project.name.toLowerCase().replace(/_/g, '-')}
-                                                                </h3>
-                                                                {(project.custom_url || project.function_url) && (
-                                                                    <p className="text-xs text-zinc-500 truncate">
-                                                                        {(project.custom_url || project.function_url)!.replace("https://", "").split("/")[0]}
-                                                                    </p>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                        <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full shrink-0 ${status.bg}`}>
-                                                            <span className={`w-1.5 h-1.5 rounded-full ${status.dot}`} />
-                                                            <span className="text-xs font-medium text-zinc-700">
-                                                                {status.label}
+                                            <div className="bg-white border border-zinc-200 rounded-xl p-5 transition-all duration-200 hover:border-zinc-300 hover:shadow-lg hover:shadow-zinc-200/50">
+                                                {/* Top: Icon + Name + Status */}
+                                                <div className="flex items-start justify-between mb-4">
+                                                    <div className="flex items-center gap-3 min-w-0">
+                                                        <div className="w-9 h-9 rounded-lg bg-zinc-900 flex items-center justify-center shrink-0">
+                                                            <span className="text-white font-semibold text-sm">
+                                                                {project.name.charAt(0).toUpperCase()}
                                                             </span>
                                                         </div>
+                                                        <div className="min-w-0">
+                                                            <h3 className="font-semibold text-[15px] text-zinc-900 group-hover:text-black transition-colors truncate">
+                                                                {project.name.toLowerCase().replace(/_/g, '-')}
+                                                            </h3>
+                                                            {(project.custom_url || project.function_url) && (
+                                                                <p className="text-xs text-zinc-400 truncate mt-0.5">
+                                                                    {(project.custom_url || project.function_url)!.replace("https://", "").split("/")[0]}
+                                                                </p>
+                                                            )}
+                                                        </div>
                                                     </div>
-
-                                                    <div className="flex items-center gap-2 text-sm text-zinc-500">
-                                                        <Github className="h-4 w-4 shrink-0" />
-                                                        <span className="truncate text-xs">{project.github_repo}</span>
+                                                    <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full shrink-0 ml-3 ${status.bg}`}>
+                                                        <span className={`w-1.5 h-1.5 rounded-full ${status.dot}`} />
+                                                        <span className="text-xs font-medium text-zinc-700">
+                                                            {status.label}
+                                                        </span>
                                                     </div>
                                                 </div>
 
-                                                <div className="px-5 py-3 bg-zinc-50 border-t border-zinc-100 flex items-center justify-between">
+                                                {/* GitHub repo badge */}
+                                                <div className="flex items-center gap-1.5 mb-4">
+                                                    <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-zinc-50 border border-zinc-100 rounded-full">
+                                                        <Github className="h-3 w-3 text-zinc-500" />
+                                                        <span className="text-xs text-zinc-600 truncate max-w-[200px]">{project.github_repo}</span>
+                                                    </div>
+                                                </div>
+
+                                                {/* Bottom: Date + Action icons */}
+                                                <div className="flex items-center justify-between pt-3 border-t border-zinc-100">
                                                     <span className="text-xs text-zinc-400">
                                                         {new Date(project.updated_at || project.created_at).toLocaleDateString("en-US", {
                                                             month: "short",
@@ -380,16 +383,16 @@ export default function ProjectsPage() {
                                                             year: "numeric",
                                                         })}
                                                     </span>
-                                                    <div className="flex items-center gap-1">
+                                                    <div className="flex items-center gap-0.5">
                                                         <button
                                                             onClick={(e) => {
                                                                 e.preventDefault()
                                                                 e.stopPropagation()
                                                                 window.open(`https://github.com/${project.github_repo}`, "_blank")
                                                             }}
-                                                            className="p-1.5 rounded-md text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 transition-colors cursor-pointer"
+                                                            className="p-1.5 rounded-md text-zinc-300 hover:text-zinc-600 hover:bg-zinc-50 transition-colors cursor-pointer"
                                                         >
-                                                            <Github className="h-4 w-4" />
+                                                            <Github className="h-3.5 w-3.5" />
                                                         </button>
                                                         {(project.custom_url || project.function_url) && (
                                                             <button
@@ -398,9 +401,9 @@ export default function ProjectsPage() {
                                                                     e.stopPropagation()
                                                                     window.open((project.custom_url || project.function_url)!, "_blank")
                                                                 }}
-                                                                className="p-1.5 rounded-md text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 transition-colors cursor-pointer"
+                                                                className="p-1.5 rounded-md text-zinc-300 hover:text-zinc-600 hover:bg-zinc-50 transition-colors cursor-pointer"
                                                             >
-                                                                <ExternalLink className="h-4 w-4" />
+                                                                <ExternalLink className="h-3.5 w-3.5" />
                                                             </button>
                                                         )}
                                                     </div>

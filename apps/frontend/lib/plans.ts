@@ -25,7 +25,7 @@ export const PLANS: Plan[] = [
         features: [
             { label: "Unlimited Projects", icon: FolderOpen },
             { label: "50K Requests/Month", icon: Globe },
-            { label: "20K GB-Seconds", icon: Zap },
+            { label: "20K Compute/Month", icon: Zap },
             { label: "1 GB Memory", icon: Cpu },
             { label: "Up to 30s Timeout", icon: Clock },
             { label: "512 MB Temp Disk", icon: HardDrive },
@@ -41,7 +41,7 @@ export const PLANS: Plan[] = [
         features: [
             { label: "Unlimited Projects", icon: FolderOpen },
             { label: "1M Requests/Month", icon: Globe },
-            { label: "400K GB-Seconds", icon: Zap },
+            { label: "400K Compute/Month", icon: Zap },
             { label: "Up to 4 GB Memory", icon: Cpu },
             { label: "Up to 300s Timeout", icon: Clock },
             { label: "2 GB Temp Disk", icon: HardDrive },

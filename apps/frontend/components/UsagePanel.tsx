@@ -16,7 +16,7 @@ const formatNumber = (num: number) => {
 
 export function UsagePanel({ onUpgrade }: UsagePanelProps) {
     const { usage, loading: usageLoading, error: usageError, isValidating } = useUsage()
-    const { isPro } = useIsPro()
+    const { isPro, proProduct } = useIsPro()
 
     return (
         <div className="w-full lg:w-80 lg:shrink-0">
@@ -24,7 +24,14 @@ export function UsagePanel({ onUpgrade }: UsagePanelProps) {
                 {/* Header row */}
                 <div className="flex items-center justify-between px-5 pt-5 pb-1">
                     <div>
-                        <h3 className="text-sm font-semibold text-zinc-900">Usage</h3>
+                        <h3 className="text-sm font-semibold text-zinc-900 flex items-center gap-2">
+                            Usage
+                            {proProduct?.status === "trialing" && (
+                                <span className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium bg-blue-100 text-blue-700 rounded-full">
+                                    Trial
+                                </span>
+                            )}
+                        </h3>
                         <p className="text-xs text-zinc-400 mt-0.5">
                             {usage?.periodStart && usage?.periodEnd
                                 ? `${new Date(usage.periodStart).toLocaleDateString("en-US", { month: "short", day: "numeric" })} – ${new Date(usage.periodEnd).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`

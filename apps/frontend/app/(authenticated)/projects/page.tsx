@@ -175,65 +175,64 @@ export default function ProjectsPage() {
                 <div className="flex flex-col lg:flex-row gap-6 lg:gap-8">
                     {/* Usage Panel - Shows above projects on mobile/tablet, sidebar on desktop */}
                     <div className="w-full lg:w-80 lg:shrink-0">
-                        <Card className="sticky top-8 border-zinc-200 bg-white/80 backdrop-blur">
-                            <CardHeader className="pb-3">
-                                <CardTitle className="text-sm font-semibold text-zinc-900">
-                                    Usage
-                                </CardTitle>
-                                <CardDescription className="flex items-center justify-between text-xs text-zinc-500">
-                                    <span>
+                        <div className="sticky top-8 border border-zinc-200 rounded-xl bg-white overflow-hidden">
+                            {/* Header row */}
+                            <div className="flex items-center justify-between px-5 pt-5 pb-1">
+                                <div>
+                                    <h3 className="text-sm font-semibold text-zinc-900">Usage</h3>
+                                    <p className="text-xs text-zinc-400 mt-0.5">
                                         {usage?.periodStart && usage?.periodEnd
                                             ? `${new Date(usage.periodStart).toLocaleDateString("en-US", { month: "short", day: "numeric" })} – ${new Date(usage.periodEnd).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
                                             : "Current period"}
+                                    </p>
+                                </div>
+                                {(usageLoading || isValidating) && (
+                                    <span className="inline-flex items-center gap-1.5 text-[11px] text-zinc-400">
+                                        <span className="h-1.5 w-1.5 rounded-full bg-zinc-300 animate-pulse" />
+                                        Syncing
                                     </span>
-                                    {(usageLoading || isValidating) && (
-                                        <span className="ml-2 inline-flex items-center gap-1 text-[10px] text-sky-700">
-                                            <span className="h-1 w-1 rounded-full bg-sky-600 animate-pulse" />
-                                            Refreshing
-                                        </span>
-                                    )}
-                                </CardDescription>
-                            </CardHeader>
-                            <CardContent className="px-5 pb-4 pt-0">
-                                {/* Loading State - show skeleton while loading or validating with no data */}
+                                )}
+                            </div>
+
+                            {/* Body */}
+                            <div className="px-5 pt-4 pb-5">
                                 {(usageLoading || (isValidating && !usage)) ? (
-                                    <div className="space-y-4 animate-pulse">
-                                        <div className="space-y-2">
-                                            <div className="h-4 bg-zinc-200 rounded w-2/3" />
-                                            <div className="h-1.5 bg-zinc-200 rounded-full" />
+                                    <div className="space-y-5 animate-pulse">
+                                        <div className="space-y-2.5">
+                                            <div className="flex justify-between">
+                                                <div className="h-3 bg-zinc-100 rounded w-24" />
+                                                <div className="h-3 bg-zinc-100 rounded w-16" />
+                                            </div>
+                                            <div className="h-2 bg-zinc-100 rounded-full" />
                                         </div>
-                                        <div className="space-y-2">
-                                            <div className="h-4 bg-zinc-200 rounded w-2/3" />
-                                            <div className="h-1.5 bg-zinc-200 rounded-full" />
+                                        <div className="space-y-2.5">
+                                            <div className="flex justify-between">
+                                                <div className="h-3 bg-zinc-100 rounded w-20" />
+                                                <div className="h-3 bg-zinc-100 rounded w-16" />
+                                            </div>
+                                            <div className="h-2 bg-zinc-100 rounded-full" />
                                         </div>
                                     </div>
                                 ) : usageError && !usage ? (
-                                    /* Error State - only show if we have NO data at all */
-                                    <div className="py-4 text-center">
-                                        <AlertCircle className="h-6 w-6 text-red-500 mx-auto mb-2" />
-                                        <p className="text-sm text-zinc-600 mb-1">Failed to load usage</p>
-                                        <p className="text-xs text-zinc-400">{usageError.message}</p>
+                                    <div className="py-6 text-center">
+                                        <AlertCircle className="h-5 w-5 text-red-400 mx-auto mb-2" />
+                                        <p className="text-sm text-zinc-600">Failed to load usage</p>
+                                        <p className="text-xs text-zinc-400 mt-0.5">{usageError.message}</p>
                                     </div>
                                 ) : (
-                                    /* Usage Items */
-                                    <div className="space-y-4">
-                                        {/* Total Requests */}
-                                        <div className="space-y-1.5">
-                                            <div className="flex items-center justify-between">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="w-2 h-2 rounded-full bg-sky-700" />
-                                                    <span className="text-xs font-medium text-zinc-600">
-                                                        Requests
-                                                    </span>
-                                                </div>
-                                                <span className="text-xs font-mono text-zinc-500">
-                                                    {formatNumber(usage?.requests.current || 0)}{" "}
-                                                    / {formatNumber(usage?.requests.limit || 0)}
+                                    <div className="space-y-5">
+                                        {/* Included Requests */}
+                                        <div>
+                                            <div className="flex items-baseline justify-between mb-2">
+                                                <span className="text-[13px] text-zinc-600">Included Requests</span>
+                                                <span className="text-[13px] tabular-nums text-zinc-900">
+                                                    {formatNumber(usage?.requests.current || 0)}
+                                                    <span className="text-zinc-400"> / {formatNumber(usage?.requests.limit || 0)}</span>
                                                 </span>
                                             </div>
-                                            <div className="h-1.5 rounded-full bg-sky-100 overflow-hidden">
+                                            <div className="h-2 rounded-full bg-zinc-100 overflow-hidden">
                                                 <div
-                                                    className="h-full rounded-full bg-sky-800"
+                                                    className="h-full rounded-full bg-zinc-900 transition-all duration-500 ease-out"
                                                     style={{
                                                         width: `${Math.min(
                                                             ((usage?.requests.current || 0) /
@@ -246,23 +245,18 @@ export default function ProjectsPage() {
                                             </div>
                                         </div>
 
-                                        {/* Compute */}
-                                        <div className="space-y-1.5">
-                                            <div className="flex items-center justify-between">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="w-2 h-2 rounded-full bg-sky-700" />
-                                                    <span className="text-xs font-medium text-zinc-600">
-                                                        Compute
-                                                    </span>
-                                                </div>
-                                                <span className="text-xs font-mono text-zinc-500">
-                                                    {formatNumber(usage?.gbSeconds.current || 0)}{" "}
-                                                    / {formatNumber(usage?.gbSeconds.limit || 0)}
+                                        {/* Included Compute */}
+                                        <div>
+                                            <div className="flex items-baseline justify-between mb-2">
+                                                <span className="text-[13px] text-zinc-600">Included Compute</span>
+                                                <span className="text-[13px] tabular-nums text-zinc-900">
+                                                    {formatNumber(usage?.gbSeconds.current || 0)}
+                                                    <span className="text-zinc-400"> / {formatNumber(usage?.gbSeconds.limit || 0)}</span>
                                                 </span>
                                             </div>
-                                            <div className="h-1.5 rounded-full bg-sky-100 overflow-hidden">
+                                            <div className="h-2 rounded-full bg-zinc-100 overflow-hidden">
                                                 <div
-                                                    className="h-full rounded-full bg-sky-800"
+                                                    className="h-full rounded-full bg-zinc-900 transition-all duration-500 ease-out"
                                                     style={{
                                                         width: `${Math.min(
                                                             ((usage?.gbSeconds.current || 0) /
@@ -276,24 +270,20 @@ export default function ProjectsPage() {
                                         </div>
                                     </div>
                                 )}
-                            </CardContent>
-                            <CardFooter className="flex flex-col gap-1 border-t border-zinc-100 bg-zinc-50/60 py-3">
-                                {usage?.lastUpdated && (
-                                    <p className="text-[10px] text-zinc-400 text-center w-full">
-                                        Updated{" "}
-                                        {new Date(usage.lastUpdated).toLocaleTimeString()}
-                                    </p>
-                                )}
-                                {!isPro && (
+                            </div>
+
+                            {/* Footer — only show upgrade CTA for non-pro users */}
+                            {!isPro && (
+                                <div className="border-t border-zinc-100 px-5 py-3">
                                     <button
                                         onClick={openUpgradeModal}
-                                        className="w-full text-center text-[11px] font-medium text-sky-700 hover:text-sky-800 hover:underline transition-colors"
+                                        className="w-full text-center text-xs font-medium text-zinc-500 hover:text-zinc-900 transition-colors"
                                     >
                                         Upgrade to increase limits →
                                     </button>
-                                )}
-                            </CardFooter>
-                        </Card>
+                                </div>
+                            )}
+                        </div>
                     </div>
 
                     {/* Right Side - Projects */}

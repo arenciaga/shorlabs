@@ -7,6 +7,7 @@ import Link from "next/link"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card"
 import { UpgradeModal, useUpgradeModal } from "@/components/upgrade-modal"
 import { useUsage } from "@/hooks/use-usage"
 import { useIsPro } from "@/hooks/use-is-pro"
@@ -174,101 +175,115 @@ export default function ProjectsPage() {
                 <div className="flex flex-col lg:flex-row gap-6 lg:gap-8">
                     {/* Usage Panel - Shows above projects on mobile/tablet, sidebar on desktop */}
                     <div className="w-full lg:w-80 lg:shrink-0">
-                        <div className="bg-white border border-zinc-200 rounded-xl overflow-hidden sticky top-8">
-                            {/* Usage Header */}
-                            <div className="px-5 py-4 border-b border-zinc-100">
-                                <h2 className="font-semibold text-zinc-900">Usage</h2>
-                                <p className="text-xs text-zinc-500">
-                                    {usage?.period || 'Current period'}
-                                </p>
-                            </div>
-
-                            {/* Loading State - show skeleton while loading or validating with no data */}
-                            {(usageLoading || (isValidating && !usage)) ? (
-                                <div className="divide-y divide-zinc-100 animate-pulse">
-                                    <div className="px-5 py-4">
-                                        <div className="h-4 bg-zinc-200 rounded w-3/4 mb-2"></div>
-                                        <div className="h-1 bg-zinc-200 rounded-full"></div>
+                        <Card className="sticky top-8 border-zinc-200 bg-white/80 backdrop-blur">
+                            <CardHeader className="pb-3">
+                                <CardTitle className="text-sm font-semibold text-zinc-900">
+                                    Usage
+                                </CardTitle>
+                                <CardDescription className="text-xs text-zinc-500">
+                                    {usage?.period || "Current period"}
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent className="px-5 pb-4 pt-0">
+                                {/* Loading State - show skeleton while loading or validating with no data */}
+                                {(usageLoading || (isValidating && !usage)) ? (
+                                    <div className="space-y-4 animate-pulse">
+                                        <div className="space-y-2">
+                                            <div className="h-4 bg-zinc-200 rounded w-2/3" />
+                                            <div className="h-1.5 bg-zinc-200 rounded-full" />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <div className="h-4 bg-zinc-200 rounded w-2/3" />
+                                            <div className="h-1.5 bg-zinc-200 rounded-full" />
+                                        </div>
                                     </div>
-                                    <div className="px-5 py-4">
-                                        <div className="h-4 bg-zinc-200 rounded w-3/4 mb-2"></div>
-                                        <div className="h-1 bg-zinc-200 rounded-full"></div>
+                                ) : usageError && !usage ? (
+                                    /* Error State - only show if we have NO data at all */
+                                    <div className="py-4 text-center">
+                                        <AlertCircle className="h-6 w-6 text-red-500 mx-auto mb-2" />
+                                        <p className="text-sm text-zinc-600 mb-1">Failed to load usage</p>
+                                        <p className="text-xs text-zinc-400">{usageError.message}</p>
                                     </div>
-                                </div>
-                            ) : usageError && !usage ? (
-                                /* Error State - only show if we have NO data at all */
-                                <div className="px-5 py-6 text-center">
-                                    <AlertCircle className="h-8 w-8 text-red-500 mx-auto mb-2" />
-                                    <p className="text-sm text-zinc-600 mb-2">Failed to load usage</p>
-                                    <p className="text-xs text-zinc-400">{usageError.message}</p>
-                                </div>
-                            ) : (
-                                /* Usage Items */
-                                <>
-                                    <div className="divide-y divide-zinc-100">
+                                ) : (
+                                    /* Usage Items */
+                                    <div className="space-y-4">
                                         {/* Total Requests */}
-                                        <div className="px-5 py-4">
-                                            <div className="flex items-center justify-between mb-2">
+                                        <div className="space-y-1.5">
+                                            <div className="flex items-center justify-between">
                                                 <div className="flex items-center gap-2">
-                                                    <span className="w-2 h-2 rounded-full bg-zinc-900" />
-                                                    <span className="text-sm text-zinc-600">Requests</span>
+                                                    <span className="w-2 h-2 rounded-full bg-sky-700" />
+                                                    <span className="text-xs font-medium text-zinc-600">
+                                                        Requests
+                                                    </span>
                                                 </div>
-                                                <span className="text-sm font-mono text-zinc-500">
-                                                    {formatNumber(usage?.requests.current || 0)} / {formatNumber(usage?.requests.limit || 0)}
+                                                <span className="text-xs font-mono text-zinc-500">
+                                                    {formatNumber(usage?.requests.current || 0)}{" "}
+                                                    / {formatNumber(usage?.requests.limit || 0)}
                                                 </span>
                                             </div>
-                                            <div className="h-1 bg-zinc-100 rounded-full overflow-hidden">
+                                            <div className="h-1.5 rounded-full bg-sky-100 overflow-hidden">
                                                 <div
-                                                    className="h-full bg-zinc-900 rounded-full"
-                                                    style={{ width: `${Math.min(((usage?.requests.current || 0) / (usage?.requests.limit || 1)) * 100, 100)}%` }}
+                                                    className="h-full rounded-full bg-sky-800"
+                                                    style={{
+                                                        width: `${Math.min(
+                                                            ((usage?.requests.current || 0) /
+                                                                (usage?.requests.limit || 1)) *
+                                                                100,
+                                                            100
+                                                        )}%`,
+                                                    }}
                                                 />
                                             </div>
                                         </div>
 
-                                        {/* GB-Seconds */}
-                                        <div className="px-5 py-4">
-                                            <div className="flex items-center justify-between mb-2">
+                                        {/* Compute */}
+                                        <div className="space-y-1.5">
+                                            <div className="flex items-center justify-between">
                                                 <div className="flex items-center gap-2">
-                                                    <span className="w-2 h-2 rounded-full bg-zinc-900" />
-                                                    <span className="text-sm text-zinc-600">Compute</span>
+                                                    <span className="w-2 h-2 rounded-full bg-sky-700" />
+                                                    <span className="text-xs font-medium text-zinc-600">
+                                                        Compute
+                                                    </span>
                                                 </div>
-                                                <span className="text-sm font-mono text-zinc-500">
-                                                    {formatNumber(usage?.gbSeconds.current || 0)} / {formatNumber(usage?.gbSeconds.limit || 0)}
+                                                <span className="text-xs font-mono text-zinc-500">
+                                                    {formatNumber(usage?.gbSeconds.current || 0)}{" "}
+                                                    / {formatNumber(usage?.gbSeconds.limit || 0)}
                                                 </span>
                                             </div>
-                                            <div className="h-1 bg-zinc-100 rounded-full overflow-hidden">
+                                            <div className="h-1.5 rounded-full bg-sky-100 overflow-hidden">
                                                 <div
-                                                    className="h-full bg-zinc-900 rounded-full"
-                                                    style={{ width: `${Math.min(((usage?.gbSeconds.current || 0) / (usage?.gbSeconds.limit || 1)) * 100, 100)}%` }}
+                                                    className="h-full rounded-full bg-sky-800"
+                                                    style={{
+                                                        width: `${Math.min(
+                                                            ((usage?.gbSeconds.current || 0) /
+                                                                (usage?.gbSeconds.limit || 1)) *
+                                                                100,
+                                                            100
+                                                        )}%`,
+                                                    }}
                                                 />
                                             </div>
                                         </div>
                                     </div>
-
-                                    {/* Last Updated */}
-                                    {usage?.lastUpdated && (
-                                        <div className="px-5 py-2 bg-zinc-50 border-t border-zinc-100">
-                                            <p className="text-[10px] text-zinc-400 text-center">
-                                                Updated {new Date(usage.lastUpdated).toLocaleTimeString()}
-                                            </p>
-                                        </div>
-                                    )}
-                                </>
-                            )}
-
-                            {!isPro && (
-                                <button
-                                    onClick={openUpgradeModal}
-                                    className="w-full px-5 py-3 border-t border-zinc-100 text-left hover:bg-zinc-50 transition-colors cursor-pointer"
-                                >
-                                    <p className="text-xs text-blue-600 hover:underline">
-                                        Upgrade to increase limits →
+                                )}
+                            </CardContent>
+                            <CardFooter className="flex flex-col gap-1 border-t border-zinc-100 bg-zinc-50/60 py-3">
+                                {usage?.lastUpdated && (
+                                    <p className="text-[10px] text-zinc-400 text-center w-full">
+                                        Updated{" "}
+                                        {new Date(usage.lastUpdated).toLocaleTimeString()}
                                     </p>
-                                </button>
-                            )}
-
-
-                        </div>
+                                )}
+                                {!isPro && (
+                                    <button
+                                        onClick={openUpgradeModal}
+                                        className="w-full text-center text-[11px] font-medium text-sky-700 hover:text-sky-800 hover:underline transition-colors"
+                                    >
+                                        Upgrade to increase limits →
+                                    </button>
+                                )}
+                            </CardFooter>
+                        </Card>
                     </div>
 
                     {/* Right Side - Projects */}

@@ -44,7 +44,7 @@ export const PLANS: Plan[] = [
             { label: "400K Compute/Month", icon: Zap },
             { label: "Up to 4 GB Memory", icon: Cpu },
             { label: "Up to 300s Timeout", icon: Clock },
-            { label: "2 GB Temp Disk", icon: HardDrive },
+            { label: "Up to 2 GB Temp Disk", icon: HardDrive },
         ],
     },
 ]

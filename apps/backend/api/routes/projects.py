@@ -348,12 +348,12 @@ async def get_org_usage_endpoint(
 ):
     """
     Get organization's usage metrics for the current billing period.
-    
+
     Usage is tracked per organization (the billing entity), not per user.
-    This aligns with industry standards (Vercel, AWS, etc.) where organizations pay for usage.
-    
-    Source of truth: Autumn (features: invocations, compute)
-    Period dates come from the Autumn product's current_period_start/end.
+    This aligns with industry standards (Vercel, Railway) where organizations pay for usage.
+
+    For Pro users (credit system): returns dollar-based credit usage with breakdown.
+    For Hobby users (raw features): returns raw invocation/compute counts.
     """
     customer = _fetch_autumn_customer(org_id)
     features = customer.get("features") or {}
@@ -361,10 +361,55 @@ async def get_org_usage_endpoint(
     inv = features.get("invocations") or {}
     comp = features.get("compute") or {}
 
-    # Autumn fields: balance (remaining), usage (consumed), included_usage (grant)
-    # For the UI you described ("390,000 / 400,000 left"), we want:
-    #   current = remaining = balance
-    #   limit   = included_usage
+    # ── Check for credit system (Pro users) ──────────────────────────
+    usd_credits = features.get("usd_credits") or {}
+    credits_included = usd_credits.get("included_usage")
+    has_credit_system = credits_included is not None and credits_included > 0
+
+    credits_response = None
+    breakdown_response = None
+
+    if has_credit_system:
+        # Credit system: values are in cents
+        credits_usage = float(usd_credits.get("usage", 0) or 0)
+        credits_balance = float(usd_credits.get("balance", 0) or 0)
+        credits_included_f = float(credits_included)
+        credit_schema = usd_credits.get("credit_schema") or []
+
+        # Convert cents to dollars for the response
+        credits_response = {
+            "used": round(credits_usage / 100, 2),
+            "included": round(credits_included_f / 100, 2),
+            "balance": round(credits_balance / 100, 2),
+            "currency": "USD",
+        }
+
+        # Build per-feature breakdown using credit_schema rates
+        # credit_schema looks like: [{"feature_id": "invocations", "credit_amount": 0.0002}, ...]
+        breakdown_response = []
+        for schema_entry in credit_schema:
+            fid = schema_entry.get("feature_id", "")
+            credit_amount = float(schema_entry.get("credit_amount", 0))
+
+            feat_data = features.get(fid) or {}
+            raw_usage = float(feat_data.get("usage", 0) or 0)
+
+            # Dollar amount = raw_usage * credit_amount_per_unit / 100 (cents to dollars)
+            dollar_amount = round((raw_usage * credit_amount) / 100, 2)
+
+            label_map = {
+                "invocations": "Requests",
+                "compute": "Compute (GB-s)",
+            }
+
+            breakdown_response.append({
+                "featureId": fid,
+                "label": label_map.get(fid, fid),
+                "dollarAmount": dollar_amount,
+                "rawUsage": round(raw_usage, 2) if isinstance(raw_usage, float) else int(raw_usage),
+            })
+
+    # ── Raw counts (Hobby users, or fallback) ────────────────────────
     inv_balance = inv.get("balance")
     inv_included = inv.get("included_usage")
     comp_balance = comp.get("balance")
@@ -384,15 +429,11 @@ async def get_org_usage_endpoint(
         current_compute = float(comp.get("usage", 0.0) or 0.0)
         included_compute = float(comp.get("included_usage", 0.0) or 0.0)
 
-    # Extract billing period dates from the Autumn product.
-    # Pick the most relevant product: prefer non-default (Pro) over default (Hobby).
-    # For trials, use started_at as period start (trial is shorter than a month).
-    # For active subscriptions, use current_period_start/end directly.
+    # ── Billing period dates ─────────────────────────────────────────
     period_start = None
     period_end = None
 
     products = customer.get("products") or []
-    # Sort: non-default products first (Pro before Hobby)
     products_sorted = sorted(products, key=lambda p: p.get("is_default", False))
 
     for product in products_sorted:
@@ -404,7 +445,6 @@ async def get_org_usage_endpoint(
         period_end = datetime.utcfromtimestamp(pe / 1000).isoformat()
 
         if status == "trialing":
-            # Trial: period starts when the trial began, not a full month before
             started = product.get("started_at")
             if started:
                 period_start = datetime.utcfromtimestamp(started / 1000).isoformat()
@@ -413,7 +453,6 @@ async def get_org_usage_endpoint(
                 if ps:
                     period_start = datetime.utcfromtimestamp(ps / 1000).isoformat()
         else:
-            # Active/regular: use the subscription's actual period start
             ps = product.get("current_period_start")
             if ps:
                 period_start = datetime.utcfromtimestamp(ps / 1000).isoformat()
@@ -423,12 +462,11 @@ async def get_org_usage_endpoint(
 
     # Last-resort fallback: use next_reset_at from features
     if not period_end:
-        for feat in (inv, comp):
+        for feat in (inv, comp, usd_credits):
             next_reset = feat.get("next_reset_at")
             if next_reset:
                 reset_dt = datetime.utcfromtimestamp(next_reset / 1000)
                 period_end = reset_dt.isoformat()
-                # Without product data, approximate start as 1 month before reset
                 if not period_start:
                     if reset_dt.month == 1:
                         start_dt = reset_dt.replace(year=reset_dt.year - 1, month=12)
@@ -441,15 +479,17 @@ async def get_org_usage_endpoint(
                 break
 
     last_updated = datetime.utcnow().isoformat()
-    
+
     return {
+        "credits": credits_response,
+        "breakdown": breakdown_response,
         "requests": {
             "current": current_invocations,
-            "limit": included_invocations,
+            "limit": included_invocations if not has_credit_system else None,
         },
         "gbSeconds": {
             "current": round(current_compute, 2),
-            "limit": included_compute,
+            "limit": included_compute if not has_credit_system else None,
         },
         "periodStart": period_start,
         "periodEnd": period_end,

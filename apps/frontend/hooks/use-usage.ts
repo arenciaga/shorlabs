@@ -6,18 +6,31 @@ import { useAuth } from "@clerk/nextjs"
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 
 interface Usage {
+    credits: {
+        used: number
+        included: number
+        balance: number
+        currency: string
+    } | null
+    breakdown: {
+        featureId: string
+        label: string
+        dollarAmount: number
+        rawUsage: number
+    }[] | null
     requests: {
         current: number
-        limit: number
+        limit: number | null
     }
     gbSeconds: {
         current: number
-        limit: number
+        limit: number | null
     }
     periodStart: string | null
     periodEnd: string | null
     lastUpdated: string
 }
+
 
 interface UseUsageReturn {
     usage: Usage | undefined

@@ -1,6 +1,7 @@
 "use client"
 
-import { AlertCircle } from "lucide-react"
+import { useState } from "react"
+import { AlertCircle, ChevronDown, ChevronUp } from "lucide-react"
 import { useUsage } from "@/hooks/use-usage"
 import { useIsPro } from "@/hooks/use-is-pro"
 
@@ -14,9 +15,16 @@ const formatNumber = (num: number) => {
     return num.toString()
 }
 
+const formatDollars = (amount: number) => {
+    return `$${amount.toFixed(2)}`
+}
+
 export function UsagePanel({ onUpgrade }: UsagePanelProps) {
     const { usage, loading: usageLoading, error: usageError, isValidating } = useUsage()
     const { isPro, proProduct } = useIsPro()
+    const [breakdownOpen, setBreakdownOpen] = useState(false)
+
+    const hasCredits = usage?.credits != null
 
     return (
         <div className="w-full lg:w-80 lg:shrink-0">
@@ -71,7 +79,86 @@ export function UsagePanel({ onUpgrade }: UsagePanelProps) {
                             <p className="text-sm text-zinc-600">Failed to load usage</p>
                             <p className="text-xs text-zinc-400 mt-0.5">{usageError.message}</p>
                         </div>
+                    ) : hasCredits ? (
+                        /* ── Pro: Credit-based display ─────────────── */
+                        <div className="space-y-4">
+                            {/* Labels */}
+                            <div className="flex items-baseline justify-between">
+                                <span className="text-[13px] text-zinc-600">Included Credit</span>
+                                <span className="text-[13px] text-zinc-400">On-Demand Charges</span>
+                            </div>
+
+                            {/* Dollar amount + progress bar */}
+                            <div>
+                                <div className="flex items-baseline justify-between mb-2">
+                                    <span className="text-lg font-semibold tabular-nums text-zinc-900">
+                                        {formatDollars(usage!.credits!.used)}
+                                        <span className="text-sm font-normal text-zinc-400">
+                                            {" "}/ {formatDollars(usage!.credits!.included)}
+                                        </span>
+                                    </span>
+                                    <span className="text-[13px] tabular-nums text-zinc-500">
+                                        {usage!.credits!.used > usage!.credits!.included
+                                            ? formatDollars(usage!.credits!.used - usage!.credits!.included)
+                                            : "—"}
+                                    </span>
+                                </div>
+                                <div className="h-2.5 rounded-full bg-zinc-100 overflow-hidden">
+                                    <div
+                                        className={`h-full rounded-full transition-all duration-500 ease-out ${usage!.credits!.used > usage!.credits!.included
+                                                ? "bg-amber-500"
+                                                : "bg-blue-600"
+                                            }`}
+                                        style={{
+                                            width: `${Math.min(
+                                                (usage!.credits!.used / (usage!.credits!.included || 1)) * 100,
+                                                100
+                                            )}%`,
+                                        }}
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Expandable breakdown */}
+                            {usage?.breakdown && usage.breakdown.length > 0 && (
+                                <div>
+                                    <button
+                                        onClick={() => setBreakdownOpen(!breakdownOpen)}
+                                        className="flex items-center gap-1 text-xs text-zinc-500 hover:text-zinc-700 transition-colors cursor-pointer"
+                                    >
+                                        {breakdownOpen ? (
+                                            <ChevronUp className="h-3 w-3" />
+                                        ) : (
+                                            <ChevronDown className="h-3 w-3" />
+                                        )}
+                                        Breakdown
+                                    </button>
+
+                                    {breakdownOpen && (
+                                        <div className="mt-2 space-y-2 pl-1">
+                                            {usage.breakdown.map((item) => (
+                                                <div
+                                                    key={item.featureId}
+                                                    className="flex items-center justify-between"
+                                                >
+                                                    <span className="text-xs text-zinc-500">
+                                                        {item.label}
+                                                    </span>
+                                                    <span className="text-xs tabular-nums text-zinc-600">
+                                                        {formatDollars(item.dollarAmount)}
+                                                        <span className="text-zinc-400 ml-1">
+                                                            ({formatNumber(item.rawUsage)})
+                                                        </span>
+                                                    </span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
                     ) : (
+                        /* ── Hobby: Raw count display ──────────────── */
                         <div className="space-y-5">
                             {/* Included Requests */}
                             <div>

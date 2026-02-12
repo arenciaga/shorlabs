@@ -47,7 +47,10 @@ export default function ProjectsPage() {
     const [projects, setProjects] = useState<Project[]>([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
+    const [mounted, setMounted] = useState(false)
     const { isOpen: upgradeOpen, openUpgradeModal, closeUpgradeModal } = useUpgradeModal()
+
+    useEffect(() => { setMounted(true) }, [])
 
 
 
@@ -118,7 +121,7 @@ export default function ProjectsPage() {
                 <div className="mb-8">
                     <h1 className="text-2xl font-semibold text-zinc-900 tracking-tight mb-1 flex items-center gap-2">
                         Projects
-                        {isPro && (
+                        {mounted && isPro && (
                             <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-700 rounded-full">
                                 {proProduct?.status === "trialing" ? "Pro Trial" : "Pro"}
                             </span>

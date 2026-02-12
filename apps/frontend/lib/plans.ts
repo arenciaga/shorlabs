@@ -24,8 +24,8 @@ export const PLANS: Plan[] = [
         period: "/ month",
         features: [
             { label: "Unlimited Projects", icon: FolderOpen },
-            { label: "50K Requests/Month", icon: Globe },
-            { label: "20K Compute (GB-s)/Month", icon: Zap },
+            { label: "5K Requests/Month", icon: Globe },
+            { label: "2.5K Compute (GB-s)/Month", icon: Zap },
             { label: "1 GB Memory", icon: Cpu },
             { label: "Up to 30s Timeout", icon: Clock },
             { label: "512 MB Temp Disk", icon: HardDrive },

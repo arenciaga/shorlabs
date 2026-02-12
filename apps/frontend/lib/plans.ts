@@ -1,4 +1,4 @@
-import { Clock, Cpu, FolderOpen, Globe, HardDrive, type LucideIcon, Zap } from 'lucide-react'
+import { Clock, Cpu, DollarSign, FolderOpen, Globe, HardDrive, type LucideIcon, Zap } from 'lucide-react'
 
 export interface PlanFeature {
     label: string
@@ -25,7 +25,7 @@ export const PLANS: Plan[] = [
         features: [
             { label: "Unlimited Projects", icon: FolderOpen },
             { label: "50K Requests/Month", icon: Globe },
-            { label: "20K Compute/Month", icon: Zap },
+            { label: "20K Compute (GB-s)/Month", icon: Zap },
             { label: "1 GB Memory", icon: Cpu },
             { label: "Up to 30s Timeout", icon: Clock },
             { label: "512 MB Temp Disk", icon: HardDrive },
@@ -40,8 +40,9 @@ export const PLANS: Plan[] = [
         highlighted: true,
         features: [
             { label: "Unlimited Projects", icon: FolderOpen },
-            { label: "1M Requests/Month", icon: Globe },
-            { label: "400K Compute/Month", icon: Zap },
+            { label: "$20 Included Usage/Month", icon: DollarSign },
+            { label: "$0.60 / 1M Requests", icon: Globe },
+            { label: "$0.035 / 1K Compute (GB-s)", icon: Zap },
             { label: "Up to 4 GB Memory", icon: Cpu },
             { label: "Up to 300s Timeout", icon: Clock },
             { label: "Up to 2 GB Temp Disk", icon: HardDrive },

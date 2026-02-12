@@ -55,7 +55,7 @@ const CTASection = () => {
                                 </Link>
                                 <GoogleSignInButton
                                     source="cta_section"
-                                    text="Sign up with Google"
+                                    text="Continue With Google"
                                     className="w-full sm:w-auto"
                                 />
                             </>

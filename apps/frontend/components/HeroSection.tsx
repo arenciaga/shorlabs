@@ -56,7 +56,7 @@ const HeroSection = () => {
                                 </Link>
                                 <GoogleSignInButton
                                     source="hero"
-                                    text="Sign up with Google"
+                                    text="Continue With Google"
                                     className="w-full sm:w-auto"
                                 />
                             </>

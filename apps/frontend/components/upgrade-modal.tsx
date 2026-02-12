@@ -30,7 +30,7 @@ export function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
         try {
             // Downgrade: cancel the current paid product (reverts to free tier at period end)
             if (productId === "hobby" && currentPlan && currentPlan !== "hobby") {
-                const result = await cancel({ productId: activeProduct?.id ?? currentPlan })
+                const result = await cancel({ productId: String(activeProduct?.id ?? currentPlan) })
                 if (result.error) {
                     setActionError(result.error.message || "Failed to downgrade plan. Please try again.")
                     return

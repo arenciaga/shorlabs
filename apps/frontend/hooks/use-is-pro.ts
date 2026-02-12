@@ -36,12 +36,7 @@ export function useIsPro() {
 
     // Single pass: find which paid plan (if any) the customer has. Pro wins over Plus.
     let currentPlan: "pro" | "plus" | "hobby" | undefined = hasCustomerData ? "hobby" : undefined
-    let activeProduct: {
-        id: unknown
-        status?: string
-        canceled_at?: string | null
-        current_period_end?: string | null
-    } | null = null
+    let activeProduct: (typeof products)[number] | null = null
 
     for (const planId of PAID_PLAN_IDS) {
         const product = products.find((p) => productMatchesPlan(p, planId))

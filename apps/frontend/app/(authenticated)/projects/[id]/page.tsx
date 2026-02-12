@@ -894,7 +894,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                                     <Button
                                         onClick={saveCompute}
                                         disabled={savingCompute}
-                                        className="bg-zinc-900 hover:bg-zinc-800 rounded-full"
+                                        className="bg-zinc-900 hover:bg-zinc-800 text-white rounded-full"
                                     >
                                         {savingCompute && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                                         Save Compute Settings

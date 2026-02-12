@@ -44,8 +44,10 @@ import { trackEvent } from "@/lib/amplitude"
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 
-// No project count limits - usage (requests/compute) is the real gate
-const FREE_PROJECT_LIMIT = Infinity
+// Project limits by plan:
+// - Hobby: 1 project
+// - Pro: unlimited projects
+const FREE_PROJECT_LIMIT = 1
 const PRO_PROJECT_LIMIT = Infinity
 
 interface DirectoryItem {
@@ -325,7 +327,7 @@ function ConfigureProjectContent() {
                 timeout_seconds: timeout,
                 ephemeral_storage_mb: ephemeralStorage,
                 env_var_count: envVars.filter(v => v.key.trim()).length,
-                user_tier: isPro ? 'pro' : 'free'
+                user_tier: isPro ? 'pro' : 'hobby'
             })
 
             router.push(`/projects/${data.project_id}`)

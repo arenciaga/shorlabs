@@ -11,41 +11,53 @@ import { useCustomer } from "autumn-js/react"
  * from the customer object that SWR keeps warm.
  *
  * All plan detection across the app goes through this single hook.
+ *
+ * Plan ids must match PLANS in lib/plans.ts: "hobby" | "plus" | "pro".
  */
 
 const BILLABLE_STATUSES = new Set(["active", "trialing", "past_due", "scheduled"])
 
+/** Paid plan ids in priority order (pro over plus when both present). */
+const PAID_PLAN_IDS = ["pro", "plus"] as const
+
+function normalizeProductId(id: unknown): string {
+    return String(id ?? "").trim().toLowerCase()
+}
+
+function productMatchesPlan(product: { id: unknown; status?: string }, planId: string): boolean {
+    return normalizeProductId(product.id) === planId && BILLABLE_STATUSES.has(product.status ?? "")
+}
+
 export function useIsPro() {
     const { customer, isLoading } = useCustomer()
 
-    const plusProduct = customer?.products?.find(
-        (product) => product.id === "plus" && BILLABLE_STATUSES.has(product.status)
-    )
-    const proProduct = customer?.products?.find(
-        (product) => product.id === "pro" && BILLABLE_STATUSES.has(product.status)
-    )
-
+    const products = customer?.products ?? []
     const hasCustomerData = !!customer
-    // "isPro" is treated as "has any paid plan" (Plus or Pro)
-    const isPro = hasCustomerData ? !!(proProduct || plusProduct) : false
-    const isCanceling = hasCustomerData
-        ? (!!(proProduct || plusProduct) && !!(proProduct || plusProduct)!.canceled_at)
-        : false
-    const currentPlan: "pro" | "plus" | "hobby" | undefined = hasCustomerData
-        ? (proProduct
-            ? "pro"
-            : plusProduct
-                ? "plus"
-                : "hobby")
-        : undefined
-    const activeProduct = proProduct ?? plusProduct ?? null
+
+    // Single pass: find which paid plan (if any) the customer has. Pro wins over Plus.
+    let currentPlan: "pro" | "plus" | "hobby" | undefined = hasCustomerData ? "hobby" : undefined
+    let activeProduct: { id: unknown; status?: string; canceled_at?: string | null } | null = null
+
+    for (const planId of PAID_PLAN_IDS) {
+        const product = products.find((p) => productMatchesPlan(p, planId))
+        if (product) {
+            currentPlan = planId
+            activeProduct = product
+            break
+        }
+    }
+
+    const isPro = currentPlan === "pro" || currentPlan === "plus"
+    const isCanceling = !!activeProduct?.canceled_at ?? false
+    const proProduct = currentPlan === "pro" ? activeProduct : null
+    const plusProduct = currentPlan === "plus" ? activeProduct : null
 
     return {
         isPro,
         isCanceling,
         currentPlan,
-        proProduct: proProduct ?? null,
-        plusProduct: plusProduct ?? null,
+        proProduct,
+        plusProduct,
         activeProduct,
         isLoaded: hasCustomerData,
         customer,

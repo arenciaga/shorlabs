@@ -19,18 +19,18 @@ interface UpgradeModalProps {
 
 export function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
     const { attach, cancel } = useCustomer()
-    const { currentPlan: currentProductId, isCanceling: isDowngradeScheduled, isLoaded } = useIsPro()
+    const { currentPlan, activeProduct, isCanceling: isDowngradeScheduled, isLoaded } = useIsPro()
     const [loadingPlan, setLoadingPlan] = useState<string | null>(null)
     const [actionError, setActionError] = useState<string | null>(null)
 
     const handleSelectPlan = async (productId: string) => {
-        if (productId === currentProductId) return
+        if (productId === currentPlan) return
         setActionError(null)
         setLoadingPlan(productId)
         try {
             // Downgrade: cancel the current paid product (reverts to free tier at period end)
-            if (productId === "hobby" && currentProductId && currentProductId !== "hobby") {
-                const result = await cancel({ productId: currentProductId })
+            if (productId === "hobby" && currentPlan && currentPlan !== "hobby") {
+                const result = await cancel({ productId: activeProduct?.id ?? currentPlan })
                 if (result.error) {
                     setActionError(result.error.message || "Failed to downgrade plan. Please try again.")
                     return
@@ -89,10 +89,12 @@ export function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
 
                     <div className="mx-auto mt-6 grid w-full max-w-4xl grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3">
                         {PLANS.map((plan) => {
-                            const isCurrent = plan.id === currentProductId
+                            const isCurrent = currentPlan != null && plan.id === currentPlan
                             const isLoading = loadingPlan === plan.id
                             const isPro = plan.id === "pro"
+                            const isPlus = plan.id === "plus"
                             const isFree = plan.id === "hobby"
+                            const isPaidPlan = isPro || isPlus
 
                             // Determine button text based on plan state
                             let buttonText: string
@@ -114,7 +116,7 @@ export function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
                                     plan={plan}
                                     highlighted={isCurrent}
                                     renderBadge={() => {
-                                        if (isCurrent && isPro && isDowngradeScheduled) {
+                                        if (isCurrent && isPaidPlan && isDowngradeScheduled) {
                                             return (
                                                 <Badge className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
                                                     Cancels at period end
@@ -128,7 +130,7 @@ export function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
                                                 </Badge>
                                             )
                                         }
-                                        if (plan.id === "pro" || plan.id === "plus") {
+                                        if (isPaidPlan) {
                                             return (
                                                 <Badge className="rounded-full bg-gradient-to-r from-violet-500 to-blue-500 px-2 py-0.5 text-xs font-medium text-white">
                                                     14 day free trial
@@ -146,8 +148,8 @@ export function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
                                             className={cn(
                                                 "h-10 w-full rounded-full text-sm font-medium",
                                                 isPro && !isCurrent && "bg-zinc-900 text-white hover:bg-zinc-800",
-                                                (isCurrent || (!isPro && isDowngradeScheduled)) && "border-zinc-200 bg-zinc-100 text-zinc-500 hover:bg-zinc-100",
-                                                !isPro && !isCurrent && !isDowngradeScheduled && "border-zinc-200 text-zinc-700 hover:bg-zinc-50",
+                                                (isCurrent || (!isPaidPlan && isDowngradeScheduled)) && "border-zinc-200 bg-zinc-100 text-zinc-500 hover:bg-zinc-100",
+                                                !isPaidPlan && !isCurrent && !isDowngradeScheduled && "border-zinc-200 text-zinc-700 hover:bg-zinc-50",
                                             )}
                                         >
                                             {isLoading ? (

@@ -41,7 +41,7 @@ const STATUS_CONFIG: Record<string, { dot: string; label: string; bg: string }> 
 
 export default function ProjectsPage() {
     const { getToken, isLoaded, orgId } = useAuth()
-    const { isPro, proProduct } = useIsPro()
+    const { isPro, planLabel } = useIsPro()
     const { signOut } = useClerk()
     const [searchQuery, setSearchQuery] = useState("")
     const [projects, setProjects] = useState<Project[]>([])
@@ -123,7 +123,7 @@ export default function ProjectsPage() {
                         Projects
                         {mounted && isPro && (
                             <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-700 rounded-full">
-                                {proProduct?.status === "trialing" ? "Pro Trial" : "Pro"}
+                                {planLabel}
                             </span>
                         )}
                     </h1>

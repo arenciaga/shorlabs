@@ -5,6 +5,7 @@ import { useAuth, useUser } from '@clerk/nextjs'
 import { useCustomer } from 'autumn-js/react'
 import { Github, Loader2, ExternalLink, Unplug, RefreshCw, AlertCircle, CreditCard, ArrowUpRight } from 'lucide-react'
 import { useIsPro } from '@/hooks/use-is-pro'
+import { PLANS } from '@/lib/plans'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { UpgradeModal, useUpgradeModal } from '@/components/upgrade-modal'
@@ -34,7 +35,8 @@ export default function SettingsPage() {
     const { getToken, orgId, isLoaded: authLoaded } = useAuth()
     const { isLoaded: userLoaded } = useUser()
     const { openBillingPortal, isLoading: isCustomerLoading } = useCustomer()
-    const { isPro, isCanceling, proProduct, isLoaded: isPlanLoaded } = useIsPro()
+    const { isPro, isCanceling, currentPlan, planLabel, activeProduct, isLoaded: isPlanLoaded } = useIsPro()
+    const planPrice = currentPlan ? PLANS.find((p) => p.id === currentPlan)?.price ?? "$0" : "$0"
     const { isOpen: upgradeOpen, openUpgradeModal, closeUpgradeModal } = useUpgradeModal()
 
     const [activeTab, setActiveTab] = useState<"integrations" | "billing">("integrations")
@@ -368,29 +370,29 @@ export default function SettingsPage() {
                                                 <div className="w-10 h-10 shrink-0 rounded-full" style={{ background: 'linear-gradient(135deg, #34d399, #a3e635, #facc15)' }} />
                                                 <div>
                                                     <div className="flex flex-wrap items-center gap-2">
-                                                        <p className="font-semibold text-zinc-900">{isPro ? "Pro" : "Hobby"}</p>
+                                                        <p className="font-semibold text-zinc-900">{planLabel}</p>
                                                         {isCanceling ? (
                                                             <Badge className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700">
                                                                 Cancels at period end
                                                             </Badge>
-                                                        ) : proProduct?.status === "trialing" ? (
+                                                        ) : activeProduct?.status === "trialing" ? (
                                                             <Badge className="rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-700">
                                                                 Trial
                                                             </Badge>
-                                                        ) : proProduct?.status === "past_due" ? (
+                                                        ) : activeProduct?.status === "past_due" ? (
                                                             <Badge className="rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-medium text-red-700">
                                                                 Past due
                                                             </Badge>
-                                                        ) : (
+                                                        ) : isPro ? (
                                                             <Badge className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
                                                                 Active
                                                             </Badge>
-                                                        )}
+                                                        ) : null}
                                                     </div>
                                                     <p className="text-sm text-zinc-500 mt-0.5">
-                                                        {isPro ? "$20" : "$0"} / month
-                                                        {isPro && proProduct?.current_period_end && (
-                                                            <> · {proProduct.status === "trialing" ? "Trial ends" : "Renews"} {new Date(proProduct.current_period_end).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</>
+                                                        {planPrice} / month
+                                                        {isPro && activeProduct?.current_period_end && (
+                                                            <> · {activeProduct.status === "trialing" ? "Trial ends" : "Renews"} {new Date(activeProduct.current_period_end).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</>
                                                         )}
                                                     </p>
                                                 </div>
@@ -410,8 +412,8 @@ export default function SettingsPage() {
                                             <div className="rounded-xl bg-amber-50 border border-amber-100 px-4 py-3">
                                                 <p className="text-sm text-amber-800">
                                                     Your plan will change to <span className="font-medium">Hobby</span> at the end of the current billing period
-                                                    {proProduct?.current_period_end && (
-                                                        <> on {new Date(proProduct.current_period_end).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</>
+                                                    {activeProduct?.current_period_end && (
+                                                        <> on {new Date(activeProduct.current_period_end).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</>
                                                     )}.
                                                 </p>
                                             </div>

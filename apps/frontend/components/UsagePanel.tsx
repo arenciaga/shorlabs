@@ -21,7 +21,7 @@ const formatDollars = (amount: number) => {
 
 export function UsagePanel({ onUpgrade }: UsagePanelProps) {
     const { usage, loading: usageLoading, error: usageError, isValidating } = useUsage()
-    const { isPro, proProduct } = useIsPro()
+    const { isPro, planLabel } = useIsPro()
     const [breakdownOpen, setBreakdownOpen] = useState(false)
     const [mounted, setMounted] = useState(false)
 
@@ -41,9 +41,9 @@ export function UsagePanel({ onUpgrade }: UsagePanelProps) {
                     <div>
                         <h3 className="text-sm font-semibold text-zinc-900 flex items-center gap-2">
                             Usage
-                            {mounted && proProduct?.status === "trialing" && (
+                            {mounted && isPro && (
                                 <span className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium bg-blue-100 text-blue-700 rounded-full">
-                                    Trial
+                                    {planLabel}
                                 </span>
                             )}
                         </h3>

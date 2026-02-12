@@ -36,7 +36,12 @@ export function useIsPro() {
 
     // Single pass: find which paid plan (if any) the customer has. Pro wins over Plus.
     let currentPlan: "pro" | "plus" | "hobby" | undefined = hasCustomerData ? "hobby" : undefined
-    let activeProduct: { id: unknown; status?: string; canceled_at?: string | null } | null = null
+    let activeProduct: {
+        id: unknown
+        status?: string
+        canceled_at?: string | null
+        current_period_end?: string | null
+    } | null = null
 
     for (const planId of PAID_PLAN_IDS) {
         const product = products.find((p) => productMatchesPlan(p, planId))
@@ -48,14 +53,32 @@ export function useIsPro() {
     }
 
     const isPro = currentPlan === "pro" || currentPlan === "plus"
-    const isCanceling = !!activeProduct?.canceled_at ?? false
+    const isTrialing = activeProduct?.status === "trialing"
+    const isCanceling = !!activeProduct?.canceled_at
+
+    /** Display label: "Hobby" | "Plus" | "Plus Trial" | "Pro" | "Pro Trial" */
+    const planLabel: "Hobby" | "Plus" | "Plus Trial" | "Pro" | "Pro Trial" =
+        currentPlan === "hobby"
+            ? "Hobby"
+            : currentPlan === "pro"
+                ? isTrialing
+                    ? "Pro Trial"
+                    : "Pro"
+                : currentPlan === "plus"
+                    ? isTrialing
+                        ? "Plus Trial"
+                        : "Plus"
+                    : "Hobby"
+
     const proProduct = currentPlan === "pro" ? activeProduct : null
     const plusProduct = currentPlan === "plus" ? activeProduct : null
 
     return {
         isPro,
+        isTrialing,
         isCanceling,
         currentPlan,
+        planLabel,
         proProduct,
         plusProduct,
         activeProduct,

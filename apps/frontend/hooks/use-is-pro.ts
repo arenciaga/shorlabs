@@ -51,6 +51,20 @@ export function useIsPro() {
     const isTrialing = activeProduct?.status === "trialing"
     const isCanceling = !!activeProduct?.canceled_at
 
+    /** When canceling, the plan we're switching to at period end (another paid plan scheduled, or Hobby). */
+    let scheduledPlanId: "hobby" | "plus" | "pro" = "hobby"
+    if (isCanceling && products.length > 0) {
+        const scheduledProduct = products.find((p) => (p.status ?? "") === "scheduled")
+        if (scheduledProduct) {
+            const id = normalizeProductId(scheduledProduct.id)
+            if (id === "pro" || id === "plus") scheduledPlanId = id
+        }
+    }
+
+    /** Display label for scheduled plan (for "Your plan will change to X" banner). */
+    const scheduledPlanLabel: "Hobby" | "Plus" | "Pro" =
+        scheduledPlanId === "pro" ? "Pro" : scheduledPlanId === "plus" ? "Plus" : "Hobby"
+
     /** Display label: "Hobby" | "Plus" | "Plus Trial" | "Pro" | "Pro Trial" */
     const planLabel: "Hobby" | "Plus" | "Plus Trial" | "Pro" | "Pro Trial" =
         currentPlan === "hobby"
@@ -74,6 +88,8 @@ export function useIsPro() {
         isCanceling,
         currentPlan,
         planLabel,
+        scheduledPlanId,
+        scheduledPlanLabel,
         proProduct,
         plusProduct,
         activeProduct,

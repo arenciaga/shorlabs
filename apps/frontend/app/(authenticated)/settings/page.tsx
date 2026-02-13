@@ -35,7 +35,7 @@ export default function SettingsPage() {
     const { getToken, orgId, isLoaded: authLoaded } = useAuth()
     const { isLoaded: userLoaded } = useUser()
     const { openBillingPortal, isLoading: isCustomerLoading } = useCustomer()
-    const { isPro, isCanceling, currentPlan, planLabel, activeProduct, isLoaded: isPlanLoaded } = useIsPro()
+    const { isPro, isCanceling, currentPlan, planLabel, activeProduct, scheduledPlanLabel, isLoaded: isPlanLoaded } = useIsPro()
     const planPrice = currentPlan ? PLANS.find((p) => p.id === currentPlan)?.price ?? "$0" : "$0"
     const { isOpen: upgradeOpen, openUpgradeModal, closeUpgradeModal } = useUpgradeModal()
 
@@ -411,7 +411,7 @@ export default function SettingsPage() {
                                         {isCanceling && (
                                             <div className="rounded-xl bg-amber-50 border border-amber-100 px-4 py-3">
                                                 <p className="text-sm text-amber-800">
-                                                    Your plan will change to <span className="font-medium">Hobby</span> at the end of the current billing period
+                                                    Your plan will change to <span className="font-medium">{scheduledPlanLabel}</span> at the end of the current billing period
                                                     {activeProduct?.current_period_end && (
                                                         <> on {new Date(activeProduct.current_period_end).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</>
                                                     )}.

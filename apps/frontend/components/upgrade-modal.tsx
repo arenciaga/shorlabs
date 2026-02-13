@@ -19,7 +19,7 @@ interface UpgradeModalProps {
 
 export function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
     const { attach, cancel } = useCustomer()
-    const { currentPlan, activeProduct, isCanceling: isDowngradeScheduled, isLoaded } = useIsPro()
+    const { currentPlan, activeProduct, isCanceling: isDowngradeScheduled, scheduledPlanId, isLoaded } = useIsPro()
     const [loadingPlan, setLoadingPlan] = useState<string | null>(null)
     const [actionError, setActionError] = useState<string | null>(null)
 
@@ -90,6 +90,7 @@ export function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
                     <div className="mx-auto mt-6 grid w-full max-w-4xl grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3">
                         {PLANS.map((plan) => {
                             const isCurrent = currentPlan != null && plan.id === currentPlan
+                            const isScheduledTarget = isDowngradeScheduled && plan.id === scheduledPlanId
                             const isLoading = loadingPlan === plan.id
                             const isPro = plan.id === "pro"
                             const isPlus = plan.id === "plus"
@@ -100,8 +101,10 @@ export function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
                             let buttonText: string
                             if (isCurrent) {
                                 buttonText = "Current plan"
+                            } else if (isScheduledTarget) {
+                                buttonText = "Starts at period end"
                             } else if (isFree) {
-                                if (isDowngradeScheduled) {
+                                if (isDowngradeScheduled && scheduledPlanId === "hobby") {
                                     buttonText = "Switching at period end"
                                 } else {
                                     buttonText = "Switch to Hobby"
@@ -120,6 +123,13 @@ export function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
                                             return (
                                                 <Badge className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
                                                     Cancels at period end
+                                                </Badge>
+                                            )
+                                        }
+                                        if (isScheduledTarget) {
+                                            return (
+                                                <Badge className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
+                                                    Starts at period end
                                                 </Badge>
                                             )
                                         }
@@ -143,13 +153,13 @@ export function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
                                         <Button
                                             type="button"
                                             onClick={() => handleSelectPlan(plan.id)}
-                                            disabled={isCurrent || isLoading || !isLoaded || (isFree && isDowngradeScheduled)}
-                                            variant={isPro && !isCurrent ? "default" : "outline"}
+                                            disabled={isCurrent || isScheduledTarget || isLoading || !isLoaded || (isFree && isDowngradeScheduled && scheduledPlanId === "hobby")}
+                                            variant={isPro && !isCurrent && !isScheduledTarget ? "default" : "outline"}
                                             className={cn(
                                                 "h-10 w-full rounded-full text-sm font-medium",
-                                                isPro && !isCurrent && "bg-zinc-900 text-white hover:bg-zinc-800",
-                                                (isCurrent || (!isPaidPlan && isDowngradeScheduled)) && "border-zinc-200 bg-zinc-100 text-zinc-500 hover:bg-zinc-100",
-                                                !isPaidPlan && !isCurrent && !isDowngradeScheduled && "border-zinc-200 text-zinc-700 hover:bg-zinc-50",
+                                                isPro && !isCurrent && !isScheduledTarget && "bg-zinc-900 text-white hover:bg-zinc-800",
+                                                (isCurrent || isScheduledTarget || (isFree && isDowngradeScheduled && scheduledPlanId === "hobby")) && "border-zinc-200 bg-zinc-100 text-zinc-500 hover:bg-zinc-100",
+                                                !isPaidPlan && !isCurrent && !isScheduledTarget && !(isFree && isDowngradeScheduled && scheduledPlanId === "hobby") && "border-zinc-200 text-zinc-700 hover:bg-zinc-50",
                                             )}
                                         >
                                             {isLoading ? (

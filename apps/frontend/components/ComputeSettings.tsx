@@ -196,7 +196,7 @@ export function ComputeSettings({
             <div className="bg-white rounded-xl border border-zinc-200 overflow-hidden">
                 <div className="flex items-center gap-3 px-4 py-3 border-b border-zinc-100">
                     <HardDrive className="h-4 w-4 text-zinc-400" />
-                    <h3 className="font-semibold text-zinc-900 text-sm">Temporary Storagee</h3>
+                    <h3 className="font-semibold text-zinc-900 text-sm">Temporary Storage</h3>
                 </div>
                 <div className="p-4">
                     <div className="space-y-2">

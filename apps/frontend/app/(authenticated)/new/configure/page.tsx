@@ -47,7 +47,7 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 // Project limits by plan:
 // - Hobby: 1 project
 // - Pro: unlimited projects
-const FREE_PROJECT_LIMIT = 1
+const FREE_PROJECT_LIMIT = Infinity
 const PRO_PROJECT_LIMIT = Infinity
 
 interface DirectoryItem {

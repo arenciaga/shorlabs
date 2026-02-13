@@ -28,7 +28,6 @@ export const PLANS: Plan[] = [
         price: "$0",
         period: "/ month",
         features: [
-            { label: "1 Project", icon: FolderOpen },
             { label: "3K Requests/Month", icon: Globe },
             { label: "1.2K Compute (GB-s)/Month", icon: Zap },
             { label: "512 MB Memory", icon: Cpu },
@@ -43,7 +42,6 @@ export const PLANS: Plan[] = [
         price: "$5",
         period: "/ month",
         features: [
-            { label: "Unlimited Projects", icon: FolderOpen },
             { label: "$5 Included Usage/Month", icon: DollarSign },
             { label: USAGE_PRICING.requests, icon: Globe },
             { label: USAGE_PRICING.compute, icon: Zap },
@@ -60,7 +58,6 @@ export const PLANS: Plan[] = [
         period: "/ month",
         highlighted: true,
         features: [
-            { label: "Unlimited Projects", icon: FolderOpen },
             { label: "$20 Included Usage/Month", icon: DollarSign },
             { label: USAGE_PRICING.requests, icon: Globe },
             { label: USAGE_PRICING.compute, icon: Zap },

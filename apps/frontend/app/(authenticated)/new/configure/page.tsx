@@ -534,7 +534,7 @@ function ConfigureProjectContent() {
                                 : "text-zinc-500 hover:text-zinc-700"
                                 }`}
                         >
-                            <section.icon className="h-4 w-4" />
+                            
                             {section.label}
                             {activeSection === section.id && (
                                 <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-zinc-900" />

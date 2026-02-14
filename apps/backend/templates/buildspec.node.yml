@@ -3,23 +3,9 @@ phases:
   pre_build:
     commands:
       - echo "Cloning repository from GitHub..."
-      - git clone https://x-access-token:$GITHUB_TOKEN@github.com/{{REPO_PATH}}.git repo
+      - git clone --depth 1 https://x-access-token:$GITHUB_TOKEN@github.com/{{REPO_PATH}}.git repo
       - |
         cd repo
-        # Detect monorepo (includes bun.lock for Bun workspaces)
-        if [ -f "pnpm-workspace.yaml" ] || [ -f "lerna.json" ] || [ -f "nx.json" ] || [ -f "turbo.json" ] || ([ -f "package.json" ] && grep -q '"workspaces"' package.json 2>/dev/null) || ([ -f "bun.lock" ] && grep -q '"workspaces"' package.json 2>/dev/null); then
-          echo "MONOREPO=true"
-          echo "BUILD_CONTEXT=." > /tmp/build_env
-          echo "APP_DIR={{ROOT_DIRECTORY}}" >> /tmp/build_env
-        else
-          echo "MONOREPO=false"
-          echo "BUILD_CONTEXT={{ROOT_DIRECTORY}}" > /tmp/build_env
-          echo "APP_DIR=." >> /tmp/build_env
-        fi
-      - cat /tmp/build_env
-      - |
-        . /tmp/build_env
-        cd repo/$BUILD_CONTEXT
         echo "Creating Dockerfile for Node.js..."
         cat > Dockerfile << 'DOCKERFILE_EOF'
 {{DOCKERFILE_CONTENT}}
@@ -29,15 +15,13 @@ phases:
   build:
     commands:
       - |
-        . /tmp/build_env
-        cd repo/$BUILD_CONTEXT
+        cd repo
         echo "Building Docker image..."
-        docker build --build-arg APP_DIR=$APP_DIR {{BUILD_ARGS}} -t {{ECR_REPO_URI}}:latest .
+        docker build --build-arg APP_DIR={{ROOT_DIRECTORY}} {{BUILD_ARGS}} -t {{ECR_REPO_URI}}:latest .
   post_build:
     commands:
       - |
-        . /tmp/build_env
-        cd repo/$BUILD_CONTEXT
+        cd repo
         echo "Pushing Docker image to ECR..."
         docker push {{ECR_REPO_URI}}:latest
         echo "Build completed successfully"

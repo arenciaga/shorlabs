@@ -5,10 +5,10 @@ phases:
     commands:
       - echo "Cloning repository from GitHub..."
       # Token passed via $GITHUB_TOKEN env var (not logged)
-      - git clone https://x-access-token:$GITHUB_TOKEN@github.com/{{REPO_PATH}}.git repo
-      - cd repo/{{ROOT_DIRECTORY}}
-      - echo "Creating Dockerfile for Python..."
+      - git clone --depth 1 https://x-access-token:$GITHUB_TOKEN@github.com/{{REPO_PATH}}.git repo
       - |
+        cd repo/{{ROOT_DIRECTORY}}
+        echo "Creating Dockerfile for Python..."
         cat > Dockerfile << 'DOCKERFILE_EOF'
 {{DOCKERFILE_CONTENT}}
         DOCKERFILE_EOF
@@ -16,10 +16,14 @@ phases:
       - aws ecr get-login-password --region {{AWS_REGION}} | docker login --username AWS --password-stdin {{AWS_ACCOUNT_ID}}.dkr.ecr.{{AWS_REGION}}.amazonaws.com
   build:
     commands:
-      - echo "Building Docker image..."
-      - docker build {{BUILD_ARGS}} -t {{ECR_REPO_URI}}:latest .
+      - |
+        cd repo/{{ROOT_DIRECTORY}}
+        echo "Building Docker image..."
+        docker build {{BUILD_ARGS}} -t {{ECR_REPO_URI}}:latest .
   post_build:
     commands:
-      - echo "Pushing Docker image to ECR..."
-      - docker push {{ECR_REPO_URI}}:latest
-      - echo "Build completed successfully"
+      - |
+        cd repo/{{ROOT_DIRECTORY}}
+        echo "Pushing Docker image to ECR..."
+        docker push {{ECR_REPO_URI}}:latest
+        echo "Build completed successfully"

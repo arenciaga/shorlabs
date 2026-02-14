@@ -15,22 +15,40 @@ from .lambda_service import filter_env_vars
 def create_or_update_codebuild_project(role_arn: str) -> None:
     """
     Create or update the CodeBuild project.
-    
+
     Args:
         role_arn: CodeBuild service role ARN
     """
     codebuild_client = get_codebuild_client()
-    
+
+    desired_environment = {
+        "type": "LINUX_CONTAINER",
+        "image": "aws/codebuild/standard:7.0",
+        "computeType": "BUILD_GENERAL1_LARGE",
+        "privilegedMode": True,  # Required for Docker builds
+    }
+
     try:
         projects = codebuild_client.batch_get_projects(names=[CODEBUILD_PROJECT_NAME])
         if projects["projects"]:
-            print(f"✅ CodeBuild project exists: {CODEBUILD_PROJECT_NAME}")
+            existing = projects["projects"][0]
+            current_compute = existing["environment"].get("computeType")
+            if current_compute != desired_environment["computeType"]:
+                print(f"🔄 Updating CodeBuild project compute: {current_compute} → {desired_environment['computeType']}")
+                codebuild_client.update_project(
+                    name=CODEBUILD_PROJECT_NAME,
+                    environment=desired_environment,
+                    serviceRole=role_arn,
+                )
+                print(f"✅ Updated CodeBuild project")
+            else:
+                print(f"✅ CodeBuild project exists: {CODEBUILD_PROJECT_NAME}")
             return
     except Exception:
         pass
-    
+
     print(f"🔨 Creating CodeBuild project: {CODEBUILD_PROJECT_NAME}")
-    
+
     codebuild_client.create_project(
         name=CODEBUILD_PROJECT_NAME,
         source={
@@ -38,15 +56,10 @@ def create_or_update_codebuild_project(role_arn: str) -> None:
             "buildspec": "version: 0.2\nphases:\n  build:\n    commands:\n      - echo 'Buildspec will be provided inline'"
         },
         artifacts={"type": "NO_ARTIFACTS"},
-        environment={
-            "type": "LINUX_CONTAINER",
-            "image": "aws/codebuild/standard:7.0",
-            "computeType": "BUILD_GENERAL1_SMALL",
-            "privilegedMode": True,  # Required for Docker builds
-        },
+        environment=desired_environment,
         serviceRole=role_arn,
     )
-    
+
     print(f"✅ Created CodeBuild project")
 
 
@@ -77,14 +90,17 @@ def start_build(
         The build ID
     """
     print(f"🚀 Starting CodeBuild build from GitHub ({runtime})...")
-    
+
     codebuild_client = get_codebuild_client()
-    
+
     # Get AWS credentials for ECR login
     from ..clients import get_aws_account_id, get_aws_region
     account_id = get_aws_account_id()
     region = get_aws_region()
-    
+
+    # Normalize root_directory: "./", "", "." → ".", "apps/frontend/" → "apps/frontend"
+    root_directory = root_directory.strip("/").strip("./").strip("/") or "."
+
     # Extract owner/repo from GitHub URL
     # https://github.com/owner/repo -> owner/repo
     repo_path = github_url.replace("https://github.com/", "").replace(".git", "")
@@ -100,19 +116,24 @@ def start_build(
     
     #Read template content
     dockerfile_template = template_path.read_text()
-    
-    # Replace CMD with user's start command
-    # Convert start command to JSON array format for Docker CMD
-    cmd_parts = start_command.split()
-    cmd_json = str(cmd_parts).replace("'", '"')
-    
+
+    # Replace CMD with appropriate start command
+    if runtime == "nodejs":
+        # Node.js: always use /start.sh which handles monorepos,
+        # package manager detection, and workspace start scripts
+        cmd_json = '["/start.sh"]'
+    else:
+        # Python: use the user's start command
+        cmd_parts = start_command.split()
+        cmd_json = str(cmd_parts).replace("'", '"')
+
     # Replace the CMD line in the template
     lines = dockerfile_template.split('\n')
     for i in range(len(lines) - 1, -1, -1):
         if lines[i].strip().startswith('CMD '):
             lines[i] = f'CMD {cmd_json}'
             break
-    
+
     dockerfile = '\n'.join(lines)
 
     # Filter and prepare user environment variables

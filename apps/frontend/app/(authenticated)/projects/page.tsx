@@ -41,14 +41,24 @@ const STATUS_CONFIG: Record<string, { dot: string; label: string; bg: string }> 
 
 const getProjectGradient = (id: string) => {
     const gradients = [
-        "linear-gradient(135deg, #34d399, #a3e635, #facc15)",
-        "linear-gradient(135deg, #60a5fa, #818cf8, #c084fc)",
-        "linear-gradient(135deg, #f472b6, #fb7185, #fca5a5)",
-        "linear-gradient(135deg, #fbbf24, #fb923c, #f87171)",
-        "linear-gradient(135deg, #22d3ee, #2dd4bf, #34d399)",
+        "linear-gradient(135deg, #34d399, #a3e635, #facc15)", // Green/Lime
+        "linear-gradient(135deg, #60a5fa, #818cf8, #c084fc)", // Blue/Purple
+        "linear-gradient(135deg, #f472b6, #fb7185, #fca5a5)", // Pink/Rose
+        "linear-gradient(135deg, #fbbf24, #fb923c, #f87171)", // Amber/Orange
+        "linear-gradient(135deg, #22d3ee, #2dd4bf, #34d399)", // Cyan/Teal
+        "linear-gradient(135deg, #a78bfa, #818cf8, #60a5fa)", // Violet/Blue
+        "linear-gradient(135deg, #f87171, #fca5a5, #fcd34d)", // Red/Yellow
+        "linear-gradient(135deg, #2dd4bf, #34d399, #10b981)", // Teal/Emerald
     ]
-    const index = id.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0)
-    return gradients[index % gradients.length]
+
+    // Simple improved hash
+    let hash = 0
+    for (let i = 0; i < id.length; i++) {
+        hash = (hash << 5) - hash + id.charCodeAt(i)
+        hash |= 0 // Convert to 32bit integer
+    }
+
+    return gradients[Math.abs(hash) % gradients.length]
 }
 
 export default function ProjectsPage() {

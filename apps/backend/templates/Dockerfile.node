@@ -22,14 +22,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Enable corepack for pnpm/yarn
 RUN corepack enable 2>/dev/null || true
 
-# Copy everything
+# Copy entire repo (always from root for workspace resolution)
 COPY . .
 
-# Universal install + build script
+# ============================================================
+# Phase 1: Detect package manager and install all dependencies
+# ============================================================
+# Industry standard: Always install from repo root so workspace
+# symlinks/hoisting resolves correctly (Vercel, Railway, Render
+# all do this). This works for both monorepos and standalone.
+# ============================================================
 RUN set -e && \
-    echo "========================================" && \
     echo "=== Detecting package manager ===" && \
-    echo "========================================" && \
     PM="npm" && \
     if [ -f "bun.lockb" ] || [ -f "bun.lock" ]; then \
         PM="bun" && \
@@ -52,80 +56,76 @@ RUN set -e && \
         npm ci 2>/dev/null || npm install; \
     fi && \
     echo "PM=$PM" > /tmp/pm_env && \
-    echo "========================================" && \
-    echo "=== Building project ===" && \
-    echo "========================================" && \
-    if [ "$APP_DIR" != "." ]; then \
-        echo "Monorepo detected, APP_DIR=$APP_DIR" && \
-        APP_NAME=$(node -e "console.log(require('./$APP_DIR/package.json').name || '')" 2>/dev/null || echo "") && \
-        echo "App package name: $APP_NAME" && \
-        ROOT_SCRIPT=$(node -e "const p=require('./package.json'); const s=p.scripts||{}; const app='$APP_DIR'; console.log(s[app]||s['build:'+app]||'')" 2>/dev/null || echo "") && \
-        if [ -n "$ROOT_SCRIPT" ]; then \
-            echo "Found root script for $APP_DIR: $ROOT_SCRIPT" && \
-            case $PM in \
-                bun) $HOME/.bun/bin/bun run "$APP_DIR" 2>/dev/null || $HOME/.bun/bin/bun run "build:$APP_DIR" 2>/dev/null || true ;; \
-                pnpm) pnpm run "$APP_DIR" 2>/dev/null || pnpm run "build:$APP_DIR" 2>/dev/null || true ;; \
-                yarn) yarn "$APP_DIR" 2>/dev/null || yarn "build:$APP_DIR" 2>/dev/null || true ;; \
-                npm) npm run "$APP_DIR" 2>/dev/null || npm run "build:$APP_DIR" 2>/dev/null || true ;; \
-            esac; \
-        else \
-            echo "No root script found, building workspace packages..." && \
-            case $PM in \
-                bun) \
-                    if [ -n "$APP_NAME" ]; then \
-                        DEPS=$(node -e "const d=require('./$APP_DIR/package.json').dependencies||{}; Object.keys(d).filter(k=>d[k].includes('workspace')).forEach(k=>console.log(k))" 2>/dev/null) && \
-                        for DEP in $DEPS; do \
-                            echo "Building dependency: $DEP" && \
-                            $HOME/.bun/bin/bun run --filter "$DEP" build 2>/dev/null || true; \
-                        done; \
-                    fi && \
-                    cd "$APP_DIR" && \
-                    if [ -f "package.json" ] && node -e "process.exit(require('./package.json').scripts?.build ? 0 : 1)" 2>/dev/null; then \
-                        $HOME/.bun/bin/bun run build; \
-                    fi ;; \
-                pnpm) \
-                    if [ -n "$APP_NAME" ]; then \
-                        pnpm --filter "$APP_NAME"... run build 2>/dev/null || true; \
-                    else \
-                        cd "$APP_DIR" && pnpm run build 2>/dev/null || true; \
-                    fi ;; \
-                yarn) \
-                    if [ -n "$APP_NAME" ]; then \
-                        yarn workspaces foreach --from "$APP_NAME" --topological run build 2>/dev/null || \
-                        (cd "$APP_DIR" && yarn build 2>/dev/null || true); \
-                    else \
-                        cd "$APP_DIR" && yarn build 2>/dev/null || true; \
-                    fi ;; \
-                npm) \
-                    if [ -n "$APP_NAME" ]; then \
-                        npm run build --workspace="$APP_NAME" --if-present 2>/dev/null || true; \
-                    else \
-                        cd "$APP_DIR" && npm run build --if-present 2>/dev/null || true; \
-                    fi ;; \
-            esac; \
-        fi; \
-    else \
+    echo "=== Dependencies installed ==="
+
+# ============================================================
+# Phase 2: Build the target app
+# ============================================================
+# Industry standard: Build from root, targeting the specific
+# workspace package. For standalone projects (APP_DIR=.),
+# just run build in place. For monorepos, use the package
+# manager's workspace-aware build commands so dependencies
+# are built first in topological order.
+# ============================================================
+RUN set -e && \
+    . /tmp/pm_env && \
+    if [ -f "$HOME/.bun/bin/bun" ]; then export PATH="$HOME/.bun/bin:$PATH"; fi && \
+    echo "=== Building project (APP_DIR=$APP_DIR) ===" && \
+    if [ "$APP_DIR" = "." ]; then \
         echo "Standalone project" && \
         HAS_BUILD=$(node -e "console.log(require('./package.json').scripts?.build ? 'yes' : 'no')" 2>/dev/null || echo "no") && \
         if [ "$HAS_BUILD" = "yes" ]; then \
             echo "Running build..." && \
             case $PM in \
-                bun) $HOME/.bun/bin/bun run build ;; \
+                bun) bun run build ;; \
                 pnpm) pnpm run build ;; \
                 yarn) yarn build ;; \
                 npm) npm run build ;; \
             esac; \
         fi; \
+    else \
+        echo "Monorepo: building workspace at $APP_DIR" && \
+        APP_NAME=$(node -e "console.log(require('./$APP_DIR/package.json').name || '')" 2>/dev/null || echo "") && \
+        echo "Workspace package name: $APP_NAME" && \
+        if [ -n "$APP_NAME" ]; then \
+            echo "Building $APP_NAME and its dependencies..." && \
+            case $PM in \
+                bun) bun run --filter "$APP_NAME" build 2>/dev/null || (cd "$APP_DIR" && bun run build) ;; \
+                pnpm) pnpm --filter "$APP_NAME"... run build 2>/dev/null || (cd "$APP_DIR" && pnpm run build) ;; \
+                yarn) yarn workspaces foreach --from "$APP_NAME" --topological run build 2>/dev/null || (cd "$APP_DIR" && yarn build) ;; \
+                npm) npm run build --workspace="$APP_NAME" --if-present 2>/dev/null || (cd "$APP_DIR" && npm run build) ;; \
+            esac; \
+        else \
+            echo "No package name found, building directly in $APP_DIR" && \
+            cd "$APP_DIR" && \
+            HAS_BUILD=$(node -e "console.log(require('./package.json').scripts?.build ? 'yes' : 'no')" 2>/dev/null || echo "no") && \
+            if [ "$HAS_BUILD" = "yes" ]; then \
+                case $PM in \
+                    bun) bun run build ;; \
+                    pnpm) pnpm run build ;; \
+                    yarn) yarn build ;; \
+                    npm) npm run build ;; \
+                esac; \
+            fi; \
+        fi; \
     fi && \
-    echo "========================================" && \
-    echo "=== Build complete ===" && \
-    echo "========================================"
+    echo "=== Build complete ==="
 
-# Default port
+# Add bun to PATH if installed (persists across layers and at runtime)
+ENV PATH="/root/.bun/bin:$PATH"
+
+# Default port (Lambda Web Adapter expects 8080)
 ENV PORT=8080
+ENV HOSTNAME=0.0.0.0
 ENV NODE_ENV=production
 
-# Create universal start script
+# ============================================================
+# Phase 3: Start script
+# ============================================================
+# Industry standard: cd into the app directory and run the
+# start script from there. For standalone (APP_DIR=.), this
+# is just /app. For monorepos, it's /app/<workspace-dir>.
+# ============================================================
 RUN echo '#!/bin/sh\n\
 set -e\n\
 \n\
@@ -139,29 +139,29 @@ if [ -f "$HOME/.bun/bin/bun" ]; then\n\
     export PATH="$HOME/.bun/bin:$PATH"\n\
 fi\n\
 \n\
-cd /app\n\
-\n\
-# For monorepos, check if root has a start script for the app\n\
-if [ "$APP_DIR" != "." ]; then\n\
-    ROOT_START=$(node -e "const s=require('"'"'./package.json'"'"').scripts||{}; console.log(s['"'"'$APP_DIR'"'"']||s['"'"'start:$APP_DIR'"'"']||'"'"''"'"')" 2>/dev/null || echo "")\n\
-    if [ -n "$ROOT_START" ]; then\n\
-        echo "Starting via root script: $APP_DIR"\n\
-        case $PM in\n\
-            bun) exec bun run "$APP_DIR" ;;\n\
-            pnpm) exec pnpm run "$APP_DIR" ;;\n\
-            yarn) exec yarn "$APP_DIR" ;;\n\
-            npm) exec npm run "$APP_DIR" ;;\n\
-        esac\n\
-    fi\n\
-fi\n\
-\n\
-# Otherwise, start from the app directory\n\
+# Navigate to the app directory\n\
 cd /app/$APP_DIR\n\
+\n\
+# Next.js standalone: run node server.js (avoids Bun + Lambda Runtime.ExitError)\n\
+# In monorepos server.js can be at .next/standalone/apps/<app>/server.js (see Next.js #78446)\n\
+STANDALONE_SERVER=$(find .next/standalone -name "server.js" -type f 2>/dev/null | head -1)\n\
+if [ -n "$STANDALONE_SERVER" ]; then\n\
+    STANDALONE_DIR=$(dirname "$STANDALONE_SERVER")\n\
+    echo "Starting: Next.js standalone (node server.js) from $STANDALONE_DIR"\n\
+    cd "$STANDALONE_DIR"\n\
+    [ -d "/app/$APP_DIR/.next/static" ] && mkdir -p .next && cp -r /app/$APP_DIR/.next/static .next/ 2>/dev/null || true\n\
+    [ -d "/app/$APP_DIR/public" ] && cp -r /app/$APP_DIR/public . 2>/dev/null || true\n\
+    exec node server.js\n\
+fi\n\
 \n\
 START_CMD=$(node -e "console.log(require('"'"'./package.json'"'"').scripts?.start || '"'"''"'"')" 2>/dev/null || echo "")\n\
 \n\
 if [ -n "$START_CMD" ]; then\n\
     echo "Starting: $START_CMD"\n\
+    # Next.js: always run with Node in Lambda (Bun can cause Runtime.ExitError)\n\
+    if [ "$START_CMD" = "next start" ]; then\n\
+        exec node ./node_modules/next/dist/bin/next start\n\
+    fi\n\
     case $PM in\n\
         bun) exec bun run start ;;\n\
         pnpm) exec pnpm run start ;;\n\
@@ -175,7 +175,6 @@ else\n\
 fi\n\
 ' > /start.sh && chmod +x /start.sh
 
-# Set working directory (but start.sh handles the actual cd)
 WORKDIR /app
 
-CMD ["node", "index.js"]
+CMD ["/start.sh"]

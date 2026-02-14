@@ -10,6 +10,13 @@ export interface BlogPostMeta {
   summary: string;
   author: string;
   slug: string;
+  image?: string;
+  readingTime: number;
+}
+
+export function getReadingTime(content: string): number {
+  const words = content.trim().split(/\s+/).length;
+  return Math.ceil(words / 200);
 }
 
 export function getAllPosts(): BlogPostMeta[] {
@@ -19,7 +26,7 @@ export function getAllPosts(): BlogPostMeta[] {
     const slug = filename.replace(/\.mdx$/, "");
     const filePath = path.join(BLOG_DIR, filename);
     const fileContent = fs.readFileSync(filePath, "utf-8");
-    const { data } = matter(fileContent);
+    const { data, content } = matter(fileContent);
 
     return {
       title: data.title,
@@ -27,6 +34,8 @@ export function getAllPosts(): BlogPostMeta[] {
       summary: data.summary,
       author: data.author,
       slug,
+      image: data.image || undefined,
+      readingTime: getReadingTime(content),
     };
   });
 
@@ -52,6 +61,8 @@ export function getPostBySlug(slug: string) {
       summary: data.summary,
       author: data.author,
       slug,
+      image: data.image || undefined,
+      readingTime: getReadingTime(content),
     },
     content,
   };

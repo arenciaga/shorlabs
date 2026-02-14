@@ -114,6 +114,9 @@ RUN set -e && \
 # Add bun to PATH if installed (persists across layers and at runtime)
 ENV PATH="/root/.bun/bin:$PATH"
 
+# Install serve for Vite/CRA static builds (dist/ or build/)
+RUN npm install -g serve
+
 # Default port (Lambda Web Adapter expects 8080)
 ENV PORT=8080
 ENV HOSTNAME=0.0.0.0
@@ -146,12 +149,15 @@ cd /app/$APP_DIR\n\
 # In monorepos server.js can be at .next/standalone/apps/<app>/server.js (see Next.js #78446)\n\
 STANDALONE_SERVER=$(find .next/standalone -name "server.js" -type f 2>/dev/null | head -1)\n\
 if [ -n "$STANDALONE_SERVER" ]; then\n\
-    STANDALONE_DIR=$(dirname "$STANDALONE_SERVER")\n\
-    echo "Starting: Next.js standalone (node server.js) from $STANDALONE_DIR"\n\
-    cd "$STANDALONE_DIR"\n\
-    [ -d "/app/$APP_DIR/.next/static" ] && mkdir -p .next && cp -r /app/$APP_DIR/.next/static .next/ 2>/dev/null || true\n\
-    [ -d "/app/$APP_DIR/public" ] && cp -r /app/$APP_DIR/public . 2>/dev/null || true\n\
-    exec node server.js\n\
+    STANDALONE_ABS=$(cd "$(dirname "$STANDALONE_SERVER")" && pwd)\n\
+    echo "Starting: Next.js standalone (node server.js) from $STANDALONE_ABS"\n\
+    if [ -d "/app/$APP_DIR/.next/static" ]; then\n\
+        mkdir -p "$STANDALONE_ABS/.next" && cp -r /app/$APP_DIR/.next/static "$STANDALONE_ABS/.next/" && echo "Copied .next/static"\n\
+    fi\n\
+    if [ -d "/app/$APP_DIR/public" ]; then\n\
+        cp -r /app/$APP_DIR/public "$STANDALONE_ABS/" && echo "Copied public"\n\
+    fi\n\
+    cd "$STANDALONE_ABS" && exec node server.js\n\
 fi\n\
 \n\
 START_CMD=$(node -e "console.log(require('"'"'./package.json'"'"').scripts?.start || '"'"''"'"')" 2>/dev/null || echo "")\n\
@@ -169,6 +175,15 @@ if [ -n "$START_CMD" ]; then\n\
         npm) exec npm run start ;;\n\
     esac\n\
 else\n\
+    # Vite / Create React App: serve static build if dist/ or build/ exists (no index.js)\n\
+    if [ -d "dist" ]; then\n\
+        echo "Starting: serve (Vite static build)"\n\
+        exec serve -s dist -l "$PORT"\n\
+    fi\n\
+    if [ -d "build" ]; then\n\
+        echo "Starting: serve (CRA static build)"\n\
+        exec serve -s build -l "$PORT"\n\
+    fi\n\
     MAIN=$(node -e "console.log(require('"'"'./package.json'"'"').main || '"'"'index.js'"'"')" 2>/dev/null || echo "index.js")\n\
     echo "Starting: node $MAIN"\n\
     exec node "$MAIN"\n\

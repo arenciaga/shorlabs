@@ -117,10 +117,41 @@ ENV PATH="/root/.bun/bin:$PATH"
 # Install serve for Vite/CRA static builds (dist/ or build/)
 RUN npm install -g serve
 
+# ============================================================
+# Phase 2.5: Copy Next.js standalone static assets at build time
+# ============================================================
+# Lambda has a read-only filesystem, so this MUST happen during
+# the Docker build, not at runtime. For monorepos, server.js is
+# nested (e.g. .next/standalone/apps/frontend/server.js) and
+# static/public must be copied NEXT TO server.js, not at the
+# standalone root. See: https://github.com/vercel/next.js/issues/78446
+# ============================================================
+RUN set -e && \
+    cd /app/$APP_DIR && \
+    STANDALONE_SERVER=$(find .next/standalone -path "*/node_modules" -prune -o -name "server.js" -type f -print 2>/dev/null | head -1) && \
+    if [ -n "$STANDALONE_SERVER" ]; then \
+        SERVER_DIR=$(cd "$(dirname "$STANDALONE_SERVER")" && pwd) && \
+        echo "=== Copying Next.js standalone assets ===" && \
+        echo "server.js location: $SERVER_DIR" && \
+        if [ -d ".next/static" ]; then \
+            mkdir -p "$SERVER_DIR/.next" && \
+            cp -r .next/static "$SERVER_DIR/.next/" && \
+            echo "Copied .next/static to $SERVER_DIR/.next/static"; \
+        fi && \
+        if [ -d "public" ]; then \
+            cp -r public "$SERVER_DIR/" && \
+            echo "Copied public to $SERVER_DIR/public"; \
+        fi && \
+        echo "=== Standalone assets ready ==="; \
+    else \
+        echo "=== No Next.js standalone build detected, skipping ==="; \
+    fi
+
 # Default port (Lambda Web Adapter expects 8080)
 ENV PORT=8080
 ENV HOSTNAME=0.0.0.0
 ENV NODE_ENV=production
+ENV AWS_LWA_INVOKE_MODE=response_stream
 
 # ============================================================
 # Phase 3: Start script
@@ -147,16 +178,10 @@ cd /app/$APP_DIR\n\
 \n\
 # Next.js standalone: run node server.js (avoids Bun + Lambda Runtime.ExitError)\n\
 # In monorepos server.js can be at .next/standalone/apps/<app>/server.js (see Next.js #78446)\n\
-STANDALONE_SERVER=$(find .next/standalone -name "server.js" -type f 2>/dev/null | head -1)\n\
+STANDALONE_SERVER=$(find .next/standalone -path "*/node_modules" -prune -o -name "server.js" -type f -print 2>/dev/null | head -1)\n\
 if [ -n "$STANDALONE_SERVER" ]; then\n\
     STANDALONE_ABS=$(cd "$(dirname "$STANDALONE_SERVER")" && pwd)\n\
     echo "Starting: Next.js standalone (node server.js) from $STANDALONE_ABS"\n\
-    if [ -d "/app/$APP_DIR/.next/static" ]; then\n\
-        mkdir -p "$STANDALONE_ABS/.next" && cp -r /app/$APP_DIR/.next/static "$STANDALONE_ABS/.next/" && echo "Copied .next/static"\n\
-    fi\n\
-    if [ -d "/app/$APP_DIR/public" ]; then\n\
-        cp -r /app/$APP_DIR/public "$STANDALONE_ABS/" && echo "Copied public"\n\
-    fi\n\
     cd "$STANDALONE_ABS" && exec node server.js\n\
 fi\n\
 \n\

@@ -155,6 +155,14 @@ def _ensure_function_url(function_name: str) -> str:
     
     try:
         response = lambda_client.get_function_url_config(FunctionName=function_name)
+        # Ensure streaming mode is enabled (fixes media/binary serving)
+        if response.get("InvokeMode") != "RESPONSE_STREAM":
+            lambda_client.update_function_url_config(
+                FunctionName=function_name,
+                AuthType="NONE",
+                InvokeMode="RESPONSE_STREAM",
+            )
+            print("🔄 Updated function URL to RESPONSE_STREAM mode")
         return response["FunctionUrl"]
     except lambda_client.exceptions.ResourceNotFoundException:
         print("🔗 Creating function URL...")
@@ -173,6 +181,7 @@ def _ensure_function_url(function_name: str) -> str:
         response = lambda_client.create_function_url_config(
             FunctionName=function_name,
             AuthType="NONE",
+            InvokeMode="RESPONSE_STREAM",
         )
         return response["FunctionUrl"]
 

@@ -67,6 +67,7 @@ RUN set -e && \
 ENV PORT=8080
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
+ENV AWS_LWA_INVOKE_MODE=response_stream
 
 # Create start script
 RUN echo '#!/bin/sh\n\

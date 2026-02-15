@@ -32,7 +32,7 @@ const HeroSection = () => {
 
                     {/* Subtitle */}
                     <p className="text-base sm:text-lg text-gray-500 max-w-lg leading-relaxed">
-                        The serverless platform for frontends and backends. Next.js, React, FastAPI, Express—all with pay-per-request pricing. No idle costs. No container limits.
+                        Serverless for everything. Frontend, backend, all pay-per-request. Your idle side project? $0.
                     </p>
 
                     {/* CTA Buttons */}
@@ -63,10 +63,32 @@ const HeroSection = () => {
                         )}
                     </div>
 
-                    {/* Trust Signal */}
-                    <p className="text-xs sm:text-sm text-gray-400 pt-1">
-                        Free tier available • No credit card required
-                    </p>
+                    {/* Frameworks supported */}
+                    <div className="flex flex-col sm:flex-row items-center gap-3 sm:gap-4 pt-6 sm:pt-8 self-center sm:self-end">
+                        <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">
+                            Frameworks supported
+                        </span>
+                        <div className="flex items-center gap-4 sm:gap-5">
+                            {[
+                                { name: "Next.js", icon: "https://cdn.simpleicons.org/nextdotjs/000000" },
+                                { name: "React", icon: "https://cdn.simpleicons.org/react/61DAFB" },
+                                { name: "FastAPI", icon: "https://cdn.simpleicons.org/fastapi/009688" },
+                                { name: "Express", icon: "https://cdn.simpleicons.org/express/000000" },
+                                { name: "Flask", icon: "https://cdn.simpleicons.org/flask/000000" },
+                                { name: "Django", icon: "https://cdn.simpleicons.org/django/092E20" },
+                            ].map(({ name, icon }) => (
+                                <img
+                                    key={name}
+                                    src={icon}
+                                    alt={name}
+                                    title={name}
+                                    className="h-6 w-6 sm:h-7 sm:w-7 opacity-90 hover:opacity-100 transition-opacity"
+                                    width={28}
+                                    height={28}
+                                />
+                            ))}
+                        </div>
+                    </div>
                 </div>
             </div>
 

@@ -597,6 +597,50 @@ def increment_org_usage(
 
 
 # ─────────────────────────────────────────────────────────────
+# QUOTA THROTTLE STATE (stored in projects table)
+# ─────────────────────────────────────────────────────────────
+
+
+def get_throttle_state(org_id: str) -> Optional[dict]:
+    """
+    Get throttle state for an org. Returns None if not throttled.
+
+    Stored in the projects table with PK=ORG#{org_id}, SK=THROTTLE_STATE.
+    """
+    table = get_or_create_table()
+    response = table.get_item(
+        Key={"PK": f"ORG#{org_id}", "SK": "THROTTLE_STATE"},
+        ConsistentRead=True,
+    )
+    return response.get("Item")
+
+
+def set_throttle_state(org_id: str, reason: str, throttled_functions: list) -> dict:
+    """Mark an org as throttled and record which functions were disabled."""
+    table = get_or_create_table()
+    now = datetime.utcnow().isoformat()
+    period = datetime.utcnow().strftime("%Y-%m")
+    item = {
+        "PK": f"ORG#{org_id}",
+        "SK": "THROTTLE_STATE",
+        "is_throttled": True,
+        "throttled_at": now,
+        "reason": reason,
+        "throttled_functions": throttled_functions,
+        "billing_period": period,
+    }
+    table.put_item(Item=item)
+    return item
+
+
+def clear_throttle_state(org_id: str) -> bool:
+    """Remove throttle state for an org (unthrottle)."""
+    table = get_or_create_table()
+    table.delete_item(Key={"PK": f"ORG#{org_id}", "SK": "THROTTLE_STATE"})
+    return True
+
+
+# ─────────────────────────────────────────────────────────────
 # GITHUB CONNECTIONS TABLE (Organization-based)
 # ─────────────────────────────────────────────────────────────
 

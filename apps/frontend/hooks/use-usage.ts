@@ -29,6 +29,9 @@ interface Usage {
     periodStart: string | null
     periodEnd: string | null
     lastUpdated: string
+    isThrottled: boolean
+    throttleReason: string | null
+    throttledAt: string | null
 }
 
 

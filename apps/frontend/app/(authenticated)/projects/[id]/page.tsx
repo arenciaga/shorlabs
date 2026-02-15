@@ -75,6 +75,7 @@ interface Project {
     ephemeral_storage: number
     created_at: string
     updated_at: string
+    is_throttled?: boolean
 }
 
 interface Deployment {
@@ -513,14 +514,38 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                         <div className="flex items-center gap-2">
                             <Button
                                 onClick={handleRedeploy}
-                                disabled={isBuilding || redeploying}
+                                disabled={isBuilding || redeploying || project.is_throttled}
                                 className="bg-zinc-900 hover:bg-zinc-800 text-white rounded-full h-10 px-5 shadow-lg shadow-zinc-900/10"
                             >
                                 <RotateCw className={`h-4 w-4 mr-2 ${redeploying ? 'animate-spin' : ''}`} />
-                                Redeploy
+                                {project.is_throttled ? "Paused" : "Redeploy"}
                             </Button>
                         </div>
                     </div>
+
+                    {/* Throttle Banner */}
+                    {project.is_throttled && (
+                        <div className="bg-red-50 border border-red-200 rounded-2xl p-5 mb-6">
+                            <div className="flex items-start gap-4">
+                                <div className="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center shrink-0">
+                                    <AlertCircle className="h-5 w-5 text-red-500" />
+                                </div>
+                                <div className="flex-1">
+                                    <h3 className="font-semibold text-red-900">Project Paused</h3>
+                                    <p className="text-sm text-red-700 mt-1">
+                                        This project is paused because your organization has exceeded its Hobby plan quota.
+                                        Your endpoint will return errors until you upgrade or the billing period resets.
+                                    </p>
+                                    <Button
+                                        onClick={openUpgradeModal}
+                                        className="mt-3 bg-red-600 hover:bg-red-700 text-white rounded-full h-9 px-4 text-sm"
+                                    >
+                                        Upgrade to Restore
+                                    </Button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
                     {/* Stats Cards */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 sm:mb-8">

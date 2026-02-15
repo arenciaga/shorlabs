@@ -153,8 +153,28 @@ def _run_deployment_sync(
             "function_name": function_name,  # Store for usage aggregation
         })
         
+        # If the org is throttled, immediately throttle this new function too
+        project_data = get_project(project_id)
+        if project_data:
+            org_id = project_data.get("organization_id")
+            if org_id:
+                from api.db.dynamodb import get_throttle_state
+                throttle_state = get_throttle_state(org_id)
+                if throttle_state and throttle_state.get("is_throttled"):
+                    try:
+                        from deployer.aws.lambda_service import get_lambda_function_name
+                        full_fn = get_lambda_function_name(function_name) if function_name else None
+                        if full_fn:
+                            boto3.client("lambda").put_function_concurrency(
+                                FunctionName=full_fn,
+                                ReservedConcurrentExecutions=0,
+                            )
+                            print(f"🚫 New deploy throttled: {full_fn} (org {org_id} is throttled)")
+                    except Exception as throttle_err:
+                        print(f"⚠️ Failed to throttle new deploy: {throttle_err}")
+
         print(f"✅ Deployment complete: {function_url}")
-        
+
     except Exception as e:
         # Update deployment as failed if it was created
         if deployment:
@@ -323,6 +343,12 @@ async def get_projects(
 ):
     """List all projects for the organization."""
     projects = list_projects(org_id)
+
+    # Check org-level throttle state (single lookup for all projects)
+    from api.db.dynamodb import get_throttle_state
+    throttle_state = get_throttle_state(org_id)
+    is_throttled = bool(throttle_state and throttle_state.get("is_throttled"))
+
     return [
         {
             "project_id": p["project_id"],
@@ -336,6 +362,7 @@ async def get_projects(
             "custom_url": p.get("custom_url"),
             "created_at": p["created_at"],
             "updated_at": p["updated_at"],
+            "is_throttled": is_throttled,
         }
         for p in projects
     ]
@@ -480,6 +507,11 @@ async def get_org_usage_endpoint(
 
     last_updated = datetime.utcnow().isoformat()
 
+    # Check throttle status
+    from api.db.dynamodb import get_throttle_state
+    throttle_state = get_throttle_state(org_id)
+    is_throttled = bool(throttle_state and throttle_state.get("is_throttled"))
+
     return {
         "credits": credits_response,
         "breakdown": breakdown_response,
@@ -494,6 +526,9 @@ async def get_org_usage_endpoint(
         "periodStart": period_start,
         "periodEnd": period_end,
         "lastUpdated": last_updated,
+        "isThrottled": is_throttled,
+        "throttleReason": throttle_state.get("reason") if is_throttled else None,
+        "throttledAt": throttle_state.get("throttled_at") if is_throttled else None,
     }
 
 
@@ -506,12 +541,17 @@ async def get_project_details(
     """Get project details with deployment history."""
 
     project = get_project_by_key(org_id, project_id)
-    
+
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
-    
+
     deployments = list_deployments(project_id)
-    
+
+    # Check org-level throttle state
+    from api.db.dynamodb import get_throttle_state
+    throttle_state = get_throttle_state(org_id)
+    is_throttled = bool(throttle_state and throttle_state.get("is_throttled"))
+
     return {
         "project": {
             "project_id": project["project_id"],
@@ -532,6 +572,7 @@ async def get_project_details(
             "ephemeral_storage": project.get("ephemeral_storage", 512),
             "created_at": project["created_at"],
             "updated_at": project["updated_at"],
+            "is_throttled": is_throttled,
         },
         "deployments": [
             {

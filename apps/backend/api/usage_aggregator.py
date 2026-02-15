@@ -339,7 +339,23 @@ def aggregate_usage_metrics():
                     idempotency_key=f"{org_id}:compute:{window_key}",
                 )
     
-    print(f"🎉 Aggregation complete!")
+    # ── Quota enforcement for hobby orgs ─────────────────────────
+    print("🛡️ Running quota enforcement pass...")
+    from api.quota_enforcer import check_and_enforce_quota
+
+    for org_id in orgs_projects.keys():
+        try:
+            result = check_and_enforce_quota(org_id)
+            if result == "throttled":
+                print(f"  🚫 ORG {org_id} throttled (quota exceeded)")
+            elif result == "already_throttled":
+                print(f"  🚫 ORG {org_id} already throttled")
+            elif result == "unthrottled":
+                print(f"  ✅ ORG {org_id} unthrottled (quota restored)")
+        except Exception as e:
+            print(f"  ❌ Quota enforcement error for {org_id}: {e}")
+
+    print(f"🎉 Aggregation + enforcement complete!")
     print(f"   Total: {total_requests} requests, {total_gb_seconds:.2f} GB-Seconds")
     print(f"   Period: {period}")
     print(f"   Window: {window_seconds}s ending {window_key}")

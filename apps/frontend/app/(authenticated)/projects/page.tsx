@@ -11,6 +11,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 import { UpgradeModal, useUpgradeModal } from "@/components/upgrade-modal"
 import { UsagePanel } from "@/components/UsagePanel"
 import { useIsPro } from "@/hooks/use-is-pro"
+import { useUsage } from "@/hooks/use-usage"
 import { trackEvent } from "@/lib/amplitude"
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
@@ -26,6 +27,7 @@ interface Project {
     subdomain: string | null
     created_at: string
     updated_at: string
+    is_throttled?: boolean
 }
 
 const STATUS_CONFIG: Record<string, { dot: string; label: string; bg: string }> = {
@@ -64,6 +66,7 @@ const getProjectGradient = (id: string) => {
 export default function ProjectsPage() {
     const { getToken, isLoaded, orgId } = useAuth()
     const { isPro, planLabel } = useIsPro()
+    const { usage } = useUsage()
     const { signOut } = useClerk()
     const [searchQuery, setSearchQuery] = useState("")
     const [projects, setProjects] = useState<Project[]>([])
@@ -198,6 +201,25 @@ export default function ProjectsPage() {
 
                     {/* Right Side - Projects */}
                     <div className="flex-1 min-w-0">
+                        {/* Throttle Banner */}
+                        {usage?.isThrottled && (
+                            <div className="mb-5 bg-red-50 border border-red-200 rounded-xl p-4 flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <AlertCircle className="h-5 w-5 text-red-500 shrink-0" />
+                                    <div>
+                                        <p className="text-sm font-medium text-red-900">Quota exceeded — all projects paused</p>
+                                        <p className="text-xs text-red-700">Upgrade your plan to restore service</p>
+                                    </div>
+                                </div>
+                                <Button
+                                    onClick={openUpgradeModal}
+                                    className="bg-red-600 hover:bg-red-700 text-white rounded-full h-8 px-4 text-xs shrink-0"
+                                >
+                                    Upgrade
+                                </Button>
+                            </div>
+                        )}
+
                         <div className="flex items-center justify-between mb-5">
                             <h2 className="font-medium text-zinc-900">Projects</h2>
                         </div>

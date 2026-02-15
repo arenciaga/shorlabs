@@ -175,6 +175,61 @@ def _handle_eventbridge_event(event: dict) -> dict:
     return {"statusCode": 400, "body": f"Unknown action: {action}"}
 
 
+@app.post("/webhooks/autumn")
+async def handle_autumn_webhook(request: Request):
+    """
+    Handle Autumn billing webhooks for instant quota enforcement.
+
+    Key events:
+    - customer.product.attached: User upgraded → unthrottle immediately
+    - customer.subscription.created: User subscribed → unthrottle
+    - customer.usage.reset: Billing period reset → unthrottle
+    """
+    import hmac
+    import hashlib
+
+    body = await request.body()
+
+    # Verify webhook signature if secret is configured
+    webhook_secret = os.environ.get("AUTUMN_WEBHOOK_SECRET", "")
+    if webhook_secret:
+        signature = request.headers.get("x-autumn-signature", "")
+        expected = hmac.new(
+            webhook_secret.encode(), body, hashlib.sha256
+        ).hexdigest()
+        if not hmac.compare_digest(signature, expected):
+            from fastapi import HTTPException
+            raise HTTPException(status_code=401, detail="Invalid webhook signature")
+
+    event = json.loads(body)
+    event_type = event.get("type", "")
+    customer_id = event.get("customer_id") or (event.get("data") or {}).get("customer_id")
+
+    print(f"📩 Autumn webhook: {event_type} for customer {customer_id}")
+
+    if not customer_id:
+        return {"status": "ignored", "reason": "no_customer_id"}
+
+    from api.quota_enforcer import unthrottle_org
+    from api.db.dynamodb import get_throttle_state
+
+    if event_type in ("customer.product.attached", "customer.subscription.created"):
+        state = get_throttle_state(customer_id)
+        if state and state.get("is_throttled"):
+            unthrottle_org(customer_id)
+            print(f"Webhook: Unthrottled {customer_id} (upgraded)")
+        return {"status": "ok", "action": "unthrottled"}
+
+    elif event_type == "customer.usage.reset":
+        state = get_throttle_state(customer_id)
+        if state and state.get("is_throttled"):
+            unthrottle_org(customer_id)
+            print(f"Webhook: Unthrottled {customer_id} (period reset)")
+        return {"status": "ok", "action": "unthrottled"}
+
+    return {"status": "ok", "action": "none"}
+
+
 @app.post("/events")
 async def handle_events(request: Request):
     """

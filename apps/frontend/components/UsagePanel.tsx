@@ -61,6 +61,29 @@ export function UsagePanel({ onUpgrade }: UsagePanelProps) {
                     )}
                 </div>
 
+                {/* Quota Exceeded Banner */}
+                {dataReady && usage.isThrottled && (
+                    <div className="mx-4 mt-3 rounded-lg bg-red-50 border border-red-200 p-3">
+                        <div className="flex items-start gap-2.5">
+                            <AlertCircle className="h-4 w-4 text-red-500 shrink-0 mt-0.5" />
+                            <div>
+                                <p className="text-xs font-medium text-red-900">
+                                    Quota exceeded
+                                </p>
+                                <p className="text-[11px] text-red-700 mt-0.5">
+                                    Your projects are paused. Upgrade to restore service.
+                                </p>
+                                <button
+                                    onClick={onUpgrade}
+                                    className="mt-1.5 text-[11px] font-medium text-red-700 hover:text-red-900 underline underline-offset-2 cursor-pointer"
+                                >
+                                    Upgrade now
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 {/* Body */}
                 <div className="px-5 pt-4 pb-5">
                     {showLoading ? (
@@ -171,7 +194,11 @@ export function UsagePanel({ onUpgrade }: UsagePanelProps) {
                                 </div>
                                 <div className="h-2 rounded-full bg-zinc-100 overflow-hidden">
                                     <div
-                                        className="h-full rounded-full bg-blue-600 transition-all duration-500 ease-out"
+                                        className={`h-full rounded-full transition-all duration-500 ease-out ${
+                                            usage!.requests.limit && (usage!.requests.current || 0) >= usage!.requests.limit
+                                                ? "bg-red-500"
+                                                : "bg-blue-600"
+                                        }`}
                                         style={{
                                             width: `${Math.min(
                                                 ((usage!.requests.current || 0) /
@@ -195,7 +222,11 @@ export function UsagePanel({ onUpgrade }: UsagePanelProps) {
                                 </div>
                                 <div className="h-2 rounded-full bg-zinc-100 overflow-hidden">
                                     <div
-                                        className="h-full rounded-full bg-blue-600 transition-all duration-500 ease-out"
+                                        className={`h-full rounded-full transition-all duration-500 ease-out ${
+                                            usage!.gbSeconds.limit && (usage!.gbSeconds.current || 0) >= usage!.gbSeconds.limit
+                                                ? "bg-red-500"
+                                                : "bg-blue-600"
+                                        }`}
                                         style={{
                                             width: `${Math.min(
                                                 ((usage!.gbSeconds.current || 0) /

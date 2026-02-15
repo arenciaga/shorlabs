@@ -30,6 +30,8 @@ export function UsagePanel({ onUpgrade }: UsagePanelProps) {
     // Don't render anything meaningful until mounted (prevents hydration mismatch)
     // and until we have data (prevents showing wrong layout)
     const dataReady = mounted && !usageLoading && usage != null
+    // Critical banner only when data is confirmed (not revalidating), per SWR stale-while-revalidate UX
+    const dataConfirmed = dataReady && !isValidating
     const hasCredits = dataReady && usage.credits != null
     const showLoading = !mounted || usageLoading || (isValidating && !usage)
 
@@ -61,8 +63,8 @@ export function UsagePanel({ onUpgrade }: UsagePanelProps) {
                     )}
                 </div>
 
-                {/* Quota Exceeded Banner */}
-                {dataReady && usage.isThrottled && (
+                {/* Quota Exceeded Banner — only when confirmed (not revalidating) to avoid flash from stale cache */}
+                {dataConfirmed && usage.isThrottled && (
                     <div className="mx-4 mt-3 rounded-lg bg-red-50 border border-red-200 p-3">
                         <div className="flex items-start gap-2.5">
                             <AlertCircle className="h-4 w-4 text-red-500 shrink-0 mt-0.5" />

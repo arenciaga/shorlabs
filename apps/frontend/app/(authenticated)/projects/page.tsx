@@ -66,7 +66,7 @@ const getProjectGradient = (id: string) => {
 export default function ProjectsPage() {
     const { getToken, isLoaded, orgId } = useAuth()
     const { isPro, planLabel } = useIsPro()
-    const { usage } = useUsage()
+    const { usage, loading: usageLoading, isValidating: usageValidating } = useUsage()
     const { signOut } = useClerk()
     const [searchQuery, setSearchQuery] = useState("")
     const [projects, setProjects] = useState<Project[]>([])
@@ -201,8 +201,8 @@ export default function ProjectsPage() {
 
                     {/* Right Side - Projects */}
                     <div className="flex-1 min-w-0">
-                        {/* Throttle Banner */}
-                        {usage?.isThrottled && (
+                        {/* Throttle Banner — only when usage is confirmed (not loading/revalidating) to avoid showing stale cache */}
+                        {!usageLoading && !usageValidating && usage != null && usage.isThrottled && (
                             <div className="mb-5 bg-red-50 border border-red-200 rounded-xl p-4 flex items-center justify-between">
                                 <div className="flex items-center gap-3">
                                     <AlertCircle className="h-5 w-5 text-red-500 shrink-0" />

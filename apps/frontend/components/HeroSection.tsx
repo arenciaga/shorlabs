@@ -64,7 +64,7 @@ const HeroSection = () => {
                     </div>
 
                     {/* Frameworks supported */}
-                    <div className="flex flex-col sm:flex-row items-center gap-3 sm:gap-4 pt-6 sm:pt-8 self-center sm:self-end">
+                    <div className="flex flex-col sm:flex-row items-center sm:items-center gap-3 sm:gap-4 pt-6 sm:pt-8 w-full sm:w-auto">
                         <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">
                             Frameworks supported
                         </span>

@@ -3,7 +3,6 @@
 import { useEffect, useRef } from 'react';
 import { useUser } from '@clerk/nextjs';
 import {
-    initAmplitude,
     setAmplitudeUserId,
     setAmplitudeUserProperties,
     resetAmplitudeUser,
@@ -15,70 +14,16 @@ interface AmplitudeProviderProps {
 }
 
 /**
- * AmplitudeProvider - Initializes Amplitude Analytics with Session Replay
- * 
- * This provider should wrap your app at a high level (inside ClerkProvider).
- * It handles:
- * - SDK initialization on mount
- * - User identification when authenticated
- * - User reset when logged out
- * - Syncing Clerk user data with Amplitude
+ * AmplitudeProvider - Syncs Clerk user with Amplitude (per Next.js installation guide).
+ * SDK is initialized at module load in @/lib/amplitude so events are captured from first load.
  */
 export function AmplitudeProvider({ children }: AmplitudeProviderProps) {
     const { isLoaded, isSignedIn, user } = useUser();
-    const hasInitialized = useRef(false);
     const previousUserId = useRef<string | null>(null);
 
-    // Initialize Amplitude on mount (client-side only)
+    // Handle user identification and de-identification (init is done in lib/amplitude at module load)
     useEffect(() => {
-        if (hasInitialized.current) return;
-
-        const apiKey = process.env.NEXT_PUBLIC_AMPLITUDE_API_KEY;
-
-        if (!apiKey) {
-            console.warn(
-                '[AmplitudeProvider] NEXT_PUBLIC_AMPLITUDE_API_KEY is not set. ' +
-                'Analytics will not be tracked.'
-            );
-            return;
-        }
-
-        initAmplitude({
-            apiKey,
-            sessionReplayOptions: {
-                // Capture 10% of sessions in production to reduce overhead
-                sampleRate: process.env.NODE_ENV === 'production' ? 0.1 : 1.0,
-                privacyConfig: {
-                    defaultMaskLevel: 'medium',
-                    // Block sensitive elements from recording
-                    blockSelector: [
-                        '.amp-block',
-                        '[data-amp-block]',
-                        '[data-sensitive]',
-                    ],
-                    // Mask text content for privacy
-                    maskSelector: [
-                        '.amp-mask',
-                        '[data-amp-mask]',
-                        'input[type="password"]',
-                        'input[type="email"]',
-                        '[data-private]',
-                    ],
-                    // Explicitly unmask certain elements
-                    unmaskSelector: [
-                        '.amp-unmask',
-                        '[data-amp-unmask]',
-                    ],
-                },
-            },
-        });
-
-        hasInitialized.current = true;
-    }, []);
-
-    // Handle user identification and de-identification
-    useEffect(() => {
-        if (!isLoaded || !hasInitialized.current) return;
+        if (!isLoaded) return;
 
         if (isSignedIn && user) {
             const userId = user.id;

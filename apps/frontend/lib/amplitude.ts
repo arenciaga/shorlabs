@@ -28,6 +28,11 @@ const BLOCKED_USER_IDS = [
 // Singleton to track initialization
 let isInitialized = false;
 
+// Queue events that fire before init so they are not lost
+type QueuedEvent = { name: string; properties?: Record<string, unknown> };
+const eventQueue: QueuedEvent[] = [];
+const MAX_QUEUE_SIZE = 50;
+
 /**
  * Initialize Amplitude Analytics with Session Replay
  * Should only be called once on the client side
@@ -90,6 +95,20 @@ export function initAmplitude(config: AmplitudeConfig): void {
         amplitude.add(sessionReplay);
 
         isInitialized = true;
+
+        // Replay events that were queued before init
+        while (eventQueue.length > 0) {
+            const queued = eventQueue.shift();
+            if (queued) amplitude.track(queued.name, queued.properties);
+        }
+
+        // Flush on page unload so we don't lose events when user leaves
+        if (typeof window !== 'undefined') {
+            const flushOnUnload = () => amplitude.flush();
+            window.addEventListener('pagehide', flushOnUnload);
+            window.addEventListener('beforeunload', flushOnUnload);
+        }
+
         console.log('[Amplitude] Initialized successfully');
     } catch (error) {
         console.error('[Amplitude] Initialization failed:', error);
@@ -130,13 +149,25 @@ export function setAmplitudeUserProperties(properties: Record<string, unknown>):
 }
 
 /**
- * Track a custom event
+ * Track a custom event.
+ * If Amplitude is not yet initialized, the event is queued and sent after init.
  */
 export function trackEvent(
     eventName: string,
     eventProperties?: Record<string, unknown>
 ): void {
-    if (typeof window === 'undefined' || !isInitialized) return;
+    if (typeof window === 'undefined') return;
+
+    // Queue event if not initialized yet (replayed after init)
+    if (!isInitialized) {
+        if (eventQueue.length < MAX_QUEUE_SIZE) {
+            eventQueue.push({ name: eventName, properties: eventProperties });
+        }
+        if (process.env.NODE_ENV === 'development') {
+            console.debug(`[Amplitude] Queued event (pre-init): ${eventName}`);
+        }
+        return;
+    }
 
     // Check if current user is blocked
     const currentUserId = amplitude.getUserId();
@@ -219,3 +250,40 @@ export function getAmplitudeDeviceId(): string | undefined {
 
 // Export amplitude instance for advanced usage
 export { amplitude };
+
+/**
+ * Default session replay config (used when initializing at module load).
+ * Matches Amplitude Next.js guide: init when module loads so events aren't lost.
+ */
+function getDefaultSessionReplayOptions(): AmplitudeConfig['sessionReplayOptions'] {
+    return {
+        sampleRate: 1.0, // Capture 100% of sessions
+        privacyConfig: {
+            defaultMaskLevel: 'medium',
+            blockSelector: ['.amp-block', '[data-amp-block]', '[data-sensitive]'],
+            maskSelector: [
+                '.amp-mask',
+                '[data-amp-mask]',
+                'input[type="password"]',
+                'input[type="email"]',
+                '[data-private]',
+            ],
+            unmaskSelector: ['.amp-unmask', '[data-amp-unmask]'],
+        },
+    };
+}
+
+// Official Next.js pattern: initialize when module loads on client so SDK is ready
+// before any component effects run. See https://amplitude.com/docs/sdks/frameworks/nextjs-installation-guide
+if (typeof window !== 'undefined') {
+    const apiKey = process.env.NEXT_PUBLIC_AMPLITUDE_API_KEY;
+    if (apiKey) {
+        initAmplitude({
+            apiKey,
+            sessionReplayOptions: getDefaultSessionReplayOptions(),
+        });
+    }
+}
+
+/** Placeholder component to ensure amplitude module is loaded from root layout (official Next.js pattern). */
+export const Amplitude = () => null;

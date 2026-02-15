@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
+import { Amplitude } from "@/lib/amplitude";
 import { AmplitudeProvider } from "@/components/AmplitudeProvider";
 import { AutumnProviderWrapper } from "@/components/AutumnProviderWrapper";
 import { Toaster } from "@/components/ui/sonner";
@@ -76,6 +77,7 @@ export default function RootLayout({
           className={`${geistSans.variable} ${geistMono.variable} antialiased`}
           suppressHydrationWarning
         >
+          <Amplitude />
           <AmplitudeProvider>
             <AutumnProviderWrapper>
               {children}

@@ -11,6 +11,7 @@ export interface BlogPostMeta {
   author: string;
   slug: string;
   image?: string;
+  category: string;
   readingTime: number;
 }
 
@@ -35,6 +36,7 @@ export function getAllPosts(): BlogPostMeta[] {
       author: data.author,
       slug,
       image: data.image || undefined,
+      category: data.category || "Update",
       readingTime: getReadingTime(content),
     };
   });
@@ -62,6 +64,7 @@ export function getPostBySlug(slug: string) {
       author: data.author,
       slug,
       image: data.image || undefined,
+      category: data.category || "Update",
       readingTime: getReadingTime(content),
     },
     content,

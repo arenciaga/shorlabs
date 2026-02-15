@@ -9,10 +9,10 @@ import SectionNavigation from "@/components/SectionNavigation";
 
 export const metadata: Metadata = {
   title: {
-    absolute: "Shorlabs — Deploy backends like you deploy frontends",
+    absolute: "Shorlabs — The serverless platform for frontends and backends",
   },
   description:
-    "Deploy backends like you deploy frontends. Push your code, and Shorlabs builds, deploys, and serves it.",
+    "The serverless platform for frontends and backends. Next.js, React, FastAPI, Express—all with pay-per-request pricing. No idle costs. No container limits.",
   alternates: {
     canonical: "/",
   },
@@ -25,7 +25,7 @@ export default function Home() {
     name: "Shorlabs",
     url: "https://shorlabs.com",
     description:
-      "Deploy backends like you deploy frontends. Push your code, and Shorlabs builds, deploys, and serves it.",
+      "The serverless platform for frontends and backends. Next.js, React, FastAPI, Express—all with pay-per-request pricing. No idle costs. No container limits.",
   };
 
   return (

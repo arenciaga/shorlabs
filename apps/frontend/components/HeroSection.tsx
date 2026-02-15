@@ -27,12 +27,12 @@ const HeroSection = () => {
 
                     {/* Headline */}
                     <h1 className="text-3xl sm:text-3xl md:text-4xl lg:text-5xl font-semibold text-gray-900 leading-[1.15] tracking-tight max-w-2xl">
-                        Deploy backends like you deploy frontends.
+                        Deploy your full stack. Pay only when it runs.
                     </h1>
 
                     {/* Subtitle */}
                     <p className="text-base sm:text-lg text-gray-500 max-w-lg leading-relaxed">
-                       Push to GitHub. Go live in seconds. Python & Node.js with serverless pricing—pay only when your code runs. No Docker, no YAML, no idle costs.
+                        The serverless platform for frontends and backends. Next.js, React, FastAPI, Express—all with pay-per-request pricing. No idle costs. No container limits.
                     </p>
 
                     {/* CTA Buttons */}

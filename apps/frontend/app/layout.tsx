@@ -24,14 +24,14 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://shorlabs.com"),
   title: {
     template: "%s | Shorlabs",
-    default: "Shorlabs — Deploy backends like you deploy frontends",
+    default: "Shorlabs — The serverless platform for frontends and backends",
   },
   description:
-    "Deploy backends like you deploy frontends. Push your code, and Shorlabs builds, deploys, and serves it.",
+    "The serverless platform for frontends and backends. Next.js, React, FastAPI, Express—all with pay-per-request pricing. No idle costs. No container limits.",
   openGraph: {
     title: "Shorlabs",
     description:
-      "Deploy backends like you deploy frontends. Push your code, and Shorlabs builds, deploys, and serves it.",
+      "The serverless platform for frontends and backends. Next.js, React, FastAPI, Express—all with pay-per-request pricing. No idle costs. No container limits.",
     url: "https://shorlabs.com",
     siteName: "Shorlabs",
     locale: "en_US",

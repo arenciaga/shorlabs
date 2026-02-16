@@ -184,7 +184,7 @@ if [ "$FUNCTION_EXISTS" == "no" ]; then
         --code ImageUri=$IMAGE_URI \
         --role $ROLE_ARN \
         --timeout 900 \
-        --memory-size 2048 \
+        --memory-size 8192 \
         --region $AWS_REGION \
         --query "FunctionArn" --output text
 
@@ -206,7 +206,7 @@ else
     aws lambda update-function-configuration \
         --function-name $LAMBDA_FUNCTION_NAME \
         --timeout 900 \
-        --memory-size 2048 \
+        --memory-size 8192 \
         --region $AWS_REGION \
         --query "FunctionArn" --output text
 
@@ -285,6 +285,6 @@ echo -e "  Max Retries:  ${GREEN}3${NC}\n"
 echo -e "${YELLOW}View logs:${NC}"
 echo -e "  aws logs tail /aws/lambda/$LAMBDA_FUNCTION_NAME --follow --region $AWS_REGION\n"
 echo -e "${YELLOW}Configuration:${NC}"
-echo -e "  Memory:  2048 MB"
+echo -e "  Memory:  8192 MB"
 echo -e "  Timeout: 15 minutes (900s)"
 echo -e "  Runtime: Container (Lambda Web Adapter)\n"

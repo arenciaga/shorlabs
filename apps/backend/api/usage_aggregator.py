@@ -18,6 +18,7 @@ from boto3.dynamodb.conditions import Key
 
 from api.db.dynamodb import (
     get_or_create_table,
+    list_deployments,
 )
 from deployer import extract_project_name
 from deployer.aws.lambda_service import get_lambda_function_name
@@ -230,6 +231,62 @@ def get_all_projects() -> List[Dict]:
     return response.get("Items", [])
 
 
+def _get_build_seconds_for_project(
+    project_id: str,
+    *,
+    window_seconds: int,
+    window_end: datetime,
+) -> float:
+    """
+    Calculate total build time in seconds for a project within the aggregation window.
+
+    We derive build time from deployment records:
+      - Each deployment has started_at / finished_at timestamps
+      - We include deployments whose started_at falls inside the window
+      - Duration is (finished_at - started_at) in seconds (or until window_end if unfinished)
+
+    This gives us per-project build time that we can aggregate per organization and
+    send to Autumn as a separate "build_seconds" feature.
+    """
+    deployments = list_deployments(project_id)
+    if not deployments:
+        return 0.0
+
+    window_start = window_end - timedelta(seconds=window_seconds)
+    total_seconds = 0.0
+
+    for dep in deployments:
+        started_at = dep.get("started_at")
+        if not started_at:
+            continue
+
+        try:
+            start_dt = datetime.fromisoformat(started_at)
+        except Exception:
+            # Ignore malformed timestamps
+            continue
+
+        # Only count deployments that started within this window bucket
+        if not (window_start <= start_dt <= window_end):
+            continue
+
+        finished_at = dep.get("finished_at")
+        if finished_at:
+            try:
+                end_dt = datetime.fromisoformat(finished_at)
+            except Exception:
+                end_dt = window_end
+        else:
+            # Ongoing deployment – count up to the end of the window
+            end_dt = window_end
+
+        # Guard against negative durations if timestamps are out of order
+        duration_seconds = max(0.0, (end_dt - start_dt).total_seconds())
+        total_seconds += duration_seconds
+
+    return total_seconds
+
+
 def aggregate_usage_metrics():
     """
     Main aggregation function - called by EventBridge hourly.
@@ -267,16 +324,17 @@ def aggregate_usage_metrics():
     # Aggregate metrics for each organization
     total_requests = 0
     total_gb_seconds = 0.0
+    total_build_seconds = 0.0
     
     for org_id, org_projects in orgs_projects.items():
         org_requests = 0
         org_gb_seconds = 0.0
+        org_build_seconds = 0.0
         
         for project in org_projects:
             # Skip if project is not LIVE
             if project.get("status") != "LIVE":
                 continue
-            
             # Get function name - prefer stored function_name, fallback to deriving from github_url
             # for backwards compatibility with projects that don't have function_name stored
             stored_function_name = project.get("function_name")
@@ -291,7 +349,6 @@ def aggregate_usage_metrics():
                 function_name = get_lambda_function_name(project_name)
             
             memory_mb = int(project.get("memory", 1024))
-            
             # Fetch metrics from CloudWatch
             try:
                 invocations = get_invocations(
@@ -305,20 +362,34 @@ def aggregate_usage_metrics():
                     window_seconds=window_seconds,
                     window_end=window_end,
                 )
+
+                # Deployment/build time (seconds) from deployments table
+                build_seconds = _get_build_seconds_for_project(
+                    project.get("project_id"),
+                    window_seconds=window_seconds,
+                    window_end=window_end,
+                )
                 
-                if invocations > 0 or gb_seconds > 0:
-                    print(f"  📈 {function_name}: {invocations} invocations, {gb_seconds:.2f} GB-s")
+                if invocations > 0 or gb_seconds > 0 or build_seconds > 0:
+                    print(
+                        f"  📈 {function_name}: "
+                        f"{invocations} invocations, "
+                        f"{gb_seconds:.2f} GB-s, "
+                        f"{build_seconds:.1f} build-s"
+                    )
                     org_requests += invocations
                     org_gb_seconds += gb_seconds
+                    org_build_seconds += build_seconds
                     
             except Exception as e:
                 print(f"  ❌ Error aggregating {function_name}: {e}")
                 continue
         
         # Sync usage to Autumn (sole source of truth for billing)
-        if org_requests > 0 or org_gb_seconds > 0:
+        if org_requests > 0 or org_gb_seconds > 0 or org_build_seconds > 0:
             total_requests += org_requests
             total_gb_seconds += org_gb_seconds
+            total_build_seconds += org_build_seconds
 
             # Sync to Autumn (feature IDs must match the dashboard) using an
             # idempotency key per org/feature/window so repeated runs don't
@@ -336,6 +407,13 @@ def aggregate_usage_metrics():
                     feature_id="compute",
                     value=float(org_gb_seconds),
                     idempotency_key=f"{org_id}:compute:{window_key}",
+                )
+            if org_build_seconds > 0:
+                _autumn_track_usage(
+                    customer_id=org_id,
+                    feature_id="build_seconds",
+                    value=float(org_build_seconds),
+                    idempotency_key=f"{org_id}:build_seconds:{window_key}",
                 )
     
     # ── Quota enforcement for hobby orgs ─────────────────────────
@@ -355,6 +433,10 @@ def aggregate_usage_metrics():
             print(f"  ❌ Quota enforcement error for {org_id}: {e}")
 
     print(f"🎉 Aggregation + enforcement complete!")
-    print(f"   Total: {total_requests} requests, {total_gb_seconds:.2f} GB-Seconds")
+    print(
+        f"   Total: {total_requests} requests, "
+        f"{total_gb_seconds:.2f} GB-Seconds, "
+        f"{total_build_seconds:.1f} build-seconds"
+    )
     print(f"   Period: {period}")
     print(f"   Window: {window_seconds}s ending {window_key}")

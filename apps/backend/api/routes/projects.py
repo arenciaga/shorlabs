@@ -441,6 +441,7 @@ async def get_org_usage_endpoint(
             label_map = {
                 "invocations": "Requests",
                 "compute": "Compute (GB-s)",
+                "build_seconds": "Build (s)",
             }
 
             breakdown_response.append({

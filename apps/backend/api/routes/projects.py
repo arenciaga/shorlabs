@@ -263,8 +263,10 @@ def send_deployment_to_sqs(
     response = sqs_client.send_message(
         QueueUrl=queue_url,
         MessageBody=json.dumps(message_body),
-        # Use project_id as deduplication to prevent duplicate deployments
-        MessageGroupId="deployments",  # Required for FIFO queue
+        # Use project_id as MessageGroupId so each project gets its own deployment lane
+        # This allows different projects to deploy in parallel while maintaining strict
+        # ordering within each project (industry-standard pattern for multi-tenant systems)
+        MessageGroupId=project_id,  # Required for FIFO queue - one lane per project
         MessageDeduplicationId=f"{project_id}-{int(time.time())}",
     )
     

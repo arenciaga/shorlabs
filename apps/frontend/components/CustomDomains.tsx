@@ -401,27 +401,19 @@ export function CustomDomains({
                                                         <div className="mt-3 bg-amber-50 rounded-lg border border-amber-100 p-3">
                                                             <p className="text-sm text-amber-800 font-medium mb-2">Add DNS Record</p>
                                                             
-                                                            {isApexDomain ? (
-                                                                <>
-                                                                    <div className="bg-amber-100 border border-amber-200 rounded-lg p-3 mb-3">
-                                                                        <p className="text-xs font-semibold text-amber-900 mb-1.5">⚠️ Apex Domain Detected</p>
-                                                                        <p className="text-xs text-amber-800 leading-relaxed">
-                                                                            Most DNS providers (like GoDaddy) don't allow CNAME records for apex domains ({d.domain}). 
-                                                                            Instead, add <span className="font-mono font-semibold">www.{d.domain}</span> as a CNAME, then redirect {d.domain} to www.{d.domain} at your registrar.
-                                                                        </p>
-                                                                    </div>
-                                                                    <p className="text-xs text-amber-700 mb-3">
-                                                                        <strong>Step 1:</strong> Add a CNAME record for <span className="font-mono">www.{d.domain}</span> pointing to the value below.
+                                                            {isApexDomain && (
+                                                                <div className="bg-amber-100 border border-amber-200 rounded-lg p-2.5 mb-3">
+                                                                    <p className="text-xs font-semibold text-amber-900 mb-1">⚠️ Apex Domain Warning</p>
+                                                                    <p className="text-xs text-amber-800 leading-relaxed">
+                                                                        Some DNS providers (like GoDaddy) don't allow CNAME records for apex domains. 
+                                                                        If your provider doesn't support CNAME flattening, consider using Cloudflare, AWS Route 53, or another provider that supports it.
                                                                     </p>
-                                                                    <p className="text-xs text-amber-700 mb-3">
-                                                                        <strong>Step 2:</strong> Set up a redirect/forward from {d.domain} to www.{d.domain} in your DNS provider's settings (usually under "Domain Forwarding" or "URL Redirect").
-                                                                    </p>
-                                                                </>
-                                                            ) : (
-                                                                <p className="text-xs text-amber-700 mb-3">
-                                                                    Add a CNAME record at your domain registrar, then click Verify DNS. SSL will be provisioned automatically.
-                                                                </p>
+                                                                </div>
                                                             )}
+                                                            
+                                                            <p className="text-xs text-amber-700 mb-3">
+                                                                Add a CNAME record at your domain registrar, then click Verify DNS. SSL will be provisioned automatically.
+                                                            </p>
                                                             
                                                             <div className="bg-white rounded-lg border border-amber-200 overflow-hidden mb-3">
                                                                 <table className="w-full text-xs">
@@ -435,8 +427,8 @@ export function CustomDomains({
                                                                     </thead>
                                                                     <tbody>
                                                                         <tr>
-                                                                            <td className="px-3 py-1.5 font-mono">CNAME</td>
-                                                                            <td className="px-3 py-1.5 font-mono break-all">{isApexDomain ? `www.${d.domain}` : (dnsInstructions?.name || (d.domain.includes('.') ? d.domain.split('.')[0] : d.domain))}</td>
+                                                                            <td className="px-3 py-1.5 font-mono">{dnsInstructions?.type || "CNAME"}</td>
+                                                                            <td className="px-3 py-1.5 font-mono break-all">{dnsInstructions?.name || (d.domain.includes('.') ? d.domain.split('.')[0] : d.domain)}</td>
                                                                             <td className="px-3 py-1.5 font-mono">{dnsInstructions?.value || "Loading..."}</td>
                                                                             <td className="px-3 py-1.5">
                                                                                 <button

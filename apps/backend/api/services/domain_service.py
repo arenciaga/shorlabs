@@ -21,6 +21,7 @@ from botocore.config import Config
 
 # AWS clients (us-east-1 required for ACM + CloudFront)
 cloudfront_client = boto3.client("cloudfront", region_name="us-east-1")
+acm_client = boto3.client("acm", region_name="us-east-1")
 
 # CloudFront SaaS Manager configuration
 CLOUDFRONT_MULTITENANT_DISTRIBUTION_ID = os.environ.get(
@@ -241,6 +242,14 @@ def create_domain_tenant(domain: str, project_id: str) -> dict:
         print(f"Created CloudFront tenant {tenant_id} for domain {domain} (status: {status})")
         print(f"User should CNAME {domain} → {routing_endpoint}")
 
+        # Immediately attempt to complete domain setup
+        # This triggers domain ownership verification now that DNS is pointed
+        setup_result = complete_domain_setup(tenant_id, domain)
+        if setup_result["success"]:
+            print(f"Domain setup completed for {domain}: {setup_result['domain_status']}")
+        else:
+            print(f"Domain setup deferred for {domain}: {setup_result.get('error')}")
+
         return {
             "tenant_id": tenant_id,
             "routing_endpoint": routing_endpoint,
@@ -260,6 +269,145 @@ def create_domain_tenant(domain: str, project_id: str) -> dict:
         }
 
 
+def complete_domain_setup(tenant_id: str, domain: str) -> dict:
+    """
+    Complete domain setup for a CloudFront distribution tenant.
+
+    After the tenant is created and the managed ACM certificate is issued,
+    the domain stays in "Setup required" / "Pending certificate validation"
+    because the certificate is not yet explicitly associated with the tenant.
+
+    This function:
+    1. Verifies DNS is correctly configured via CloudFront's API
+    2. Gets the managed certificate ARN (must be in 'issued' status)
+    3. Associates the certificate with the tenant via Customizations.Certificate
+
+    This is the programmatic equivalent of clicking "Complete domain setup"
+    in the AWS CloudFront console.
+
+    Args:
+        tenant_id: The CloudFront distribution tenant ID
+        domain: The custom domain being set up
+
+    Returns:
+        {
+            "success": bool,
+            "dns_status": str,
+            "domain_status": str,
+            "certificate_status": str | None,
+            "error": str | None,
+        }
+    """
+    try:
+        # Step 1: Verify DNS configuration via CloudFront
+        dns_resp = cloudfront_client.verify_dns_configuration(
+            Identifier=tenant_id,
+            Domain=domain,
+        )
+        dns_configs = dns_resp.get("DnsConfigurationList", [])
+        dns_status = "unknown"
+        dns_reason = ""
+        for cfg in dns_configs:
+            if cfg.get("Domain", "").lower() == domain.lower():
+                dns_status = cfg.get("Status", "unknown")
+                dns_reason = cfg.get("Reason", "")
+                break
+
+        if dns_status != "valid-configuration":
+            return {
+                "success": False,
+                "dns_status": dns_status,
+                "domain_status": "pending",
+                "certificate_status": None,
+                "error": f"DNS configuration not valid: {dns_reason}" if dns_reason else f"DNS status: {dns_status}",
+            }
+
+        # Step 2: Get current tenant for ETag and check domain status
+        resp = cloudfront_client.get_distribution_tenant(
+            Identifier=tenant_id
+        )
+        tenant = resp["DistributionTenant"]
+        etag = resp["ETag"]
+
+        for d in tenant.get("Domains", []):
+            if d.get("Domain", "").lower() == domain.lower():
+                if d.get("Status") == "active":
+                    return {
+                        "success": True,
+                        "dns_status": "valid-configuration",
+                        "domain_status": "active",
+                        "certificate_status": "issued",
+                        "error": None,
+                    }
+
+        # Step 3: Get the managed certificate details
+        cert_resp = cloudfront_client.get_managed_certificate_details(
+            Identifier=tenant_id
+        )
+        cert_details = cert_resp.get("ManagedCertificateDetails", {})
+        certificate_arn = cert_details.get("CertificateArn")
+        certificate_status = cert_details.get("CertificateStatus", "unknown")
+
+        if not certificate_arn:
+            return {
+                "success": False,
+                "dns_status": "valid-configuration",
+                "domain_status": "pending",
+                "certificate_status": certificate_status,
+                "error": "No managed certificate ARN found for this tenant",
+            }
+
+        if certificate_status != "issued":
+            return {
+                "success": False,
+                "dns_status": "valid-configuration",
+                "domain_status": "pending",
+                "certificate_status": certificate_status,
+                "error": f"Certificate not yet issued (status: {certificate_status}). "
+                         "This typically resolves within a few minutes after DNS is pointed.",
+            }
+
+        # Step 4: Associate the issued certificate with the tenant
+        cloudfront_client.update_distribution_tenant(
+            Id=tenant_id,
+            IfMatch=etag,
+            Customizations={
+                "Certificate": {
+                    "Arn": certificate_arn,
+                },
+            },
+        )
+
+        # Step 5: Re-fetch tenant to get updated domain status
+        resp = cloudfront_client.get_distribution_tenant(
+            Identifier=tenant_id
+        )
+        tenant = resp["DistributionTenant"]
+        domain_status = "pending"
+        for d in tenant.get("Domains", []):
+            if d.get("Domain", "").lower() == domain.lower():
+                domain_status = d.get("Status", "pending")
+                break
+
+        return {
+            "success": True,
+            "dns_status": "valid-configuration",
+            "domain_status": domain_status,
+            "certificate_status": "issued",
+            "error": None,
+        }
+
+    except Exception as e:
+        print(f"Failed to complete domain setup for {domain} on tenant {tenant_id}: {e}")
+        return {
+            "success": False,
+            "dns_status": "unknown",
+            "domain_status": "unknown",
+            "certificate_status": None,
+            "error": str(e),
+        }
+
+
 def get_domain_tenant_status(tenant_id: str) -> dict:
     """
     Check the status of a CloudFront distribution tenant.
@@ -275,8 +423,7 @@ def get_domain_tenant_status(tenant_id: str) -> dict:
     """
     try:
         response = cloudfront_client.get_distribution_tenant(
-            DistributionId=CLOUDFRONT_MULTITENANT_DISTRIBUTION_ID,
-            TenantId=tenant_id
+            Identifier=tenant_id
         )
         tenant = response["DistributionTenant"]
 
@@ -301,10 +448,13 @@ def get_domain_tenant_status(tenant_id: str) -> dict:
 
 def delete_domain_tenant(tenant_id: str) -> bool:
     """
-    Delete a CloudFront distribution tenant.
+    Delete a CloudFront distribution tenant and its managed ACM certificate.
 
-    This removes the custom domain from CloudFront and its managed
-    ACM certificate will be cleaned up automatically.
+    Steps:
+      1. Fetch the managed certificate ARN before deletion
+      2. Disable the tenant (required before deletion)
+      3. Delete the tenant
+      4. Delete the orphaned ACM certificate
 
     Args:
         tenant_id: The CloudFront distribution tenant ID
@@ -313,10 +463,19 @@ def delete_domain_tenant(tenant_id: str) -> bool:
         True if deleted successfully, False otherwise
     """
     try:
-        # First, get the tenant to get ETag
+        # Get the managed certificate ARN before we delete the tenant
+        certificate_arn = None
+        try:
+            cert_resp = cloudfront_client.get_managed_certificate_details(
+                Identifier=tenant_id
+            )
+            certificate_arn = cert_resp.get("ManagedCertificateDetails", {}).get("CertificateArn")
+        except Exception as e:
+            print(f"Could not get managed certificate for tenant {tenant_id}: {e}")
+
+        # Get the tenant to get ETag
         resp = cloudfront_client.get_distribution_tenant(
-            DistributionId=CLOUDFRONT_MULTITENANT_DISTRIBUTION_ID,
-            TenantId=tenant_id
+            Identifier=tenant_id
         )
         tenant = resp["DistributionTenant"]
         etag = resp["ETag"]
@@ -324,31 +483,38 @@ def delete_domain_tenant(tenant_id: str) -> bool:
         # Disable the tenant first if it's enabled
         if tenant.get("Enabled", True):
             cloudfront_client.update_distribution_tenant(
-                DistributionId=CLOUDFRONT_MULTITENANT_DISTRIBUTION_ID,
-                TenantId=tenant_id,
+                Id=tenant_id,
                 IfMatch=etag,
-                Name=tenant["Name"],
-                Domains=tenant["Domains"],
                 Enabled=False,
             )
             # Re-fetch to get new ETag after disabling
             resp = cloudfront_client.get_distribution_tenant(
-                DistributionId=CLOUDFRONT_MULTITENANT_DISTRIBUTION_ID,
-                TenantId=tenant_id
+                Identifier=tenant_id
             )
             etag = resp["ETag"]
 
-        # Now delete the disabled tenant
+        # Delete the disabled tenant
         cloudfront_client.delete_distribution_tenant(
-            DistributionId=CLOUDFRONT_MULTITENANT_DISTRIBUTION_ID,
-            TenantId=tenant_id,
+            Id=tenant_id,
             IfMatch=etag,
         )
-
         print(f"Deleted CloudFront tenant {tenant_id}")
+
+        # Delete the ACM certificate now that it's disassociated
+        if certificate_arn:
+            try:
+                acm_client.delete_certificate(CertificateArn=certificate_arn)
+                print(f"Deleted ACM certificate {certificate_arn}")
+            except acm_client.exceptions.ResourceInUseException:
+                print(f"ACM certificate {certificate_arn} still in use, skipping deletion")
+            except acm_client.exceptions.ResourceNotFoundException:
+                print(f"ACM certificate {certificate_arn} already deleted")
+            except Exception as e:
+                print(f"Failed to delete ACM certificate {certificate_arn}: {e}")
+
         return True
 
-    except cloudfront_client.exceptions.NoSuchDistributionTenant:
+    except cloudfront_client.exceptions.EntityNotFound:
         print(f"Tenant {tenant_id} already deleted")
         return True
 

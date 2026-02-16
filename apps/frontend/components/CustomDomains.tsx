@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import {
     Globe,
     Link2,
@@ -18,13 +18,24 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { useAuth } from "@clerk/nextjs"
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 
 export interface CustomDomainRecord {
     domain: string
-    status: "PENDING_VERIFICATION" | "ACTIVE" | "FAILED"
+    status: "PENDING_VERIFICATION" | "PROVISIONING" | "ACTIVE" | "FAILED"
     is_active: boolean
     tenant_id: string | null
     created_at: string
@@ -187,8 +198,61 @@ export function CustomDomains({
         }
     }
 
+    // Auto-poll for PROVISIONING domains
+    const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+    const pollProvisioningDomains = useCallback(async () => {
+        if (!customDomains) return
+        const provisioning = customDomains.filter((d) => d.status === "PROVISIONING")
+        if (provisioning.length === 0) {
+            if (pollingRef.current) {
+                clearInterval(pollingRef.current)
+                pollingRef.current = null
+            }
+            return
+        }
+
+        for (const d of provisioning) {
+            try {
+                const token = await getToken()
+                const url = new URL(`${API_BASE_URL}/api/projects/${projectId}/domains/${d.domain}/status`)
+                if (orgId) url.searchParams.append("org_id", orgId)
+
+                const response = await fetch(url.toString(), {
+                    headers: { Authorization: `Bearer ${token}` },
+                })
+                const result = await response.json()
+                setDomainResponses((prev) => ({ ...prev, [d.domain]: result }))
+
+                if (result.status === "ACTIVE") {
+                    onRefetch()
+                }
+            } catch {
+                // Silently retry on next interval
+            }
+        }
+    }, [customDomains, getToken, projectId, orgId, onRefetch])
+
+    useEffect(() => {
+        const hasProvisioning = customDomains?.some((d) => d.status === "PROVISIONING")
+        if (hasProvisioning && !pollingRef.current) {
+            pollingRef.current = setInterval(pollProvisioningDomains, 10000) // every 10s
+        }
+        if (!hasProvisioning && pollingRef.current) {
+            clearInterval(pollingRef.current)
+            pollingRef.current = null
+        }
+        return () => {
+            if (pollingRef.current) {
+                clearInterval(pollingRef.current)
+                pollingRef.current = null
+            }
+        }
+    }, [customDomains, pollProvisioningDomains])
+
     const statusBadge = {
         PENDING_VERIFICATION: { bg: "bg-amber-50 border-amber-100", dot: "bg-amber-500", text: "text-amber-700", label: "Pending DNS" },
+        PROVISIONING: { bg: "bg-blue-50 border-blue-100", dot: "bg-blue-500 animate-pulse", text: "text-blue-700", label: "Provisioning SSL" },
         ACTIVE: { bg: "bg-emerald-50 border-emerald-100", dot: "bg-emerald-500", text: "text-emerald-700", label: "Active" },
         FAILED: { bg: "bg-red-50 border-red-100", dot: "bg-red-500", text: "text-red-700", label: "Failed" },
     } as const
@@ -393,6 +457,35 @@ export function CustomDomains({
                                                     </div>
                                                 )}
 
+                                                {/* PROVISIONING */}
+                                                {d.status === "PROVISIONING" && (
+                                                    <div className="mt-3 bg-blue-50 rounded-lg border border-blue-100 p-3">
+                                                        <div className="flex items-center gap-2 mb-2">
+                                                            <Loader2 className="h-4 w-4 text-blue-600 animate-spin" />
+                                                            <p className="text-sm text-blue-800 font-medium">Provisioning SSL Certificate</p>
+                                                        </div>
+                                                        <p className="text-xs text-blue-700 mb-3">
+                                                            DNS is verified. Your SSL certificate is being provisioned automatically.
+                                                            This typically takes 1-5 minutes. The page will update when ready.
+                                                        </p>
+                                                        <div className="flex items-center gap-2">
+                                                            <div className="flex-1 bg-blue-100 rounded-full h-1.5 overflow-hidden">
+                                                                <div className="bg-blue-500 h-full rounded-full animate-pulse w-2/3" />
+                                                            </div>
+                                                            <Button
+                                                                size="sm"
+                                                                variant="outline"
+                                                                onClick={(e) => { e.stopPropagation(); handleCheckDomainStatus(d.domain) }}
+                                                                disabled={checkingStatus === d.domain}
+                                                                className="rounded-full h-7 px-3 text-xs border-blue-200 text-blue-700 hover:bg-blue-100"
+                                                            >
+                                                                {checkingStatus === d.domain ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <RefreshCw className="h-3 w-3 mr-1" />}
+                                                                Check Now
+                                                            </Button>
+                                                        </div>
+                                                    </div>
+                                                )}
+
                                                 {/* ACTIVE */}
                                                 {d.status === "ACTIVE" && (
                                                     <div className="mt-3 bg-emerald-50 rounded-lg border border-emerald-100 p-3">
@@ -429,16 +522,37 @@ export function CustomDomains({
 
                                                 {/* Remove */}
                                                 <div className="mt-3 flex justify-end">
-                                                    <Button
-                                                        variant="outline"
-                                                        size="sm"
-                                                        onClick={(e) => { e.stopPropagation(); handleRemoveDomain(d.domain) }}
-                                                        disabled={removingDomain === d.domain}
-                                                        className="text-red-600 border-red-200 hover:bg-red-50 rounded-full h-8 px-4 text-xs"
-                                                    >
-                                                        {removingDomain === d.domain ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Trash2 className="h-3 w-3 mr-1" />}
-                                                        Remove
-                                                    </Button>
+                                                    <AlertDialog>
+                                                        <AlertDialogTrigger asChild>
+                                                            <Button
+                                                                variant="outline"
+                                                                size="sm"
+                                                                onClick={(e) => e.stopPropagation()}
+                                                                disabled={removingDomain === d.domain}
+                                                                className="text-red-600 border-red-200 hover:bg-red-50 rounded-full h-8 px-4 text-xs"
+                                                            >
+                                                                {removingDomain === d.domain ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Trash2 className="h-3 w-3 mr-1" />}
+                                                                Remove
+                                                            </Button>
+                                                        </AlertDialogTrigger>
+                                                        <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+                                                            <AlertDialogHeader>
+                                                                <AlertDialogTitle>Remove domain</AlertDialogTitle>
+                                                                <AlertDialogDescription>
+                                                                    Are you sure you want to remove <span className="font-mono font-medium">{d.domain}</span>? This will delete the SSL certificate and DNS configuration. This action cannot be undone.
+                                                                </AlertDialogDescription>
+                                                            </AlertDialogHeader>
+                                                            <AlertDialogFooter>
+                                                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                                <AlertDialogAction
+                                                                    onClick={() => handleRemoveDomain(d.domain)}
+                                                                    className="bg-red-600 hover:bg-red-700 text-white"
+                                                                >
+                                                                    Remove domain
+                                                                </AlertDialogAction>
+                                                            </AlertDialogFooter>
+                                                        </AlertDialogContent>
+                                                    </AlertDialog>
                                                 </div>
                                             </div>
                                         )}

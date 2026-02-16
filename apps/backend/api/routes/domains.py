@@ -25,6 +25,7 @@ from api.services.domain_service import (
     is_apex_domain,
     verify_domain_dns,
     create_domain_tenant,
+    complete_domain_setup,
     get_domain_tenant_status,
     delete_domain_tenant,
 )
@@ -158,32 +159,9 @@ async def verify_domain(
         # Create new CloudFront tenant
         tenant_result = create_domain_tenant(domain, project_id)
 
-        if tenant_result["success"]:
-            update_domain(domain, {
-                "status": "ACTIVE",
-                "tenant_id": tenant_result["tenant_id"],
-                "function_url": project.get("function_url"),
-            })
-
-            return {
-                "domain": domain,
-                "dns_verified": True,
-                "status": "ACTIVE",
-                "is_active": True,
-                "tenant_id": tenant_result["tenant_id"],
-                "message": (
-                    "DNS verified and domain activated! "
-                    "SSL certificate will be provisioned automatically. "
-                    "It may take 5-15 minutes for CloudFront to fully propagate."
-                ),
-            }
-        else:
-            # Tenant creation failed — don't set to ACTIVE
+        if not tenant_result["success"]:
             error_msg = tenant_result.get("error", "Unknown error")
-            update_domain(domain, {
-                "status": "FAILED",
-            })
-
+            update_domain(domain, {"status": "FAILED"})
             return {
                 "domain": domain,
                 "dns_verified": True,
@@ -192,31 +170,50 @@ async def verify_domain(
                 "message": f"DNS verified but CloudFront activation failed: {error_msg}. "
                            "Please try again or contact support.",
             }
-    else:
-        # Tenant exists but domain isn't active — check tenant status
-        tenant_status = get_domain_tenant_status(tenant_id)
-        cf_status = tenant_status.get("status", "Unknown")
 
-        if cf_status in ("Deployed", "InProgress"):
-            update_domain(domain, {
-                "status": "ACTIVE",
-                "function_url": project.get("function_url"),
-            })
-            return {
-                "domain": domain,
-                "dns_verified": True,
-                "status": "ACTIVE",
-                "is_active": True,
-                "message": "Domain is active and serving traffic.",
-            }
-        else:
-            return {
-                "domain": domain,
-                "dns_verified": True,
-                "status": domain_item.get("status"),
-                "is_active": False,
-                "message": f"CloudFront tenant status: {cf_status}. Please try again.",
-            }
+        # Tenant created — set to PROVISIONING (cert still pending)
+        update_domain(domain, {
+            "status": "PROVISIONING",
+            "tenant_id": tenant_result["tenant_id"],
+            "function_url": project.get("function_url"),
+        })
+        tenant_id = tenant_result["tenant_id"]
+
+        # Fall through to the setup attempt below
+
+    # Tenant exists — try to complete domain setup (associate cert)
+    setup_result = complete_domain_setup(tenant_id, domain)
+
+    if setup_result["success"] and setup_result["domain_status"] == "active":
+        update_domain(domain, {
+            "status": "ACTIVE",
+            "function_url": project.get("function_url"),
+        })
+        return {
+            "domain": domain,
+            "dns_verified": True,
+            "status": "ACTIVE",
+            "is_active": True,
+            "message": "Domain setup completed! SSL certificate is active.",
+        }
+
+    # Cert not ready yet — keep as PROVISIONING
+    cert_status = setup_result.get("certificate_status", "unknown")
+    current_db_status = get_domain_item(domain).get("status", "PROVISIONING") if get_domain_item(domain) else "PROVISIONING"
+    if current_db_status not in ("ACTIVE",):
+        update_domain(domain, {"status": "PROVISIONING"})
+
+    return {
+        "domain": domain,
+        "dns_verified": True,
+        "status": "PROVISIONING",
+        "is_active": False,
+        "certificate_status": cert_status,
+        "message": (
+            "DNS verified! SSL certificate is being provisioned. "
+            "This typically takes 1-5 minutes. The domain will activate automatically."
+        ),
+    }
 
 
 @router.get("/{domain}/status")
@@ -269,12 +266,12 @@ async def check_domain_status(
                 "message": f"Domain is active but CloudFront status is: {cf_status}",
             }
 
-    # If we have a tenant but status isn't ACTIVE, check if it deployed
+    # If we have a tenant but status isn't ACTIVE, try completing setup
     if tenant_id and current_status != "ACTIVE":
-        tenant_status = get_domain_tenant_status(tenant_id)
-        cf_status = tenant_status.get("status", "Unknown")
+        # Try to complete domain setup (verify DNS + trigger cert association)
+        setup_result = complete_domain_setup(tenant_id, domain)
 
-        if cf_status in ("Deployed", "InProgress"):
+        if setup_result["success"] and setup_result["domain_status"] == "active":
             update_domain(domain, {
                 "status": "ACTIVE",
                 "function_url": project.get("function_url"),
@@ -283,16 +280,20 @@ async def check_domain_status(
                 "domain": domain,
                 "status": "ACTIVE",
                 "is_active": True,
-                "cloudfront_status": cf_status,
-                "message": "Domain is now active and serving traffic.",
+                "message": "Domain setup completed! SSL certificate is active.",
             }
         else:
+            # Still provisioning
+            cert_status = setup_result.get("certificate_status", "unknown")
             return {
                 "domain": domain,
-                "status": current_status,
+                "status": "PROVISIONING",
                 "is_active": False,
-                "cloudfront_status": cf_status,
-                "message": f"CloudFront tenant status: {cf_status}. Try verifying DNS again.",
+                "certificate_status": cert_status,
+                "message": (
+                    "SSL certificate is being provisioned. "
+                    "This typically takes 1-5 minutes."
+                ),
             }
 
     # No tenant — still pending DNS verification

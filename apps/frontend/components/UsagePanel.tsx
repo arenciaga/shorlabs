@@ -144,8 +144,8 @@ export function UsagePanel({ onUpgrade }: UsagePanelProps) {
                                 </div>
                             </div>
 
-                            {/* Expandable breakdown */}
-                            {usage!.breakdown && usage!.breakdown.length > 0 && (
+                            {/* Expandable breakdown - always show if breakdown exists, even if empty */}
+                            {usage!.breakdown && (
                                 <div>
                                     <button
                                         onClick={() => setBreakdownOpen(!breakdownOpen)}
@@ -161,19 +161,23 @@ export function UsagePanel({ onUpgrade }: UsagePanelProps) {
 
                                     {breakdownOpen && (
                                         <div className="mt-2 space-y-2 pl-1">
-                                            {usage!.breakdown!.map((item) => (
-                                                <div
-                                                    key={item.featureId}
-                                                    className="flex items-center justify-between"
-                                                >
-                                                    <span className="text-xs text-zinc-500">
-                                                        {item.label}
-                                                    </span>
-                                                    <span className="text-xs tabular-nums text-zinc-600">
-                                                        {formatDollars(item.dollarAmount)}
-                                                    </span>
-                                                </div>
-                                            ))}
+                                            {usage!.breakdown!.length > 0 ? (
+                                                usage!.breakdown!.map((item) => (
+                                                    <div
+                                                        key={item.featureId}
+                                                        className="flex items-center justify-between"
+                                                    >
+                                                        <span className="text-xs text-zinc-500">
+                                                            {item.label}
+                                                        </span>
+                                                        <span className="text-xs tabular-nums text-zinc-600">
+                                                            {formatDollars(item.dollarAmount)}
+                                                        </span>
+                                                    </div>
+                                                ))
+                                            ) : (
+                                                <p className="text-xs text-zinc-400">No usage data available</p>
+                                            )}
                                         </div>
                                     )}
                                 </div>

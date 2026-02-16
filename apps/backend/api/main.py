@@ -17,7 +17,7 @@ from mangum import Mangum
 from dotenv import load_dotenv
 load_dotenv()
 
-from api.routes import github, projects, deployments, domains, webhooks
+from api.routes import github, projects, deployments, domains, webhooks, usage
 
 
 # CORS allowed origins
@@ -59,7 +59,10 @@ app.add_middleware(
 )
 
 # Include routers
+# IMPORTANT: Register usage router BEFORE projects router to avoid route conflicts
+# Both have prefix "/api/projects", and projects has catch-all "/{project_id}" route
 app.include_router(github.router)
+app.include_router(usage.router)  # Must come before projects.router
 app.include_router(projects.router)
 app.include_router(deployments.router)
 app.include_router(domains.router)

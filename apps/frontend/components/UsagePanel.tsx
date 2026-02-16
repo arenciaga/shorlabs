@@ -171,9 +171,6 @@ export function UsagePanel({ onUpgrade }: UsagePanelProps) {
                                                     </span>
                                                     <span className="text-xs tabular-nums text-zinc-600">
                                                         {formatDollars(item.dollarAmount)}
-                                                        <span className="text-zinc-400 ml-1">
-                                                            ({formatNumber(item.rawUsage)})
-                                                        </span>
                                                     </span>
                                                 </div>
                                             ))}

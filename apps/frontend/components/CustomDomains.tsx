@@ -52,6 +52,7 @@ interface DomainResponse {
     message?: string
     status?: string
     is_active?: boolean
+    dns_instructions?: { type: string; name: string; value: string }
 }
 
 interface CustomDomainsProps {
@@ -166,6 +167,25 @@ export function CustomDomains({
             console.error("Failed to check domain status:", err)
         } finally {
             setCheckingStatus(null)
+        }
+    }
+
+    const fetchDomainInstructions = async (domain: string) => {
+        try {
+            const token = await getToken()
+            const url = new URL(`${API_BASE_URL}/api/projects/${projectId}/domains/${domain}/status`)
+            if (orgId) url.searchParams.append("org_id", orgId)
+
+            const response = await fetch(url.toString(), {
+                headers: { Authorization: `Bearer ${token}` },
+            })
+
+            const result = await response.json()
+            if (result.dns_instructions) {
+                setDomainResponses((prev) => ({ ...prev, [domain]: { ...prev[domain], dns_instructions: result.dns_instructions } }))
+            }
+        } catch (err) {
+            console.error("Failed to fetch domain instructions:", err)
         }
     }
 
@@ -384,8 +404,23 @@ export function CustomDomains({
                                     <div key={d.domain} className="bg-white">
                                         <div
                                             className="flex items-center gap-4 px-4 py-3 cursor-pointer hover:bg-zinc-50 transition-colors"
-                                            onClick={() => setExpandedDomain(isExpanded ? null : d.domain)}
-                                            onKeyDown={(e) => e.key === "Enter" && setExpandedDomain(isExpanded ? null : d.domain)}
+                                            onClick={() => {
+                                                const newExpanded = isExpanded ? null : d.domain
+                                                setExpandedDomain(newExpanded)
+                                                // Fetch DNS instructions if expanding a PENDING_VERIFICATION domain
+                                                if (newExpanded && d.status === "PENDING_VERIFICATION" && !domainResponses[d.domain]?.dns_instructions) {
+                                                    fetchDomainInstructions(d.domain)
+                                                }
+                                            }}
+                                            onKeyDown={(e) => {
+                                                if (e.key === "Enter") {
+                                                    const newExpanded = isExpanded ? null : d.domain
+                                                    setExpandedDomain(newExpanded)
+                                                    if (newExpanded && d.status === "PENDING_VERIFICATION" && !domainResponses[d.domain]?.dns_instructions) {
+                                                        fetchDomainInstructions(d.domain)
+                                                    }
+                                                }
+                                            }}
                                             role="button"
                                             tabIndex={0}
                                         >
@@ -423,14 +458,19 @@ export function CustomDomains({
                                                                 </thead>
                                                                 <tbody>
                                                                     <tr>
-                                                                        <td className="px-3 py-1.5 font-mono">CNAME</td>
-                                                                        <td className="px-3 py-1.5 font-mono break-all">{d.domain}</td>
-                                                                        <td className="px-3 py-1.5 font-mono">cname.shorlabs.com</td>
+                                                                        <td className="px-3 py-1.5 font-mono">{response?.dns_instructions?.type || "CNAME"}</td>
+                                                                        <td className="px-3 py-1.5 font-mono break-all">{response?.dns_instructions?.name || d.domain}</td>
+                                                                        <td className="px-3 py-1.5 font-mono">{response?.dns_instructions?.value || "Loading..."}</td>
                                                                         <td className="px-3 py-1.5">
                                                                             <button
                                                                                 type="button"
-                                                                                onClick={(e) => { e.stopPropagation(); copyDomainValue("cname.shorlabs.com", `cname-${d.domain}`) }}
+                                                                                onClick={(e) => { 
+                                                                                    e.stopPropagation(); 
+                                                                                    const cnameValue = response?.dns_instructions?.value || "cname.shorlabs.com"
+                                                                                    copyDomainValue(cnameValue, `cname-${d.domain}`) 
+                                                                                }}
                                                                                 className="p-1 hover:bg-amber-100 rounded"
+                                                                                disabled={!response?.dns_instructions?.value}
                                                                             >
                                                                                 {domainCopied === `cname-${d.domain}` ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3 text-amber-500" />}
                                                                             </button>

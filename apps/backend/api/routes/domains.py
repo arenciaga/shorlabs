@@ -297,10 +297,17 @@ async def check_domain_status(
             }
 
     # No tenant — still pending DNS verification
+    apex = is_apex_domain(domain)
+    dns_instructions = {
+        "type": "CNAME",
+        "name": domain if apex else domain.split(".")[0],
+        "value": CNAME_TARGET,
+    }
     return {
         "domain": domain,
         "status": current_status or "PENDING_VERIFICATION",
         "is_active": False,
+        "dns_instructions": dns_instructions,
         "message": "Domain is pending DNS verification. Add the CNAME record and click Verify.",
     }
 

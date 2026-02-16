@@ -148,6 +148,49 @@ async def get_or_refresh_token(org_id: str, user_id: str) -> Optional[str]:
 
     return installation.get("token")
 
+
+async def get_or_refresh_token_for_org(org_id: str) -> Optional[str]:
+    """
+    Get GitHub token for an organization, refreshing if expired.
+    Used by webhooks where there is no user context (e.g. push → auto-deploy).
+
+    Args:
+        org_id: Clerk organization ID
+
+    Returns:
+        Valid GitHub installation token, or None if not connected
+    """
+    installation = get_github_installation(org_id)
+    if not installation:
+        return None
+
+    if installation.get("expires_at"):
+        try:
+            expires_at = datetime.fromisoformat(installation["expires_at"].replace("Z", "+00:00"))
+            if datetime.now(expires_at.tzinfo) >= expires_at - timedelta(minutes=5):
+                installation_id = installation.get("installation_id")
+                if installation_id:
+                    try:
+                        token_data = await generate_installation_token(installation_id)
+                        # Use stored connected_by when saving refreshed token (no user in webhook context)
+                        user_id = installation.get("connected_by") or "webhook"
+                        save_github_token(
+                            org_id,
+                            user_id,
+                            token_data["token"],
+                            metadata=installation.get("metadata"),
+                            installation_id=installation_id,
+                            expires_at=token_data["expires_at"],
+                        )
+                        return token_data["token"]
+                    except Exception:
+                        return None
+        except (ValueError, TypeError):
+            pass
+
+    return installation.get("token")
+
+
 @router.get("/auth-url")
 async def get_auth_url():
     """Get the GitHub OAuth authorization URL."""

@@ -1,0 +1,462 @@
+"use client"
+
+import { useState } from "react"
+import {
+    Globe,
+    Link2,
+    Plus,
+    Loader2,
+    Copy,
+    Check,
+    XCircle,
+    Shield,
+    RefreshCw,
+    CheckCircle2,
+    Trash2,
+    ChevronDown,
+    ChevronUp,
+} from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { useAuth } from "@clerk/nextjs"
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+
+export interface CustomDomainRecord {
+    domain: string
+    status: "PENDING_VERIFICATION" | "ACTIVE" | "FAILED"
+    is_active: boolean
+    tenant_id: string | null
+    created_at: string
+}
+
+interface DomainInstructions {
+    domain: string
+    dns_instructions: { type: string; name: string; value: string }
+    message: string
+}
+
+interface DomainResponse {
+    dns_verified?: boolean
+    message?: string
+    status?: string
+    is_active?: boolean
+}
+
+interface CustomDomainsProps {
+    projectId: string
+    orgId: string | null
+    subdomain: string | null
+    customDomains: CustomDomainRecord[] | undefined
+    onRefetch: () => void
+}
+
+export function CustomDomains({
+    projectId,
+    orgId,
+    subdomain,
+    customDomains,
+    onRefetch,
+}: CustomDomainsProps) {
+    const { getToken } = useAuth()
+
+    const [newDomain, setNewDomain] = useState("")
+    const [addingDomain, setAddingDomain] = useState(false)
+    const [domainError, setDomainError] = useState<string | null>(null)
+    const [domainInstructions, setDomainInstructions] = useState<DomainInstructions | null>(null)
+    const [verifyingDomain, setVerifyingDomain] = useState<string | null>(null)
+    const [checkingStatus, setCheckingStatus] = useState<string | null>(null)
+    const [removingDomain, setRemovingDomain] = useState<string | null>(null)
+    const [expandedDomain, setExpandedDomain] = useState<string | null>(null)
+    const [domainCopied, setDomainCopied] = useState<string | null>(null)
+    const [domainResponses, setDomainResponses] = useState<Record<string, DomainResponse>>({})
+
+    const copyDomainValue = (text: string, key: string) => {
+        navigator.clipboard.writeText(text)
+        setDomainCopied(key)
+        setTimeout(() => setDomainCopied(null), 2000)
+    }
+
+    const handleAddDomain = async () => {
+        if (!newDomain.trim()) return
+        setAddingDomain(true)
+        setDomainError(null)
+        setDomainInstructions(null)
+        try {
+            const token = await getToken()
+            const url = new URL(`${API_BASE_URL}/api/projects/${projectId}/domains`)
+            if (orgId) url.searchParams.append("org_id", orgId)
+
+            const response = await fetch(url.toString(), {
+                method: "POST",
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ domain: newDomain.trim().toLowerCase() }),
+            })
+
+            const result = await response.json()
+            if (!response.ok) {
+                throw new Error(result.detail || "Failed to add domain")
+            }
+
+            setDomainInstructions(result)
+            setNewDomain("")
+            setExpandedDomain(result.domain)
+            onRefetch()
+        } catch (err) {
+            setDomainError(err instanceof Error ? err.message : "Failed to add domain")
+        } finally {
+            setAddingDomain(false)
+        }
+    }
+
+    const handleVerifyDomain = async (domain: string) => {
+        setVerifyingDomain(domain)
+        try {
+            const token = await getToken()
+            const url = new URL(`${API_BASE_URL}/api/projects/${projectId}/domains/${domain}/verify`)
+            if (orgId) url.searchParams.append("org_id", orgId)
+
+            const response = await fetch(url.toString(), {
+                method: "POST",
+                headers: { Authorization: `Bearer ${token}` },
+            })
+
+            const result = await response.json()
+            setDomainResponses((prev) => ({ ...prev, [domain]: result }))
+
+            if (result.dns_verified) {
+                onRefetch()
+            }
+        } catch (err) {
+            console.error("Failed to verify domain:", err)
+        } finally {
+            setVerifyingDomain(null)
+        }
+    }
+
+    const handleCheckDomainStatus = async (domain: string) => {
+        setCheckingStatus(domain)
+        try {
+            const token = await getToken()
+            const url = new URL(`${API_BASE_URL}/api/projects/${projectId}/domains/${domain}/status`)
+            if (orgId) url.searchParams.append("org_id", orgId)
+
+            const response = await fetch(url.toString(), {
+                headers: { Authorization: `Bearer ${token}` },
+            })
+
+            const result = await response.json()
+            setDomainResponses((prev) => ({ ...prev, [domain]: result }))
+            onRefetch()
+        } catch (err) {
+            console.error("Failed to check domain status:", err)
+        } finally {
+            setCheckingStatus(null)
+        }
+    }
+
+    const handleRemoveDomain = async (domain: string) => {
+        setRemovingDomain(domain)
+        try {
+            const token = await getToken()
+            const url = new URL(`${API_BASE_URL}/api/projects/${projectId}/domains/${domain}`)
+            if (orgId) url.searchParams.append("org_id", orgId)
+
+            const response = await fetch(url.toString(), {
+                method: "DELETE",
+                headers: { Authorization: `Bearer ${token}` },
+            })
+
+            if (!response.ok) {
+                throw new Error("Failed to remove domain")
+            }
+
+            setDomainResponses((prev) => {
+                const next = { ...prev }
+                delete next[domain]
+                return next
+            })
+            onRefetch()
+        } catch (err) {
+            console.error("Failed to remove domain:", err)
+        } finally {
+            setRemovingDomain(null)
+        }
+    }
+
+    const statusBadge = {
+        PENDING_VERIFICATION: { bg: "bg-amber-50 border-amber-100", dot: "bg-amber-500", text: "text-amber-700", label: "Pending DNS" },
+        ACTIVE: { bg: "bg-emerald-50 border-emerald-100", dot: "bg-emerald-500", text: "text-emerald-700", label: "Active" },
+        FAILED: { bg: "bg-red-50 border-red-100", dot: "bg-red-500", text: "text-red-700", label: "Failed" },
+    } as const
+
+    return (
+        <div className="space-y-6">
+            {/* Shorlabs Domain */}
+            <div className="bg-white rounded-2xl border border-zinc-200 overflow-hidden">
+                <div className="px-6 py-4 border-b border-zinc-100">
+                    <div className="flex items-center gap-3">
+                        <Globe className="h-5 w-5 text-zinc-400" />
+                        <h3 className="font-semibold text-zinc-900">Shorlabs Domain</h3>
+                    </div>
+                </div>
+                <div className="px-6 py-4">
+                    <div className="flex items-center gap-3">
+                        <div className="flex-1 bg-zinc-50 rounded-xl px-4 py-3 font-mono text-sm text-zinc-700 border border-zinc-100">
+                            {subdomain}.shorlabs.com
+                        </div>
+                        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-100">
+                            <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                            <span className="text-xs font-medium text-emerald-700">Active</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Custom Domains */}
+            <div className="bg-white rounded-2xl border border-zinc-200 overflow-hidden">
+                <div className="px-6 py-4 border-b border-zinc-100">
+                    <div className="flex items-center gap-3">
+                        <Link2 className="h-5 w-5 text-zinc-400" />
+                        <h3 className="font-semibold text-zinc-900">Custom Domains</h3>
+                    </div>
+                </div>
+                <div className="p-6">
+                    {/* Add Domain Input */}
+                    <div className="flex gap-3 mb-4">
+                        <Input
+                            placeholder="e.g., api.example.com or example.com"
+                            value={newDomain}
+                            onChange={(e) => {
+                                setNewDomain(e.target.value)
+                                setDomainError(null)
+                            }}
+                            onKeyDown={(e) => e.key === "Enter" && handleAddDomain()}
+                            className="flex-1 font-mono text-sm"
+                        />
+                        <Button
+                            onClick={handleAddDomain}
+                            disabled={addingDomain || !newDomain.trim()}
+                            className="bg-zinc-900 hover:bg-zinc-800 text-white rounded-full px-5"
+                        >
+                            {addingDomain ? (
+                                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                            ) : (
+                                <Plus className="h-4 w-4 mr-2" />
+                            )}
+                            Add
+                        </Button>
+                    </div>
+
+                    {domainError && (
+                        <div className="flex items-center gap-2 text-sm text-red-600 mb-4">
+                            <XCircle className="h-4 w-4" />
+                            {domainError}
+                        </div>
+                    )}
+
+                    {/* DNS Instructions (shown after adding a new domain) */}
+                    {domainInstructions && (
+                        <div className="bg-blue-50 rounded-xl border border-blue-100 p-4 mb-4">
+                            <div className="flex items-start gap-3">
+                                <Shield className="h-5 w-5 text-blue-600 mt-0.5 shrink-0" />
+                                <div className="flex-1">
+                                    <h4 className="font-medium text-blue-900 mb-2">DNS Configuration Required</h4>
+                                    <p className="text-sm text-blue-700 mb-3">
+                                        Add the following DNS record at your domain registrar. SSL will be provisioned automatically.
+                                    </p>
+                                    <div className="bg-white rounded-lg border border-blue-200 overflow-hidden">
+                                        <table className="w-full text-sm">
+                                            <thead className="bg-blue-50/50">
+                                                <tr>
+                                                    <th className="text-left px-3 py-2 text-blue-800 font-medium">Type</th>
+                                                    <th className="text-left px-3 py-2 text-blue-800 font-medium">Name</th>
+                                                    <th className="text-left px-3 py-2 text-blue-800 font-medium">Value</th>
+                                                    <th className="px-3 py-2" />
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <tr>
+                                                    <td className="px-3 py-2 font-mono text-blue-900">{domainInstructions.dns_instructions.type}</td>
+                                                    <td className="px-3 py-2 font-mono text-blue-900 break-all">{domainInstructions.dns_instructions.name}</td>
+                                                    <td className="px-3 py-2 font-mono text-blue-900 break-all">{domainInstructions.dns_instructions.value}</td>
+                                                    <td className="px-3 py-2">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => copyDomainValue(domainInstructions.dns_instructions.value, "new-cname")}
+                                                            className="p-1 hover:bg-blue-100 rounded"
+                                                        >
+                                                            {domainCopied === "new-cname" ? (
+                                                                <Check className="h-3.5 w-3.5 text-emerald-500" />
+                                                            ) : (
+                                                                <Copy className="h-3.5 w-3.5 text-blue-500" />
+                                                            )}
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    <p className="text-xs text-blue-600 mt-2">
+                                        After adding the record, click &quot;Verify DNS&quot; on the domain below.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Domain List */}
+                    {customDomains && customDomains.length > 0 ? (
+                        <div className="divide-y divide-zinc-100 border border-zinc-200 rounded-xl overflow-hidden">
+                            {customDomains.map((d) => {
+                                const isExpanded = expandedDomain === d.domain
+                                const response = domainResponses[d.domain]
+                                const badge = statusBadge[d.status] ?? { bg: "bg-zinc-50 border-zinc-100", dot: "bg-zinc-400", text: "text-zinc-600", label: d.status }
+
+                                return (
+                                    <div key={d.domain} className="bg-white">
+                                        <div
+                                            className="flex items-center gap-4 px-4 py-3 cursor-pointer hover:bg-zinc-50 transition-colors"
+                                            onClick={() => setExpandedDomain(isExpanded ? null : d.domain)}
+                                            onKeyDown={(e) => e.key === "Enter" && setExpandedDomain(isExpanded ? null : d.domain)}
+                                            role="button"
+                                            tabIndex={0}
+                                        >
+                                            <div className="flex-1 min-w-0">
+                                                <p className="font-mono text-sm font-medium text-zinc-900 truncate">{d.domain}</p>
+                                                <p className="text-xs text-zinc-400 mt-0.5">
+                                                    Added {new Date(d.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                                                </p>
+                                            </div>
+                                            <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border ${badge.bg}`}>
+                                                <span className={`w-2 h-2 rounded-full ${badge.dot}`} />
+                                                <span className={`text-xs font-medium ${badge.text}`}>{badge.label}</span>
+                                            </div>
+                                            {isExpanded ? <ChevronUp className="h-4 w-4 text-zinc-400" /> : <ChevronDown className="h-4 w-4 text-zinc-400" />}
+                                        </div>
+
+                                        {isExpanded && (
+                                            <div className="px-4 pb-4 border-t border-zinc-100">
+                                                {/* PENDING_VERIFICATION: Add CNAME + Verify */}
+                                                {d.status === "PENDING_VERIFICATION" && (
+                                                    <div className="mt-3 bg-amber-50 rounded-lg border border-amber-100 p-3">
+                                                        <p className="text-sm text-amber-800 font-medium mb-2">Add DNS Record</p>
+                                                        <p className="text-xs text-amber-700 mb-3">
+                                                            Add a CNAME record at your domain registrar, then click Verify DNS. SSL will be provisioned automatically.
+                                                        </p>
+                                                        <div className="bg-white rounded-lg border border-amber-200 overflow-hidden mb-3">
+                                                            <table className="w-full text-xs">
+                                                                <thead className="bg-amber-50/50">
+                                                                    <tr>
+                                                                        <th className="text-left px-3 py-1.5 text-amber-800 font-medium">Type</th>
+                                                                        <th className="text-left px-3 py-1.5 text-amber-800 font-medium">Name</th>
+                                                                        <th className="text-left px-3 py-1.5 text-amber-800 font-medium">Value</th>
+                                                                        <th className="px-3 py-1.5" />
+                                                                    </tr>
+                                                                </thead>
+                                                                <tbody>
+                                                                    <tr>
+                                                                        <td className="px-3 py-1.5 font-mono">CNAME</td>
+                                                                        <td className="px-3 py-1.5 font-mono break-all">{d.domain}</td>
+                                                                        <td className="px-3 py-1.5 font-mono">cname.shorlabs.com</td>
+                                                                        <td className="px-3 py-1.5">
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={(e) => { e.stopPropagation(); copyDomainValue("cname.shorlabs.com", `cname-${d.domain}`) }}
+                                                                                className="p-1 hover:bg-amber-100 rounded"
+                                                                            >
+                                                                                {domainCopied === `cname-${d.domain}` ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3 text-amber-500" />}
+                                                                            </button>
+                                                                        </td>
+                                                                    </tr>
+                                                                </tbody>
+                                                            </table>
+                                                        </div>
+                                                        <Button
+                                                            size="sm"
+                                                            onClick={(e) => { e.stopPropagation(); handleVerifyDomain(d.domain) }}
+                                                            disabled={verifyingDomain === d.domain}
+                                                            className="bg-amber-600 hover:bg-amber-700 text-white rounded-full h-8 px-4 text-xs"
+                                                        >
+                                                            {verifyingDomain === d.domain ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <RefreshCw className="h-3 w-3 mr-1" />}
+                                                            Verify DNS
+                                                        </Button>
+                                                        {response && !response.dns_verified && response.message && (
+                                                            <p className="text-xs text-red-600 mt-2">{response.message}</p>
+                                                        )}
+                                                        {response && response.dns_verified && response.status === "FAILED" && response.message && (
+                                                            <p className="text-xs text-red-600 mt-2">{response.message}</p>
+                                                        )}
+                                                    </div>
+                                                )}
+
+                                                {/* ACTIVE */}
+                                                {d.status === "ACTIVE" && (
+                                                    <div className="mt-3 bg-emerald-50 rounded-lg border border-emerald-100 p-3">
+                                                        <div className="flex items-center gap-2">
+                                                            <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                                                            <p className="text-sm text-emerald-800 font-medium">
+                                                                Domain is active and serving traffic at https://{d.domain}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {/* FAILED */}
+                                                {d.status === "FAILED" && (
+                                                    <div className="mt-3 bg-red-50 rounded-lg border border-red-100 p-3">
+                                                        <div className="flex items-center gap-2 mb-2">
+                                                            <XCircle className="h-4 w-4 text-red-600" />
+                                                            <p className="text-sm text-red-800 font-medium">Domain configuration failed</p>
+                                                        </div>
+                                                        <p className="text-xs text-red-700 mb-3">
+                                                            {response?.message || "Try verifying DNS again."}
+                                                        </p>
+                                                        <Button
+                                                            size="sm"
+                                                            onClick={(e) => { e.stopPropagation(); handleVerifyDomain(d.domain) }}
+                                                            disabled={verifyingDomain === d.domain}
+                                                            className="bg-red-600 hover:bg-red-700 text-white rounded-full h-8 px-4 text-xs"
+                                                        >
+                                                            {verifyingDomain === d.domain ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <RefreshCw className="h-3 w-3 mr-1" />}
+                                                            Retry
+                                                        </Button>
+                                                    </div>
+                                                )}
+
+                                                {/* Remove */}
+                                                <div className="mt-3 flex justify-end">
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={(e) => { e.stopPropagation(); handleRemoveDomain(d.domain) }}
+                                                        disabled={removingDomain === d.domain}
+                                                        className="text-red-600 border-red-200 hover:bg-red-50 rounded-full h-8 px-4 text-xs"
+                                                    >
+                                                        {removingDomain === d.domain ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Trash2 className="h-3 w-3 mr-1" />}
+                                                        Remove
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                )
+                            })}
+                        </div>
+                    ) : !domainInstructions && (
+                        <div className="text-center py-8 border border-zinc-200 rounded-xl">
+                            <div className="w-12 h-12 rounded-full bg-zinc-100 flex items-center justify-center mx-auto mb-3">
+                                <Globe className="h-6 w-6 text-zinc-400" />
+                            </div>
+                            <p className="text-sm text-zinc-500">No custom domains added yet</p>
+                            <p className="text-xs text-zinc-400 mt-1">Add a domain above to get started</p>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    )
+}

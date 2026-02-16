@@ -37,12 +37,11 @@ def _get_aggregation_window_seconds() -> int:
     - For debugging: set AGGREGATION_WINDOW_SECONDS=60 and schedule every minute
     """
     try:
-        value = int(os.environ.get("AGGREGATION_WINDOW_SECONDS", "3600"))
+        value = int(os.environ.get("AGGREGATION_WINDOW_SECONDS", "900"))
         # Keep within sane bounds
         return max(60, min(value, 24 * 60 * 60))
     except Exception:
-        return 3600
-
+        return 900
 
 def _window_bucket_end(now: datetime, window_seconds: int) -> datetime:
     """

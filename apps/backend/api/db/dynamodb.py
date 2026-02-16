@@ -319,13 +319,19 @@ def update_project(project_id: str, updates: dict) -> Optional[dict]:
 
 
 def delete_project(project_id: str) -> bool:
-    """Delete a project and its deployments."""
+    """Delete a project, its deployments, and any custom domain items."""
     project = get_project(project_id)
     if not project:
         return False
-    
+
     projects_table = get_or_create_table()
     deployments_table = get_or_create_deployments_table()
+
+    # Delete all custom domain items for this project
+    domains = list_project_domains(project_id)
+    with projects_table.batch_writer() as batch:
+        for d in domains:
+            batch.delete_item(Key={"PK": d["PK"], "SK": d["SK"]})
 
     # Delete all deployments for this project from the deployments table
     deployments = list_deployments(project_id)
@@ -336,6 +342,118 @@ def delete_project(project_id: str) -> bool:
     # Delete project from projects table
     projects_table.delete_item(Key={"PK": project["PK"], "SK": project["SK"]})
     return True
+
+
+# ─────────────────────────────────────────────────────────────
+# CUSTOM DOMAIN OPERATIONS
+# ─────────────────────────────────────────────────────────────
+
+# Custom domains are stored in the projects table with:
+#   PK = DOMAIN#{domain}
+#   SK = DOMAIN
+# This gives O(1) lookup for Lambda@Edge routing via GetItem.
+
+CNAME_TARGET = os.environ.get("CNAME_TARGET", "cname.shorlabs.com")
+
+
+def add_custom_domain(
+    org_id: str,
+    project_id: str,
+    domain: str,
+    function_url: Optional[str] = None,
+) -> dict:
+    """
+    Add a custom domain mapping for a project.
+
+    Creates a DOMAIN# item in the projects table for fast edge lookups.
+    """
+    table = get_or_create_table()
+    now = datetime.utcnow().isoformat()
+
+    item = {
+        "PK": f"DOMAIN#{domain.lower()}",
+        "SK": "DOMAIN",
+        "domain": domain.lower(),
+        "project_id": project_id,
+        "organization_id": org_id,
+        "function_url": function_url,
+        "status": "PENDING_VERIFICATION",
+        "tenant_id": None,
+        "created_at": now,
+        "updated_at": now,
+    }
+    table.put_item(Item=item)
+    return item
+
+
+def get_domain_item(domain: str) -> Optional[dict]:
+    """Get a custom domain item by domain name. O(1) via GetItem."""
+    table = get_or_create_table()
+    response = table.get_item(
+        Key={"PK": f"DOMAIN#{domain.lower()}", "SK": "DOMAIN"},
+    )
+    return response.get("Item")
+
+
+def update_domain(domain: str, updates: dict) -> Optional[dict]:
+    """Update a custom domain item."""
+    table = get_or_create_table()
+    updates["updated_at"] = datetime.utcnow().isoformat()
+
+    update_expr = "SET " + ", ".join(f"#{k} = :{k}" for k in updates.keys())
+    expr_names = {f"#{k}": k for k in updates.keys()}
+    expr_values = {f":{k}": v for k, v in updates.items()}
+
+    response = table.update_item(
+        Key={"PK": f"DOMAIN#{domain.lower()}", "SK": "DOMAIN"},
+        UpdateExpression=update_expr,
+        ExpressionAttributeNames=expr_names,
+        ExpressionAttributeValues=expr_values,
+        ReturnValues="ALL_NEW",
+    )
+    return response.get("Attributes")
+
+
+def delete_domain_item(domain: str) -> bool:
+    """Delete a custom domain item."""
+    table = get_or_create_table()
+    table.delete_item(Key={"PK": f"DOMAIN#{domain.lower()}", "SK": "DOMAIN"})
+    return True
+
+
+def list_project_domains(project_id: str) -> list:
+    """
+    List all custom domain items for a project.
+
+    Scans for DOMAIN# items with matching project_id.
+    """
+    table = get_or_create_table()
+    response = table.scan(
+        FilterExpression="project_id = :pid AND begins_with(PK, :pk_prefix)",
+        ExpressionAttributeValues={
+            ":pid": project_id,
+            ":pk_prefix": "DOMAIN#",
+        },
+    )
+    return response.get("Items", [])
+
+
+def get_project_by_custom_domain(domain: str) -> Optional[dict]:
+    """
+    Look up a project by custom domain for Lambda@Edge routing.
+
+    Returns minimal data needed for routing (function_url, status).
+    """
+    table = get_or_create_table()
+    response = table.get_item(
+        Key={"PK": f"DOMAIN#{domain.lower()}", "SK": "DOMAIN"},
+        ProjectionExpression="function_url, #st, project_id",
+        ExpressionAttributeNames={"#st": "status"},
+    )
+    item = response.get("Item")
+    if item and item.get("status") == "ACTIVE":
+        return item
+    return None
 
 
 # ─────────────────────────────────────────────────────────────
@@ -756,6 +874,29 @@ def get_github_installation(org_id: str) -> Optional[dict]:
             "connected_by": item.get("connected_by"),
         }
     return None
+
+
+def get_org_id_by_installation_id(installation_id: str) -> Optional[str]:
+    """
+    Look up Shorlabs organization_id by GitHub App installation ID.
+    Used by GitHub webhooks (push events) to find which org's projects to deploy.
+
+    Args:
+        installation_id: GitHub App installation ID from webhook payload
+
+    Returns:
+        organization_id if found, None otherwise
+    """
+    if not installation_id:
+        return None
+    table = get_github_connections_table()
+    response = table.scan(
+        FilterExpression="installation_id = :iid",
+        ExpressionAttributeValues={":iid": str(installation_id)},
+        ProjectionExpression="organization_id",
+    )
+    items = response.get("Items", [])
+    return items[0]["organization_id"] if items else None
 
 
 def delete_github_connection(org_id: str) -> bool:

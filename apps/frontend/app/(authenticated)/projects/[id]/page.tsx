@@ -29,7 +29,7 @@ import {
     EyeOff,
     RefreshCw,
     Cpu,
-    HardDrive
+    HardDrive,
 } from "lucide-react"
 import Link from "next/link"
 
@@ -51,6 +51,7 @@ import { ComputeSettings } from "@/components/ComputeSettings"
 import { StartCommandInput } from "@/components/StartCommandInput"
 import { DeploymentLogs } from "@/components/DeploymentLogs"
 import { EnvironmentVariablesEditor } from "@/components/EnvironmentVariablesEditor"
+import { CustomDomains } from "@/components/CustomDomains"
 import { useIsPro } from "@/hooks/use-is-pro"
 import { trackEvent } from "@/lib/amplitude"
 
@@ -86,9 +87,18 @@ interface Deployment {
     finished_at: string | null
 }
 
+interface CustomDomain {
+    domain: string
+    status: "PENDING_VERIFICATION" | "ACTIVE" | "FAILED"
+    is_active: boolean
+    tenant_id: string | null
+    created_at: string
+}
+
 interface ProjectDetails {
     project: Project
     deployments: Deployment[]
+    custom_domains: CustomDomain[]
 }
 
 const STATUS_CONFIG: Record<string, { dot: string; label: string; color: string; bgGlow: string }> = {
@@ -118,7 +128,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     const [confirmPhrase, setConfirmPhrase] = useState("")
     const [copied, setCopied] = useState(false)
     const [redeploying, setRedeploying] = useState(false)
-    const [activeTab, setActiveTab] = useState<"deployments" | "logs" | "compute" | "settings">("deployments")
+    const [activeTab, setActiveTab] = useState<"deployments" | "domains" | "logs" | "compute" | "settings">("deployments")
 
     // Pro tier check via Autumn
     const { isPro, currentPlan } = useIsPro()
@@ -341,6 +351,8 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
             setSavingCompute(false)
         }
     }
+
+    // ── Custom Domain Actions ────────────────────────────────────
 
     const fetchLogs = useCallback(async () => {
         setLogsLoading(true)
@@ -676,6 +688,18 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                             )}
                         </button>
                         <button
+                            onClick={() => setActiveTab("domains")}
+                            className={`px-3 sm:px-4 py-3 text-sm font-medium transition-colors relative whitespace-nowrap ${activeTab === "domains"
+                                ? "text-zinc-900"
+                                : "text-zinc-500 hover:text-zinc-700"
+                                }`}
+                        >
+                            Domains
+                            {activeTab === "domains" && (
+                                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-zinc-900" />
+                            )}
+                        </button>
+                        <button
                             onClick={() => setActiveTab("logs")}
                             className={`px-3 sm:px-4 py-3 text-sm font-medium transition-colors relative whitespace-nowrap ${activeTab === "logs"
                                 ? "text-zinc-900"
@@ -798,6 +822,17 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                                 </div>
                             )}
                         </div>
+                    )}
+
+                    {/* Domains Tab */}
+                    {activeTab === "domains" && (
+                        <CustomDomains
+                            projectId={id}
+                            orgId={orgId ?? null}
+                            subdomain={project.subdomain ?? null}
+                            customDomains={data?.custom_domains}
+                            onRefetch={fetchProject}
+                        />
                     )}
 
                     {/* Logs Tab */}

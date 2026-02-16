@@ -51,6 +51,7 @@ It is built primarily on **AWS Lambda**, which means you only pay for what you u
 | **Deployment History** | Track every deployment with status, build logs, and timestamps. |
 | **Runtime Logs** | View real-time CloudWatch logs directly from the dashboard. |
 | **GitHub OAuth** | Seamless authentication with GitHub for repository access. |
+| **Auto-deploy on push** | Connect a GitHub App webhook; pushes to your repo trigger deployments automatically (like Railway/Render). |
 | **Pay-Per-Use Pricing** | Built on AWS Lambda, so you only pay for actual compute time. |
 
 ---
@@ -117,6 +118,9 @@ CLERK_ISSUER=https://your-clerk-instance.clerk.accounts.dev
 
 # Frontend URL (for CORS)
 FRONTEND_URL=http://localhost:3000
+
+# GitHub App webhook secret (for auto-deploy on push). Set in GitHub App → Webhook → Secret.
+GITHUB_WEBHOOK_SECRET=your_webhook_secret
 ```
 
 ### 4. Run Locally
@@ -196,6 +200,21 @@ Set these environment variables in your hosting platform:
 - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
 - `CLERK_SECRET_KEY`
 - `NEXT_PUBLIC_API_URL` (your Lambda Function URL from step 5.1)
+
+### 7. Auto-deployment on push (optional)
+
+To deploy automatically when you push to GitHub (like Railway/Render):
+
+1. **GitHub App webhook**
+   - In your [GitHub App](https://github.com/settings/apps) → **Webhook**:
+     - **Webhook URL**: `https://<your-api-url>/webhooks/github` (same base URL as `NEXT_PUBLIC_API_URL`)
+     - **Secret**: Generate a random string and set it as `GITHUB_WEBHOOK_SECRET` in your backend environment (Lambda env vars or `.env`).
+   - Subscribe to **Push events**.
+
+2. **Backend env**
+   - Set `GITHUB_WEBHOOK_SECRET` to the same value as the webhook secret in GitHub.
+
+After this, every push to a repository that has a Shorlabs project will trigger a deployment for that project (same pipeline as manual “Redeploy”).
 
 ---
 

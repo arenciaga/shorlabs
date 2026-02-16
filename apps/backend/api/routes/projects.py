@@ -152,7 +152,21 @@ def _run_deployment_sync(
             "function_url": function_url,
             "function_name": function_name,  # Store for usage aggregation
         })
-        
+
+        # Propagate new function_url to all custom domain items
+        # Lambda@Edge reads function_url from DOMAIN items, so they must stay in sync
+        try:
+            from api.db.dynamodb import list_project_domains, update_domain
+            custom_domains = list_project_domains(project_id)
+            for domain_item in custom_domains:
+                if domain_item.get("status") == "ACTIVE":
+                    update_domain(domain_item["domain"], {
+                        "function_url": function_url,
+                    })
+                    print(f"  ↳ Updated domain {domain_item['domain']} function_url")
+        except Exception as domain_err:
+            print(f"⚠️ Failed to propagate function_url to domains: {domain_err}")
+
         # If the org is throttled, immediately throttle this new function too
         project_data = get_project(project_id)
         if project_data:
@@ -547,10 +561,12 @@ async def get_project_details(
 
     deployments = list_deployments(project_id)
 
-    # Check org-level throttle state
-    from api.db.dynamodb import get_throttle_state
+    # Fetch custom domains for this project
+    from api.db.dynamodb import get_throttle_state, list_project_domains
     throttle_state = get_throttle_state(org_id)
     is_throttled = bool(throttle_state and throttle_state.get("is_throttled"))
+
+    custom_domains = list_project_domains(project_id)
 
     return {
         "project": {
@@ -583,6 +599,16 @@ async def get_project_details(
                 "finished_at": d.get("finished_at"),
             }
             for d in deployments
+        ],
+        "custom_domains": [
+            {
+                "domain": d.get("domain"),
+                "status": d.get("status"),
+                "is_active": d.get("status") == "ACTIVE",
+                "tenant_id": d.get("tenant_id"),
+                "created_at": d.get("created_at"),
+            }
+            for d in custom_domains
         ],
     }
 
@@ -787,12 +813,21 @@ async def delete_project_endpoint(
     print(f"🗑️ DELETE PROJECT: function_name from DB = '{function_name}'")
     print(f"🗑️ DELETE PROJECT: github_url = '{project.get('github_url')}'")
 
+    # Clean up custom domain resources (CloudFront distribution tenants)
+    from api.db.dynamodb import list_project_domains
+    from api.services.domain_service import delete_domain_tenant
+    custom_domains = list_project_domains(project_id)
+    for d in custom_domains:
+        tenant_id = d.get("tenant_id")
+        if tenant_id:
+            delete_domain_tenant(tenant_id)
+
     # Delete AWS resources (Lambda, ECR, and CloudWatch log group)
     result = delete_project_resources(project["github_url"], function_name=function_name)
-    
-    # Delete from DynamoDB (includes deployments)
+
+    # Delete from DynamoDB (includes deployments + domain items)
     delete_project(project_id)
-    
+
     return {
         "deleted": True,
         "lambda_deleted": result["lambda_deleted"],

@@ -17,7 +17,7 @@ from mangum import Mangum
 from dotenv import load_dotenv
 load_dotenv()
 
-from api.routes import github, projects, deployments
+from api.routes import github, projects, deployments, domains, webhooks
 
 
 # CORS allowed origins
@@ -62,6 +62,8 @@ app.add_middleware(
 app.include_router(github.router)
 app.include_router(projects.router)
 app.include_router(deployments.router)
+app.include_router(domains.router)
+app.include_router(webhooks.router)
 
 
 @app.get("/")
@@ -180,30 +182,33 @@ async def handle_autumn_webhook(request: Request):
     """
     Handle Autumn billing webhooks for instant quota enforcement.
 
-    Key events:
-    - customer.product.attached: User upgraded → unthrottle immediately
-    - customer.subscription.created: User subscribed → unthrottle
-    - customer.usage.reset: Billing period reset → unthrottle
+    Autumn uses Svix for delivery. Events (per Autumn docs):
+    - customer.products.updated: product/plan change; use data.scenario (new, upgrade, renew, etc.)
+    - customer.threshold_reached: usage limit/allowance reached (for notifications)
+
+    Unthrottle when customer gains or regains access: new, upgrade, renew.
     """
-    import hmac
-    import hashlib
+    from fastapi import HTTPException
 
     body = await request.body()
-
-    # Verify webhook signature if secret is configured
     webhook_secret = os.environ.get("AUTUMN_WEBHOOK_SECRET", "")
+
     if webhook_secret:
-        signature = request.headers.get("x-autumn-signature", "")
-        expected = hmac.new(
-            webhook_secret.encode(), body, hashlib.sha256
-        ).hexdigest()
-        if not hmac.compare_digest(signature, expected):
-            from fastapi import HTTPException
+        # Autumn uses Svix: verify with svix-id, svix-timestamp, svix-signature
+        from svix.webhooks import Webhook, WebhookVerificationError
+
+        try:
+            wh = Webhook(webhook_secret)
+            wh.verify(body, dict(request.headers))
+        except WebhookVerificationError:
             raise HTTPException(status_code=401, detail="Invalid webhook signature")
 
     event = json.loads(body)
     event_type = event.get("type", "")
-    customer_id = event.get("customer_id") or (event.get("data") or {}).get("customer_id")
+    data = event.get("data") or {}
+    # Payload shape: data.customer.id (not customer_id at top level)
+    customer = data.get("customer") or {}
+    customer_id = customer.get("id") if isinstance(customer, dict) else None
 
     print(f"📩 Autumn webhook: {event_type} for customer {customer_id}")
 
@@ -213,19 +218,23 @@ async def handle_autumn_webhook(request: Request):
     from api.quota_enforcer import unthrottle_org
     from api.db.dynamodb import get_throttle_state
 
-    if event_type in ("customer.product.attached", "customer.subscription.created"):
-        state = get_throttle_state(customer_id)
-        if state and state.get("is_throttled"):
-            unthrottle_org(customer_id)
-            print(f"Webhook: Unthrottled {customer_id} (upgraded)")
-        return {"status": "ok", "action": "unthrottled"}
+    # customer.products.updated: scenario = new | upgrade | downgrade | renew | cancel | expired | past_due | scheduled
+    if event_type == "customer.products.updated":
+        scenario = data.get("scenario", "")
+        unthrottle_scenarios = ("new", "upgrade", "renew")  # customer gained or regained access
+        if scenario in unthrottle_scenarios:
+            state = get_throttle_state(customer_id)
+            if state and state.get("is_throttled"):
+                unthrottle_org(customer_id)
+                print(f"Webhook: Unthrottled {customer_id} (scenario={scenario})")
+            return {"status": "ok", "action": "unthrottled", "scenario": scenario}
+        return {"status": "ok", "action": "none", "scenario": scenario}
 
-    elif event_type == "customer.usage.reset":
-        state = get_throttle_state(customer_id)
-        if state and state.get("is_throttled"):
-            unthrottle_org(customer_id)
-            print(f"Webhook: Unthrottled {customer_id} (period reset)")
-        return {"status": "ok", "action": "unthrottled"}
+    # customer.threshold_reached: limit_reached | allowance_used (informational; no unthrottle)
+    if event_type == "customer.threshold_reached":
+        threshold_type = data.get("threshold_type", "")
+        print(f"Webhook: threshold_reached for {customer_id} ({threshold_type})")
+        return {"status": "ok", "action": "none", "threshold_type": threshold_type}
 
     return {"status": "ok", "action": "none"}
 

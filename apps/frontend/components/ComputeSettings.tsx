@@ -34,8 +34,7 @@ const memoryOptions: {
     minPlan: PlanTier
     badge?: string
 }[] = [
-    {value: 512, label: "512 MB", description: "Hobby", minPlan: "hobby"},
-    { value: 1024, label: "1 GB", description: "Standard", minPlan: "plus",  badge: "Plus"},
+    { value: 1024, label: "1 GB", description: "Hobby", minPlan: "hobby" },
     { value: 2048, label: "2 GB", description: "High Memory", minPlan: "plus", badge: "Plus" },
     { value: 4096, label: "4 GB", description: "Intensive", minPlan: "plus", badge: "Plus" },
     { value: 8192, label: "8 GB", description: "Maximum", minPlan: "pro", badge: "Pro" },
@@ -48,8 +47,8 @@ const ephemeralStorageOptions: {
     minPlan: PlanTier
     badge?: string
 }[] = [
-    { value: 512, label: "512 MB", description: "Basic", minPlan: "hobby" },
-    { value: 1024, label: "1 GB", description: "Enhanced", minPlan: "plus", badge: "Plus" },
+    { value: 1024, label: "1 GB", description: "Basic", minPlan: "hobby" },
+    { value: 2048, label: "2 GB", description: "Enhanced", minPlan: "plus", badge: "Plus" },
     { value: 2048, label: "2 GB", description: "Expanded", minPlan: "plus", badge: "Plus" },
     { value: 4096, label: "4 GB", description: "Premium", minPlan: "pro", badge: "Pro" },
     { value: 8192, label: "8 GB", description: "Maximum", minPlan: "pro", badge: "Pro" }

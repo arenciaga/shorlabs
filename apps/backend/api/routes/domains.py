@@ -307,6 +307,7 @@ async def check_domain_status(
         "domain": domain,
         "status": current_status or "PENDING_VERIFICATION",
         "is_active": False,
+        "is_apex_domain": apex,
         "dns_instructions": dns_instructions,
         "message": "Domain is pending DNS verification. Add the CNAME record and click Verify.",
     }

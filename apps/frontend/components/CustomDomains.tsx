@@ -46,6 +46,7 @@ interface DomainResponse {
     message?: string
     status?: string
     is_active?: boolean
+    is_apex_domain?: boolean
     dns_instructions?: { type: string; name: string; value: string }
 }
 
@@ -394,64 +395,87 @@ export function CustomDomains({
                                         {isExpanded && (
                                             <div className="px-4 pb-4 border-t border-zinc-100">
                                                 {/* PENDING_VERIFICATION: Add CNAME + Verify */}
-                                                {d.status === "PENDING_VERIFICATION" && (
-                                                    <div className="mt-3 bg-amber-50 rounded-lg border border-amber-100 p-3">
-                                                        <p className="text-sm text-amber-800 font-medium mb-2">Add DNS Record</p>
-                                                        <p className="text-xs text-amber-700 mb-3">
-                                                            Add a CNAME record at your domain registrar, then click Verify DNS. SSL will be provisioned automatically.
-                                                        </p>
-                                                        <div className="bg-white rounded-lg border border-amber-200 overflow-hidden mb-3">
-                                                            <table className="w-full text-xs">
-                                                                <thead className="bg-amber-50/50">
-                                                                    <tr>
-                                                                        <th className="text-left px-3 py-1.5 text-amber-800 font-medium">Type</th>
-                                                                        <th className="text-left px-3 py-1.5 text-amber-800 font-medium">Name</th>
-                                                                        <th className="text-left px-3 py-1.5 text-amber-800 font-medium">Value</th>
-                                                                        <th className="px-3 py-1.5" />
-                                                                    </tr>
-                                                                </thead>
-                                                                <tbody>
-                                                                    <tr>
-                                                                        <td className="px-3 py-1.5 font-mono">{dnsInstructions?.type || "CNAME"}</td>
-                                                                        <td className="px-3 py-1.5 font-mono break-all">{dnsInstructions?.name || (d.domain.includes('.') ? d.domain.split('.')[0] : d.domain)}</td>
-                                                                        <td className="px-3 py-1.5 font-mono">{dnsInstructions?.value || "Loading..."}</td>
-                                                                        <td className="px-3 py-1.5">
-                                                                            <button
-                                                                                type="button"
-                                                                                onClick={(e) => { 
-                                                                                    e.stopPropagation(); 
-                                                                                    const cnameValue = dnsInstructions?.value
-                                                                                    if (cnameValue) {
-                                                                                        copyDomainValue(cnameValue, `cname-${d.domain}`)
-                                                                                    }
-                                                                                }}
-                                                                                className="p-1 hover:bg-amber-100 rounded disabled:opacity-50 disabled:cursor-not-allowed"
-                                                                                disabled={!dnsInstructions?.value}
-                                                                            >
-                                                                                {domainCopied === `cname-${d.domain}` ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3 text-amber-500" />}
-                                                                            </button>
-                                                                        </td>
-                                                                    </tr>
-                                                                </tbody>
-                                                            </table>
+                                                {d.status === "PENDING_VERIFICATION" && (() => {
+                                                    const isApexDomain = response?.is_apex_domain ?? d.domain.split('.').length === 2
+                                                    return (
+                                                        <div className="mt-3 bg-amber-50 rounded-lg border border-amber-100 p-3">
+                                                            <p className="text-sm text-amber-800 font-medium mb-2">Add DNS Record</p>
+                                                            
+                                                            {isApexDomain ? (
+                                                                <>
+                                                                    <div className="bg-amber-100 border border-amber-200 rounded-lg p-3 mb-3">
+                                                                        <p className="text-xs font-semibold text-amber-900 mb-1.5">⚠️ Apex Domain Detected</p>
+                                                                        <p className="text-xs text-amber-800 leading-relaxed">
+                                                                            Most DNS providers (like GoDaddy) don't allow CNAME records for apex domains ({d.domain}). 
+                                                                            Instead, add <span className="font-mono font-semibold">www.{d.domain}</span> as a CNAME, then redirect {d.domain} to www.{d.domain} at your registrar.
+                                                                        </p>
+                                                                    </div>
+                                                                    <p className="text-xs text-amber-700 mb-3">
+                                                                        <strong>Step 1:</strong> Add a CNAME record for <span className="font-mono">www.{d.domain}</span> pointing to the value below.
+                                                                    </p>
+                                                                    <p className="text-xs text-amber-700 mb-3">
+                                                                        <strong>Step 2:</strong> Set up a redirect/forward from {d.domain} to www.{d.domain} in your DNS provider's settings (usually under "Domain Forwarding" or "URL Redirect").
+                                                                    </p>
+                                                                </>
+                                                            ) : (
+                                                                <p className="text-xs text-amber-700 mb-3">
+                                                                    Add a CNAME record at your domain registrar, then click Verify DNS. SSL will be provisioned automatically.
+                                                                </p>
+                                                            )}
+                                                            
+                                                            <div className="bg-white rounded-lg border border-amber-200 overflow-hidden mb-3">
+                                                                <table className="w-full text-xs">
+                                                                    <thead className="bg-amber-50/50">
+                                                                        <tr>
+                                                                            <th className="text-left px-3 py-1.5 text-amber-800 font-medium">Type</th>
+                                                                            <th className="text-left px-3 py-1.5 text-amber-800 font-medium">Name</th>
+                                                                            <th className="text-left px-3 py-1.5 text-amber-800 font-medium">Value</th>
+                                                                            <th className="px-3 py-1.5" />
+                                                                        </tr>
+                                                                    </thead>
+                                                                    <tbody>
+                                                                        <tr>
+                                                                            <td className="px-3 py-1.5 font-mono">CNAME</td>
+                                                                            <td className="px-3 py-1.5 font-mono break-all">{isApexDomain ? `www.${d.domain}` : (dnsInstructions?.name || (d.domain.includes('.') ? d.domain.split('.')[0] : d.domain))}</td>
+                                                                            <td className="px-3 py-1.5 font-mono">{dnsInstructions?.value || "Loading..."}</td>
+                                                                            <td className="px-3 py-1.5">
+                                                                                <button
+                                                                                    type="button"
+                                                                                    onClick={(e) => { 
+                                                                                        e.stopPropagation(); 
+                                                                                        const cnameValue = dnsInstructions?.value
+                                                                                        if (cnameValue) {
+                                                                                            copyDomainValue(cnameValue, `cname-${d.domain}`)
+                                                                                        }
+                                                                                    }}
+                                                                                    className="p-1 hover:bg-amber-100 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                                                                                    disabled={!dnsInstructions?.value}
+                                                                                >
+                                                                                    {domainCopied === `cname-${d.domain}` ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3 text-amber-500" />}
+                                                                                </button>
+                                                                            </td>
+                                                                        </tr>
+                                                                    </tbody>
+                                                                </table>
+                                                            </div>
+                                                            <Button
+                                                                size="sm"
+                                                                onClick={(e) => { e.stopPropagation(); handleVerifyDomain(d.domain) }}
+                                                                disabled={verifyingDomain === d.domain}
+                                                                className="bg-amber-600 hover:bg-amber-700 text-white rounded-full h-8 px-4 text-xs"
+                                                            >
+                                                                {verifyingDomain === d.domain ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <RefreshCw className="h-3 w-3 mr-1" />}
+                                                                Verify DNS
+                                                            </Button>
+                                                            {response && !response.dns_verified && response.message && (
+                                                                <p className="text-xs text-red-600 mt-2">{response.message}</p>
+                                                            )}
+                                                            {response && response.dns_verified && response.status === "FAILED" && response.message && (
+                                                                <p className="text-xs text-red-600 mt-2">{response.message}</p>
+                                                            )}
                                                         </div>
-                                                        <Button
-                                                            size="sm"
-                                                            onClick={(e) => { e.stopPropagation(); handleVerifyDomain(d.domain) }}
-                                                            disabled={verifyingDomain === d.domain}
-                                                            className="bg-amber-600 hover:bg-amber-700 text-white rounded-full h-8 px-4 text-xs"
-                                                        >
-                                                            {verifyingDomain === d.domain ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <RefreshCw className="h-3 w-3 mr-1" />}
-                                                            Verify DNS
-                                                        </Button>
-                                                        {response && !response.dns_verified && response.message && (
-                                                            <p className="text-xs text-red-600 mt-2">{response.message}</p>
-                                                        )}
-                                                        {response && response.dns_verified && response.status === "FAILED" && response.message && (
-                                                            <p className="text-xs text-red-600 mt-2">{response.message}</p>
-                                                        )}
-                                                    </div>
-                                                )}
+                                                    )
+                                                })()}
 
                                                 {/* PROVISIONING */}
                                                 {d.status === "PROVISIONING" && (

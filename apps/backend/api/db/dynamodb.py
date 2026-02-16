@@ -353,7 +353,11 @@ def delete_project(project_id: str) -> bool:
 #   SK = DOMAIN
 # This gives O(1) lookup for Lambda@Edge routing via GetItem.
 
-CNAME_TARGET = os.environ.get("CNAME_TARGET", "cname.shorlabs.com")
+# Import CloudFront routing endpoint for CNAME target default
+CLOUDFRONT_ROUTING_ENDPOINT = os.environ.get(
+    "CLOUDFRONT_ROUTING_ENDPOINT", "d34dyjn0btmcwo.cloudfront.net"
+)
+CNAME_TARGET = os.environ.get("CNAME_TARGET", CLOUDFRONT_ROUTING_ENDPOINT)
 
 
 def add_custom_domain(

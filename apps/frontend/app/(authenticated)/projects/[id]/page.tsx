@@ -913,9 +913,9 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                     {activeTab === "compute" && (
                         <div className="space-y-6">
                             <ComputeSettings
-                                memory={editingCompute ? memoryValue : (project.memory || 512)}
+                                memory={editingCompute ? memoryValue : (project.memory || 1024)}
                                 timeout={editingCompute ? timeoutValue : (project.timeout || 30)}
-                                ephemeralStorage={editingCompute ? ephemeralStorageValue : (project.ephemeral_storage || 512)}
+                                ephemeralStorage={editingCompute ? ephemeralStorageValue : (project.ephemeral_storage || 1024)}
                                 onMemoryChange={(value) => {
                                     if (!editingCompute) {
                                         startEditingCompute({ memory: value })

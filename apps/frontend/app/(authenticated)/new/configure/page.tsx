@@ -93,10 +93,10 @@ function ConfigureProjectContent() {
     const [detectingFramework, setDetectingFramework] = useState(true)
     const [detectionConfidence, setDetectionConfidence] = useState<"high" | "medium" | "low">("low")
 
-    // Compute settings
-    const [memory, setMemory] = useState(512)
+    // Compute settings (defaults: 1 GB memory, 1 GB temp storage, 30s timeout)
+    const [memory, setMemory] = useState(1024)
     const [timeout, setTimeout] = useState(30)
-    const [ephemeralStorage, setEphemeralStorage] = useState(512)
+    const [ephemeralStorage, setEphemeralStorage] = useState(1024)
 
     // Project limit check
     const [projectCount, setProjectCount] = useState(0)

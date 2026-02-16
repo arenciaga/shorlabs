@@ -112,7 +112,8 @@ const STATUS_CONFIG: Record<string, { dot: string; label: string; color: string;
     FAILED: { dot: "bg-red-500", label: "Failed", color: "text-red-600", bgGlow: "shadow-red-500/20" },
 }
 
-const BUILD_STEPS = ["CLONING", "PREPARING", "UPLOADING", "BUILDING", "DEPLOYING"]
+// Include PENDING as the first step so users can see that a redeploy has been queued
+const BUILD_STEPS = ["PENDING", "CLONING", "PREPARING", "UPLOADING", "BUILDING", "DEPLOYING"]
 
 export default function ProjectDetailPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params)
@@ -532,7 +533,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                                     project.is_throttled
                                         ? "Redeploy is paused while your organization is over quota."
                                         : isBuilding
-                                            ? "A deployment is already in progress. Redeploy will be available again once this build finishes."
+                                            ? "A deployment is already in progress. Your redeploy request will run automatically as soon as capacity is available."
                                             : "Trigger a new deployment with the latest settings."
                                 }
                             >
@@ -541,8 +542,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                             </Button>
                             {!project.is_throttled && isBuilding && (
                                 <p className="text-xs text-zinc-500 max-w-xs text-right">
-                                    A deployment is currently running. Your changes will take effect the next time you redeploy
-                                    after this build completes.
+                                    A deployment is currently running or queued. Your redeploy request will run automatically when it reaches the front of the queue—no need to click again.
                                 </p>
                             )}
                         </div>

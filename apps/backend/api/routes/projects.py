@@ -762,6 +762,10 @@ async def redeploy_project(
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
+    # Immediately mark project as queued so the UI can reflect that a
+    # redeployment has been scheduled, even if the actual build hasn't started yet.
+    update_project(project_id, {"status": "PENDING"})
+
     # Get GitHub token for private repos
     github_token = await get_or_refresh_token(org_id, user_id)
     

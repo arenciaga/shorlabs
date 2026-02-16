@@ -523,15 +523,28 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                             </a>
                         </div>
 
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-col items-end gap-1">
                             <Button
                                 onClick={handleRedeploy}
                                 disabled={isBuilding || redeploying || project.is_throttled}
                                 className="bg-zinc-900 hover:bg-zinc-800 text-white rounded-full h-10 px-5 shadow-lg shadow-zinc-900/10"
+                                title={
+                                    project.is_throttled
+                                        ? "Redeploy is paused while your organization is over quota."
+                                        : isBuilding
+                                            ? "A deployment is already in progress. Redeploy will be available again once this build finishes."
+                                            : "Trigger a new deployment with the latest settings."
+                                }
                             >
                                 <RotateCw className={`h-4 w-4 mr-2 ${redeploying ? 'animate-spin' : ''}`} />
                                 {project.is_throttled ? "Paused" : "Redeploy"}
                             </Button>
+                            {!project.is_throttled && isBuilding && (
+                                <p className="text-xs text-zinc-500 max-w-xs text-right">
+                                    A deployment is currently running. Your changes will take effect the next time you redeploy
+                                    after this build completes.
+                                </p>
+                            )}
                         </div>
                     </div>
 

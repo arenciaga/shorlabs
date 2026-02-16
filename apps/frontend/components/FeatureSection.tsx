@@ -1,13 +1,6 @@
 "use client";
 
-import {
-    Zap,
-    GitBranch,
-    Globe,
-    Terminal,
-    Cpu,
-    DollarSign,
-} from "lucide-react";
+import { Zap, Code, Globe, Terminal, Cpu, DollarSign } from "lucide-react";
 
 const features = [
     {
@@ -17,15 +10,15 @@ const features = [
         highlight: true,
     },
     {
-        icon: GitBranch,
-        title: "Auto Detection",
-        description: "We detect Python or Node.js and configure the build automatically.",
+        icon: Code,
+        title: "Multi-Framework Support",
+        description: "First-class support for Next.js, FastAPI, Flask and more across frontend and backend.",
         highlight: false,
     },
     {
         icon: Globe,
-        title: "Instant Subdomains",
-        description: "Every project gets a unique .shorlabs.com URL, live in seconds.",
+        title: "Bring Your Own Domain",
+        description: "Connect your own domain in seconds.",
         highlight: false,
     },
     {

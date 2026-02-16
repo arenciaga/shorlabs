@@ -182,7 +182,13 @@ export function CustomDomains({
 
             const result = await response.json()
             if (result.dns_instructions) {
-                setDomainResponses((prev) => ({ ...prev, [domain]: { ...prev[domain], dns_instructions: result.dns_instructions } }))
+                setDomainResponses((prev) => ({ 
+                    ...prev, 
+                    [domain]: { 
+                        ...(prev[domain] || {}), 
+                        dns_instructions: result.dns_instructions 
+                    } 
+                }))
             }
         } catch (err) {
             console.error("Failed to fetch domain instructions:", err)
@@ -270,6 +276,13 @@ export function CustomDomains({
         }
     }, [customDomains, pollProvisioningDomains])
 
+    // Clear domainInstructions banner when the domain appears in the list
+    useEffect(() => {
+        if (domainInstructions && customDomains?.some(d => d.domain === domainInstructions.domain)) {
+            setDomainInstructions(null)
+        }
+    }, [customDomains, domainInstructions])
+
     const statusBadge = {
         PENDING_VERIFICATION: { bg: "bg-amber-50 border-amber-100", dot: "bg-amber-500", text: "text-amber-700", label: "Pending DNS" },
         PROVISIONING: { bg: "bg-blue-50 border-blue-100", dot: "bg-blue-500 animate-pulse", text: "text-blue-700", label: "Provisioning SSL" },
@@ -342,8 +355,8 @@ export function CustomDomains({
                         </div>
                     )}
 
-                    {/* DNS Instructions (shown after adding a new domain) */}
-                    {domainInstructions && (
+                    {/* DNS Instructions (shown after adding a new domain, but only if domain is not yet in the list) */}
+                    {domainInstructions && !customDomains?.some(d => d.domain === domainInstructions.domain) && (
                         <div className="bg-blue-50 rounded-xl border border-blue-100 p-4 mb-4">
                             <div className="flex items-start gap-3">
                                 <Shield className="h-5 w-5 text-blue-600 mt-0.5 shrink-0" />
@@ -398,6 +411,8 @@ export function CustomDomains({
                             {customDomains.map((d) => {
                                 const isExpanded = expandedDomain === d.domain
                                 const response = domainResponses[d.domain]
+                                // Use domainInstructions if this is the newly added domain and we have instructions
+                                const dnsInstructions = response?.dns_instructions || (domainInstructions?.domain === d.domain ? domainInstructions.dns_instructions : null)
                                 const badge = statusBadge[d.status] ?? { bg: "bg-zinc-50 border-zinc-100", dot: "bg-zinc-400", text: "text-zinc-600", label: d.status }
 
                                 return (
@@ -407,8 +422,12 @@ export function CustomDomains({
                                             onClick={() => {
                                                 const newExpanded = isExpanded ? null : d.domain
                                                 setExpandedDomain(newExpanded)
-                                                // Fetch DNS instructions if expanding a PENDING_VERIFICATION domain
-                                                if (newExpanded && d.status === "PENDING_VERIFICATION" && !domainResponses[d.domain]?.dns_instructions) {
+                                                // Clear the top banner instructions when expanding a domain
+                                                if (newExpanded && domainInstructions?.domain === d.domain) {
+                                                    setDomainInstructions(null)
+                                                }
+                                                // Fetch DNS instructions if expanding a PENDING_VERIFICATION domain and we don't have them yet
+                                                if (newExpanded && d.status === "PENDING_VERIFICATION" && !domainResponses[d.domain]?.dns_instructions && domainInstructions?.domain !== d.domain) {
                                                     fetchDomainInstructions(d.domain)
                                                 }
                                             }}
@@ -416,7 +435,11 @@ export function CustomDomains({
                                                 if (e.key === "Enter") {
                                                     const newExpanded = isExpanded ? null : d.domain
                                                     setExpandedDomain(newExpanded)
-                                                    if (newExpanded && d.status === "PENDING_VERIFICATION" && !domainResponses[d.domain]?.dns_instructions) {
+                                                    // Clear the top banner instructions when expanding a domain
+                                                    if (newExpanded && domainInstructions?.domain === d.domain) {
+                                                        setDomainInstructions(null)
+                                                    }
+                                                    if (newExpanded && d.status === "PENDING_VERIFICATION" && !domainResponses[d.domain]?.dns_instructions && domainInstructions?.domain !== d.domain) {
                                                         fetchDomainInstructions(d.domain)
                                                     }
                                                 }
@@ -458,19 +481,21 @@ export function CustomDomains({
                                                                 </thead>
                                                                 <tbody>
                                                                     <tr>
-                                                                        <td className="px-3 py-1.5 font-mono">{response?.dns_instructions?.type || "CNAME"}</td>
-                                                                        <td className="px-3 py-1.5 font-mono break-all">{response?.dns_instructions?.name || d.domain}</td>
-                                                                        <td className="px-3 py-1.5 font-mono">{response?.dns_instructions?.value || "Loading..."}</td>
+                                                                        <td className="px-3 py-1.5 font-mono">{dnsInstructions?.type || "CNAME"}</td>
+                                                                        <td className="px-3 py-1.5 font-mono break-all">{dnsInstructions?.name || (d.domain.includes('.') ? d.domain.split('.')[0] : d.domain)}</td>
+                                                                        <td className="px-3 py-1.5 font-mono">{dnsInstructions?.value || "Loading..."}</td>
                                                                         <td className="px-3 py-1.5">
                                                                             <button
                                                                                 type="button"
                                                                                 onClick={(e) => { 
                                                                                     e.stopPropagation(); 
-                                                                                    const cnameValue = response?.dns_instructions?.value || "cname.shorlabs.com"
-                                                                                    copyDomainValue(cnameValue, `cname-${d.domain}`) 
+                                                                                    const cnameValue = dnsInstructions?.value
+                                                                                    if (cnameValue) {
+                                                                                        copyDomainValue(cnameValue, `cname-${d.domain}`)
+                                                                                    }
                                                                                 }}
-                                                                                className="p-1 hover:bg-amber-100 rounded"
-                                                                                disabled={!response?.dns_instructions?.value}
+                                                                                className="p-1 hover:bg-amber-100 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                                                                                disabled={!dnsInstructions?.value}
                                                                             >
                                                                                 {domainCopied === `cname-${d.domain}` ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3 text-amber-500" />}
                                                                             </button>

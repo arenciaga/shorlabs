@@ -92,7 +92,6 @@ const getWebsiteIconUrl = (projectUrl: string | null) => {
 
 function ProjectAvatar({ projectId, projectName, projectUrl }: { projectId: string; projectName: string; projectUrl: string | null }) {
     const [iconLoadError, setIconLoadError] = useState(false)
-    const iconLabel = (projectName || "?").trim().charAt(0).toUpperCase()
     const websiteIconUrl = getWebsiteIconUrl(projectUrl)
 
     if (websiteIconUrl && !iconLoadError) {
@@ -112,12 +111,10 @@ function ProjectAvatar({ projectId, projectName, projectUrl }: { projectId: stri
 
     return (
         <div
-            className="w-10 h-10 shrink-0 rounded-full flex items-center justify-center text-white text-sm font-semibold"
+            className="w-10 h-10 shrink-0 rounded-full"
             style={{ background: getProjectGradient(projectId) }}
             aria-label={`${projectName} icon`}
-        >
-            {iconLabel}
-        </div>
+        />
     )
 }
 

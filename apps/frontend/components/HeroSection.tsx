@@ -32,7 +32,7 @@ const HeroSection = () => {
 
                     {/* Subtitle */}
                     <p className="text-base sm:text-lg text-gray-500 max-w-lg leading-relaxed">
-                        Shorlabs gives you the tools and infrastructure to deploy, scale, and manage your frontend and backend apps from one place.
+                        Deploy your frontend and backend, serverless. Pay only when your code runs.
                     </p>
 
                     {/* CTA Buttons */}

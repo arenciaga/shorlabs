@@ -78,20 +78,44 @@ const getProjectHost = (projectUrl: string | null) => {
     }
 }
 
-const getWebsiteIconUrl = (projectUrl: string | null) => {
-    const host = getProjectHost(projectUrl)
-    if (!host) return null
+const isLikelyDomain = (value: string | null) => {
+    if (!value) return false
+    const normalized = value.trim().toLowerCase()
+    return /^[a-z0-9][a-z0-9.-]*\.[a-z]{2,}$/i.test(normalized) && !normalized.includes(" ")
+}
 
-    // Uses domain-based website icon lookup (not direct /favicon.ico fetching).
-    return `https://logo.clearbit.com/${host}`
+const getWebsiteIconUrls = (projectUrl: string | null) => {
+    const host = getProjectHost(projectUrl)
+    const normalized = normalizeUrl(projectUrl)
+    if (!host) return []
+    let origin: string | null = null
+
+    if (normalized) {
+        try {
+            origin = new URL(normalized).origin
+        } catch {
+            origin = null
+        }
+    }
+
+    const candidates = [
+        `https://www.google.com/s2/favicons?sz=64&domain=${encodeURIComponent(host)}`,
+        `https://icons.duckduckgo.com/ip3/${host}.ico`,
+        origin ? `${origin}/favicon.ico` : null,
+        origin ? `${origin}/apple-touch-icon.png` : null,
+        `https://logo.clearbit.com/${host}`,
+    ]
+
+    return candidates.filter((url): url is string => Boolean(url))
 }
 
 function ProjectAvatar({ projectId, projectName, projectUrl }: { projectId: string; projectName: string; projectUrl: string | null }) {
-    const [iconLoadError, setIconLoadError] = useState(false)
+    const [iconIndex, setIconIndex] = useState(0)
     const iconLabel = (projectName || "?").trim().charAt(0).toUpperCase()
-    const websiteIconUrl = getWebsiteIconUrl(projectUrl)
+    const websiteIconUrls = getWebsiteIconUrls(projectUrl)
+    const websiteIconUrl = websiteIconUrls[iconIndex] || null
 
-    if (websiteIconUrl && !iconLoadError) {
+    if (websiteIconUrl) {
         return (
             <div className="w-10 h-10 shrink-0 rounded-full overflow-hidden bg-white border border-zinc-200">
                 <img
@@ -100,7 +124,9 @@ function ProjectAvatar({ projectId, projectName, projectUrl }: { projectId: stri
                     className="w-full h-full object-cover"
                     loading="lazy"
                     referrerPolicy="no-referrer"
-                    onError={() => setIconLoadError(true)}
+                    onError={() => {
+                        setIconIndex((current) => current + 1)
+                    }}
                 />
             </div>
         )
@@ -318,7 +344,12 @@ export default function ProjectsPage() {
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                                 {filteredProjects.map((project) => {
                                     const status = STATUS_CONFIG[project.status] || STATUS_CONFIG.PENDING
-                                    const preferredUrl = project.custom_url?.trim() || project.function_url?.trim() || null
+                                    const inferredCustomUrl = isLikelyDomain(project.name) ? `https://${project.name.trim().toLowerCase()}` : null
+                                    const preferredUrl =
+                                        project.custom_url?.trim() ||
+                                        inferredCustomUrl ||
+                                        project.function_url?.trim() ||
+                                        null
                                     const normalizedDisplayUrl = normalizeUrl(preferredUrl)
                                     const projectHost = getProjectHost(preferredUrl)
                                     return (
@@ -332,6 +363,7 @@ export default function ProjectsPage() {
                                                 <div className="flex items-start justify-between mb-4">
                                                 <div className="flex items-center gap-3 min-w-0">
                                                         <ProjectAvatar
+                                                            key={`avatar-${preferredUrl || project.project_id}`}
                                                             projectId={project.project_id}
                                                             projectName={project.name}
                                                             projectUrl={preferredUrl}

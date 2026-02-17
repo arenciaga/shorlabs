@@ -21,7 +21,7 @@ const geistMono = Geist_Mono({
   display: "swap",
 });
 
-const homepageTitle = "Ship Software in Peace.";
+const homepageTitle = "Shorlabs | Ship Software in Peace.";
 const homepageDescription =
   "Shorlabs gives you the tools and infrastructure to deploy, scale, and manage your frontend and backend apps from one place.";
 

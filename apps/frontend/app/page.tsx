@@ -7,7 +7,7 @@ import { CTASection } from "@/components/CTASection";
 import { Footer } from "@/components/Footer";
 import SectionNavigation from "@/components/SectionNavigation";
 
-const homepageTitle = "Ship Software in Peace.";
+const homepageTitle = "Shorlabs | Ship Software in Peace.";
 const homepageDescription =
   "Shorlabs gives you the tools and infrastructure to deploy, scale, and manage your frontend and backend apps from one place.";
 

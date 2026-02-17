@@ -7,12 +7,15 @@ import { CTASection } from "@/components/CTASection";
 import { Footer } from "@/components/Footer";
 import SectionNavigation from "@/components/SectionNavigation";
 
+const homepageTitle = "Ship Software in Peace.";
+const homepageDescription =
+  "Shorlabs gives you the tools and infrastructure to deploy, scale, and manage your frontend and backend apps from one place.";
+
 export const metadata: Metadata = {
   title: {
-    absolute: "Shorlabs — The serverless platform for frontends and backends",
+    absolute: homepageTitle,
   },
-  description:
-    "The serverless platform for frontends and backends. Next.js, React, FastAPI, Express—all with pay-per-request pricing. No idle costs. No container limits.",
+  description: homepageDescription,
   alternates: {
     canonical: "/",
   },
@@ -24,8 +27,7 @@ export default function Home() {
     "@type": "Organization",
     name: "Shorlabs",
     url: "https://shorlabs.com",
-    description:
-      "The serverless platform for frontends and backends. Next.js, React, FastAPI, Express—all with pay-per-request pricing. No idle costs. No container limits.",
+    description: homepageDescription,
   };
 
   return (
@@ -46,6 +48,3 @@ export default function Home() {
     </>
   );
 }
-
-
-

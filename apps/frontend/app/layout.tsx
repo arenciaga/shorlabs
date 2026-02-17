@@ -21,18 +21,20 @@ const geistMono = Geist_Mono({
   display: "swap",
 });
 
+const homepageTitle = "Ship Software in Peace.";
+const homepageDescription =
+  "Shorlabs gives you the tools and infrastructure to deploy, scale, and manage your frontend and backend apps from one place.";
+
 export const metadata: Metadata = {
   metadataBase: new URL("https://shorlabs.com"),
   title: {
     template: "%s | Shorlabs",
-    default: "Shorlabs — The serverless platform for frontends and backends",
+    default: homepageTitle,
   },
-  description:
-    "The serverless platform for frontends and backends. Next.js, React, FastAPI, Express—all with pay-per-request pricing. No idle costs. No container limits.",
+  description: homepageDescription,
   openGraph: {
-    title: "Shorlabs",
-    description:
-      "The serverless platform for frontends and backends. Next.js, React, FastAPI, Express—all with pay-per-request pricing. No idle costs. No container limits.",
+    title: homepageTitle,
+    description: homepageDescription,
     url: "https://shorlabs.com",
     siteName: "Shorlabs",
     locale: "en_US",
@@ -40,6 +42,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
+    title: homepageTitle,
+    description: homepageDescription,
   },
   robots: {
     index: true,
@@ -69,7 +73,7 @@ export default function RootLayout({
     <ClerkProvider
       publishableKey={process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY!}
       localization={{
-        formButtonPrimary: 'Sign in',
+        formButtonPrimary: "Sign in",
       }}
     >
       <html lang="en" suppressHydrationWarning>

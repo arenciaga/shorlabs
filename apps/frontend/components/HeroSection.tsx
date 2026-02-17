@@ -14,7 +14,7 @@ const HeroSection = () => {
         <section className="relative w-full bg-white overflow-hidden">
             {/* Hero Content */}
             <div className="w-full max-w-5xl mx-auto px-4 sm:px-6 pt-24 sm:pt-28 lg:pt-32 pb-10 sm:pb-14 lg:pb-16">
-                <div className="flex flex-col items-center sm:items-start text-center sm:text-left space-y-5 sm:space-y-6">
+                <div className="flex flex-col items-center sm:items-start text-center sm:text-left space-y-5 sm:space-y-6"> 
                     {/* View on GitHub badge */}
                     <a
                         href="https://github.com/aryankashyap0/shorlabs"
@@ -32,7 +32,7 @@ const HeroSection = () => {
 
                     {/* Subtitle */}
                     <p className="text-base sm:text-lg text-gray-500 max-w-lg leading-relaxed">
-                        Deploy both your frontend and backend in one click. We’re serverless, so you only pay for what you use!
+                        Shorlabs gives you the tools and infrastructure to deploy, scale, and manage your frontend and backend apps from one place.
                     </p>
 
                     {/* CTA Buttons */}

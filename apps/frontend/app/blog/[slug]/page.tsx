@@ -262,7 +262,7 @@ export default async function BlogPost({ params }: Props) {
               {post.meta.title}
             </h1>
             <p className="text-xs sm:text-sm text-gray mb-1.5">
-              Last updated {formatDate(post.meta.date)} · {post.meta.readingTime}{" "}
+              {formatDate(post.meta.date)} · {post.meta.readingTime}{" "}
               {post.meta.readingTime === 1 ? "minute" : "minutes"} reading time
             </p>
             <p className="text-xs sm:text-sm text-foreground">

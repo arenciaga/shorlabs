@@ -65,7 +65,7 @@ export default function SectionNavigation() {
                         className="absolute left-1/2 -translate-x-1/2 flex items-center"
                     >
                         <span className="text-lg font-semibold tracking-tight text-gray-900">
-                            shorlabs
+                            Shorlabs
                         </span>
                     </Link>
 

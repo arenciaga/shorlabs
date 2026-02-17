@@ -159,7 +159,7 @@ export function UsagePanel({ onUpgrade }: UsagePanelProps) {
                                 <div className="h-2 rounded-full bg-zinc-100 overflow-hidden">
                                     <div
                                         className={`h-full rounded-full transition-all duration-500 ease-out ${
-                                            usage!.requests.limit && (usage!.requests.current || 0) >= usage!.requests.limit
+                                            usage!.requests.limit && (usage!.requests.current || 0) > usage!.requests.limit
                                                 ? "bg-red-500"
                                                 : "bg-blue-600"
                                         }`}
@@ -187,7 +187,7 @@ export function UsagePanel({ onUpgrade }: UsagePanelProps) {
                                 <div className="h-2 rounded-full bg-zinc-100 overflow-hidden">
                                     <div
                                         className={`h-full rounded-full transition-all duration-500 ease-out ${
-                                            usage!.gbSeconds.limit && (usage!.gbSeconds.current || 0) >= usage!.gbSeconds.limit
+                                            usage!.gbSeconds.limit && (usage!.gbSeconds.current || 0) > usage!.gbSeconds.limit
                                                 ? "bg-red-500"
                                                 : "bg-blue-600"
                                         }`}

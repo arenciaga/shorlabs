@@ -16,7 +16,7 @@ LAMBDA_ROLE_NAME = "shorlabs-lambda-execution-role"
 # Default deployment settings
 DEFAULT_MEMORY = 1024 # MB
 DEFAULT_TIMEOUT = 30  # seconds (30s)
-DEFAULT_EPHEMERAL_STORAGE = 512  # MB (512-10240 allowed)
+DEFAULT_EPHEMERAL_STORAGE = 1024  # MB (512-10240 allowed)
 
 # Reserved environment variable prefixes (cannot be set by users)
 RESERVED_ENV_PREFIXES = (

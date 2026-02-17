@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { AlertCircle, ChevronDown, ChevronUp } from "lucide-react"
+import { AlertCircle } from "lucide-react"
 import { useUsage } from "@/hooks/use-usage"
 import { useIsPro } from "@/hooks/use-is-pro"
 
@@ -22,7 +22,6 @@ const formatDollars = (amount: number) => {
 export function UsagePanel({ onUpgrade }: UsagePanelProps) {
     const { usage, loading: usageLoading, error: usageError, isValidating } = useUsage()
     const { isPro, planLabel } = useIsPro()
-    const [breakdownOpen, setBreakdownOpen] = useState(false)
     const [mounted, setMounted] = useState(false)
 
     useEffect(() => { setMounted(true) }, [])
@@ -144,44 +143,6 @@ export function UsagePanel({ onUpgrade }: UsagePanelProps) {
                                 </div>
                             </div>
 
-                            {/* Expandable breakdown - always show if breakdown exists, even if empty */}
-                            {usage!.breakdown && (
-                                <div>
-                                    <button
-                                        onClick={() => setBreakdownOpen(!breakdownOpen)}
-                                        className="flex items-center gap-1 text-xs text-zinc-500 hover:text-zinc-700 transition-colors cursor-pointer"
-                                    >
-                                        {breakdownOpen ? (
-                                            <ChevronUp className="h-3 w-3" />
-                                        ) : (
-                                            <ChevronDown className="h-3 w-3" />
-                                        )}
-                                        Breakdown
-                                    </button>
-
-                                    {breakdownOpen && (
-                                        <div className="mt-2 space-y-2 pl-1">
-                                            {usage!.breakdown!.length > 0 ? (
-                                                usage!.breakdown!.map((item) => (
-                                                    <div
-                                                        key={item.featureId}
-                                                        className="flex items-center justify-between"
-                                                    >
-                                                        <span className="text-xs text-zinc-500">
-                                                            {item.label}
-                                                        </span>
-                                                        <span className="text-xs tabular-nums text-zinc-600">
-                                                            {formatDollars(item.dollarAmount)}
-                                                        </span>
-                                                    </div>
-                                                ))
-                                            ) : (
-                                                <p className="text-xs text-zinc-400">No usage data available</p>
-                                            )}
-                                        </div>
-                                    )}
-                                </div>
-                            )}
                         </div>
                     ) : dataReady ? (
                         /* ── Hobby: Raw count display ──────────────── */

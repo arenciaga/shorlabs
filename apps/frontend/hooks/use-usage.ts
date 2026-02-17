@@ -12,12 +12,6 @@ interface Usage {
         balance: number
         currency: string
     } | null
-    breakdown: {
-        featureId: string
-        label: string
-        dollarAmount: number
-        rawUsage: number
-    }[] | null
     requests: {
         current: number
         limit: number | null

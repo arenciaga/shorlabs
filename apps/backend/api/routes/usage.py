@@ -11,7 +11,6 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from api.auth import get_current_user_id
 from api.db.dynamodb import get_throttle_state
-from api.services.credit_breakdown import calculate_usage_breakdown
 
 router = APIRouter(prefix="/api/projects", tags=["usage"])
 
@@ -54,7 +53,7 @@ async def get_org_usage_endpoint(
     Usage is tracked per organization (the billing entity), not per user.
     This aligns with industry standards (Vercel, Railway) where organizations pay for usage.
 
-    For Pro users (credit system): returns dollar-based credit usage with breakdown.
+    For Pro users (credit system): returns dollar-based credit usage.
     For Hobby users (raw features): returns raw invocation/compute counts.
     """
     customer = _fetch_autumn_customer(org_id)
@@ -69,8 +68,6 @@ async def get_org_usage_endpoint(
     has_credit_system = credits_included is not None and credits_included > 0
 
     credits_response = None
-    breakdown_response = None
-
     if has_credit_system:
         # Credit system: values are in cents
         credits_usage = float(usd_credits.get("usage", 0) or 0)
@@ -84,9 +81,6 @@ async def get_org_usage_endpoint(
             "balance": round(credits_balance / 100, 2),
             "currency": "USD",
         }
-
-        # Calculate breakdown using the credit breakdown service
-        breakdown_response = calculate_usage_breakdown(org_id, features, usd_credits) or []
 
     # ── Raw counts (Hobby users, or fallback) ────────────────────────
     inv_balance = inv.get("balance")
@@ -164,7 +158,6 @@ async def get_org_usage_endpoint(
 
     return {
         "credits": credits_response,
-        "breakdown": breakdown_response,
         "requests": {
             "current": current_invocations,
             "limit": included_invocations if not has_credit_system else None,

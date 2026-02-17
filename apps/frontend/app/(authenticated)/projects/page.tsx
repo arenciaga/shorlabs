@@ -63,6 +63,44 @@ const getProjectGradient = (id: string) => {
     return gradients[Math.abs(hash) % gradients.length]
 }
 
+const getFaviconUrl = (projectUrl: string | null) => {
+    if (!projectUrl) return null
+
+    try {
+        const normalizedUrl = /^https?:\/\//i.test(projectUrl) ? projectUrl : `https://${projectUrl}`
+        const parsedUrl = new URL(normalizedUrl)
+        return `${parsedUrl.origin}/favicon.ico`
+    } catch {
+        return null
+    }
+}
+
+function ProjectAvatar({ projectId, projectName, projectUrl }: { projectId: string; projectName: string; projectUrl: string | null }) {
+    const [hasFaviconError, setHasFaviconError] = useState(false)
+    const faviconUrl = getFaviconUrl(projectUrl)
+
+    if (!faviconUrl || hasFaviconError) {
+        return (
+            <div
+                className="w-10 h-10 shrink-0 rounded-full"
+                style={{ background: getProjectGradient(projectId) }}
+            />
+        )
+    }
+
+    return (
+        <div className="w-10 h-10 shrink-0 rounded-full overflow-hidden bg-white border border-zinc-200">
+            <img
+                src={faviconUrl}
+                alt={`${projectName} favicon`}
+                className="w-full h-full object-cover"
+                loading="lazy"
+                onError={() => setHasFaviconError(true)}
+            />
+        </div>
+    )
+}
+
 export default function ProjectsPage() {
     const { getToken, isLoaded, orgId } = useAuth()
     const { isPro, planLabel } = useIsPro()
@@ -273,8 +311,12 @@ export default function ProjectsPage() {
                                             <div className="bg-white border border-zinc-200 rounded-xl p-5 transition-all duration-200 hover:border-zinc-300 hover:shadow-lg hover:shadow-zinc-200/50">
                                                 {/* Top: Icon + Name + Status */}
                                                 <div className="flex items-start justify-between mb-4">
-                                                    <div className="flex items-center gap-3 min-w-0">
-                                                        <div className="w-10 h-10 shrink-0 rounded-full" style={{ background: getProjectGradient(project.project_id) }} />
+                                                <div className="flex items-center gap-3 min-w-0">
+                                                        <ProjectAvatar
+                                                            projectId={project.project_id}
+                                                            projectName={project.name}
+                                                            projectUrl={project.custom_url || project.function_url}
+                                                        />
                                                         <div className="min-w-0">
                                                             <h3 className="font-semibold text-[15px] text-zinc-900 group-hover:text-black transition-colors truncate">
                                                                 {project.name.toLowerCase().replace(/_/g, '-')}

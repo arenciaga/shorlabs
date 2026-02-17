@@ -6,7 +6,7 @@ based on the subdomain or custom domain to the correct user's Lambda function.
 
 Routing priority:
 1. *.shorlabs.com → subdomain lookup (existing flow)
-2. Any other domain → custom domain lookup via DOMAIN# item (O(1) GetItem)
+2. Any other domain → custom domain lookup via shorlabs-domains table (O(1) GetItem)
 
 Deployed to us-east-1 (required for Lambda@Edge).
 
@@ -17,6 +17,7 @@ Note: Lambda@Edge has limitations:
 """
 
 import json
+import os
 import boto3
 from botocore.config import Config
 
@@ -30,7 +31,10 @@ dynamodb_config = Config(
 )
 dynamodb = boto3.resource('dynamodb', config=dynamodb_config)
 
-TABLE_NAME = 'shorlabs-projects'
+# Projects table for subdomain lookup; domains table for custom domain lookup
+TABLE_NAME = os.environ.get('DYNAMODB_TABLE', 'shorlabs-projects')
+DOMAINS_TABLE_NAME = os.environ.get('DOMAINS_TABLE', 'shorlabs-domains')
+DOMAIN_ITEM_SK = 'META'
 SHORLABS_DOMAIN = 'shorlabs.com'
 RESERVED_SUBDOMAINS = {'www', 'api', 'app', 'admin', 'dashboard', 'docs'}
 
@@ -160,16 +164,17 @@ def _lookup_project_by_custom_domain(domain: str) -> dict | None:
     """
     Look up project by custom domain in DynamoDB.
 
-    Uses direct GetItem on PK=DOMAIN#{domain} — O(1), no scan.
+    Uses the shorlabs-domains table: GetItem on domain (PK) + SK — O(1).
     Only returns projects with ACTIVE status.
     """
     try:
-        table = dynamodb.Table(TABLE_NAME)
+        table = dynamodb.Table(DOMAINS_TABLE_NAME)
+        domain_lower = domain.lower()
 
         response = table.get_item(
             Key={
-                'PK': f'DOMAIN#{domain}',
-                'SK': 'DOMAIN',
+                'domain': domain_lower,
+                'SK': DOMAIN_ITEM_SK,
             },
             ProjectionExpression="function_url, #st, project_id",
             ExpressionAttributeNames={"#st": "status"},

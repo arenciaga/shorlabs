@@ -36,8 +36,9 @@ ALLOWED_ORIGINS = [o for o in ALLOWED_ORIGINS if o]
 async def lifespan(app: FastAPI):
     """Application lifespan events."""
     # Startup: ensure DynamoDB tables exist
-    from api.db.dynamodb import get_or_create_table
+    from api.db.dynamodb import get_or_create_table, get_or_create_domains_table
     get_or_create_table()  # Projects table
+    get_or_create_domains_table()  # Custom domains table
     yield
     # Shutdown: nothing to do
 

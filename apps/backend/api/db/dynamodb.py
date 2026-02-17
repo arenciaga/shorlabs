@@ -17,6 +17,7 @@ from boto3.dynamodb.conditions import Key
 # Table names
 TABLE_NAME = os.environ.get("DYNAMODB_TABLE", "shorlabs-projects")
 DEPLOYMENTS_TABLE_NAME = os.environ.get("DEPLOYMENTS_TABLE", "shorlabs-deployments")
+DOMAINS_TABLE_NAME = os.environ.get("DOMAINS_TABLE", "shorlabs-domains")
 
 # Shorlabs domain for custom URLs
 SHORLABS_DOMAIN = os.environ.get("SHORLABS_DOMAIN", "shorlabs.com")
@@ -64,6 +65,50 @@ def get_or_create_table():
     )
     table.wait_until_exists()
     print(f"✅ Created DynamoDB table: {TABLE_NAME}")
+    return table
+
+
+def get_or_create_domains_table():
+    """
+    Get or create the dedicated custom domains table.
+
+    Schema:
+      - PK: domain (HASH), lowercase domain name
+      - SK: "META" (RANGE), fixed value for single item per domain
+      - GSI project_id-index: list domains by project_id
+    """
+    try:
+        table = dynamodb.Table(DOMAINS_TABLE_NAME)
+        table.load()
+        return table
+    except dynamodb.meta.client.exceptions.ResourceNotFoundException:
+        pass
+
+    print(f"📦 Creating DynamoDB domains table: {DOMAINS_TABLE_NAME}")
+    table = dynamodb.create_table(
+        TableName=DOMAINS_TABLE_NAME,
+        KeySchema=[
+            {"AttributeName": "domain", "KeyType": "HASH"},
+            {"AttributeName": "SK", "KeyType": "RANGE"},
+        ],
+        AttributeDefinitions=[
+            {"AttributeName": "domain", "AttributeType": "S"},
+            {"AttributeName": "SK", "AttributeType": "S"},
+            {"AttributeName": "project_id", "AttributeType": "S"},
+        ],
+        GlobalSecondaryIndexes=[
+            {
+                "IndexName": "project_id-index",
+                "KeySchema": [
+                    {"AttributeName": "project_id", "KeyType": "HASH"},
+                ],
+                "Projection": {"ProjectionType": "ALL"},
+            },
+        ],
+        BillingMode="PAY_PER_REQUEST",
+    )
+    table.wait_until_exists()
+    print(f"✅ Created DynamoDB table: {DOMAINS_TABLE_NAME}")
     return table
 
 
@@ -348,16 +393,18 @@ def delete_project(project_id: str) -> bool:
 # CUSTOM DOMAIN OPERATIONS
 # ─────────────────────────────────────────────────────────────
 
-# Custom domains are stored in the projects table with:
-#   PK = DOMAIN#{domain}
-#   SK = DOMAIN
-# This gives O(1) lookup for Lambda@Edge routing via GetItem.
+# Custom domains are stored in the dedicated shorlabs-domains table:
+#   PK = domain (lowercase), SK = "META"
+# O(1) lookup for Lambda@Edge routing via GetItem.
 
 # Import CloudFront routing endpoint for CNAME target default
 CLOUDFRONT_ROUTING_ENDPOINT = os.environ.get(
     "CLOUDFRONT_ROUTING_ENDPOINT", "d34dyjn0btmcwo.cloudfront.net"
 )
 CNAME_TARGET = os.environ.get("CNAME_TARGET", CLOUDFRONT_ROUTING_ENDPOINT)
+
+# Fixed SK for single item per domain in the domains table
+DOMAIN_ITEM_SK = "META"
 
 
 def add_custom_domain(
@@ -369,15 +416,15 @@ def add_custom_domain(
     """
     Add a custom domain mapping for a project.
 
-    Creates a DOMAIN# item in the projects table for fast edge lookups.
+    Creates an item in the shorlabs-domains table for fast edge lookups.
     """
-    table = get_or_create_table()
+    table = get_or_create_domains_table()
     now = datetime.utcnow().isoformat()
+    domain_lower = domain.lower()
 
     item = {
-        "PK": f"DOMAIN#{domain.lower()}",
-        "SK": "DOMAIN",
-        "domain": domain.lower(),
+        "domain": domain_lower,
+        "SK": DOMAIN_ITEM_SK,
         "project_id": project_id,
         "organization_id": org_id,
         "function_url": function_url,
@@ -392,16 +439,16 @@ def add_custom_domain(
 
 def get_domain_item(domain: str) -> Optional[dict]:
     """Get a custom domain item by domain name. O(1) via GetItem."""
-    table = get_or_create_table()
+    table = get_or_create_domains_table()
     response = table.get_item(
-        Key={"PK": f"DOMAIN#{domain.lower()}", "SK": "DOMAIN"},
+        Key={"domain": domain.lower(), "SK": DOMAIN_ITEM_SK},
     )
     return response.get("Item")
 
 
 def update_domain(domain: str, updates: dict) -> Optional[dict]:
     """Update a custom domain item."""
-    table = get_or_create_table()
+    table = get_or_create_domains_table()
     updates["updated_at"] = datetime.utcnow().isoformat()
 
     update_expr = "SET " + ", ".join(f"#{k} = :{k}" for k in updates.keys())
@@ -409,7 +456,7 @@ def update_domain(domain: str, updates: dict) -> Optional[dict]:
     expr_values = {f":{k}": v for k, v in updates.items()}
 
     response = table.update_item(
-        Key={"PK": f"DOMAIN#{domain.lower()}", "SK": "DOMAIN"},
+        Key={"domain": domain.lower(), "SK": DOMAIN_ITEM_SK},
         UpdateExpression=update_expr,
         ExpressionAttributeNames=expr_names,
         ExpressionAttributeValues=expr_values,
@@ -420,8 +467,8 @@ def update_domain(domain: str, updates: dict) -> Optional[dict]:
 
 def delete_domain_item(domain: str) -> bool:
     """Delete a custom domain item."""
-    table = get_or_create_table()
-    table.delete_item(Key={"PK": f"DOMAIN#{domain.lower()}", "SK": "DOMAIN"})
+    table = get_or_create_domains_table()
+    table.delete_item(Key={"domain": domain.lower(), "SK": DOMAIN_ITEM_SK})
     return True
 
 
@@ -429,15 +476,12 @@ def list_project_domains(project_id: str) -> list:
     """
     List all custom domain items for a project.
 
-    Scans for DOMAIN# items with matching project_id.
+    Uses project_id-index GSI on the domains table.
     """
-    table = get_or_create_table()
-    response = table.scan(
-        FilterExpression="project_id = :pid AND begins_with(PK, :pk_prefix)",
-        ExpressionAttributeValues={
-            ":pid": project_id,
-            ":pk_prefix": "DOMAIN#",
-        },
+    table = get_or_create_domains_table()
+    response = table.query(
+        IndexName="project_id-index",
+        KeyConditionExpression=Key("project_id").eq(project_id),
     )
     return response.get("Items", [])
 
@@ -448,9 +492,9 @@ def get_project_by_custom_domain(domain: str) -> Optional[dict]:
 
     Returns minimal data needed for routing (function_url, status).
     """
-    table = get_or_create_table()
+    table = get_or_create_domains_table()
     response = table.get_item(
-        Key={"PK": f"DOMAIN#{domain.lower()}", "SK": "DOMAIN"},
+        Key={"domain": domain.lower(), "SK": DOMAIN_ITEM_SK},
         ProjectionExpression="function_url, #st, project_id",
         ExpressionAttributeNames={"#st": "status"},
     )

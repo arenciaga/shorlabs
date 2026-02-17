@@ -158,16 +158,13 @@ export default async function BlogPost({ params }: Props) {
         <article>
           {/* Top bar */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-4 sm:pb-6 border-b border-border mb-4 sm:mb-6">
-            <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3">
               <Link
                 href="/blog"
                 className="inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-foreground no-underline hover:opacity-70 transition-opacity"
               >
                 ‹ Blog
               </Link>
-              <span className="inline-block px-2.5 py-0.5 rounded-full bg-foreground text-background text-[0.6rem] sm:text-[0.65rem] font-semibold uppercase tracking-wider">
-                {post.meta.category}
-              </span>
             </div>
             <div className="flex items-center gap-1.5 sm:gap-2">
               <button

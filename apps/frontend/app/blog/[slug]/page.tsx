@@ -73,7 +73,7 @@ function getTextFromNode(node: ReactNode): string {
     return node.map(getTextFromNode).join("");
   }
 
-  if (isValidElement(node)) {
+  if (isValidElement<{ children?: ReactNode }>(node)) {
     return getTextFromNode(node.props.children);
   }
 

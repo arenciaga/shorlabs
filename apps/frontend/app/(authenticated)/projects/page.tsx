@@ -318,8 +318,9 @@ export default function ProjectsPage() {
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                                 {filteredProjects.map((project) => {
                                     const status = STATUS_CONFIG[project.status] || STATUS_CONFIG.PENDING
-                                    const displayUrl = project.custom_url || project.function_url
-                                    const projectHost = getProjectHost(displayUrl)
+                                    const preferredUrl = project.custom_url?.trim() || project.function_url?.trim() || null
+                                    const normalizedDisplayUrl = normalizeUrl(preferredUrl)
+                                    const projectHost = getProjectHost(preferredUrl)
                                     return (
                                         <Link
                                             key={project.project_id}
@@ -333,7 +334,7 @@ export default function ProjectsPage() {
                                                         <ProjectAvatar
                                                             projectId={project.project_id}
                                                             projectName={project.name}
-                                                            projectUrl={displayUrl}
+                                                            projectUrl={preferredUrl}
                                                         />
                                                         <div className="min-w-0">
                                                             <h3 className="font-semibold text-[15px] text-zinc-900 group-hover:text-black transition-colors truncate">
@@ -382,12 +383,12 @@ export default function ProjectsPage() {
                                                         >
                                                             <Github className="h-3.5 w-3.5" />
                                                         </button>
-                                                        {displayUrl && (
+                                                        {normalizedDisplayUrl && (
                                                             <button
                                                                 onClick={(e) => {
                                                                     e.preventDefault()
                                                                     e.stopPropagation()
-                                                                    window.open(displayUrl, "_blank")
+                                                                    window.open(normalizedDisplayUrl, "_blank")
                                                                 }}
                                                                 className="p-1.5 rounded-md text-zinc-300 hover:text-zinc-600 hover:bg-zinc-50 transition-colors cursor-pointer"
                                                             >

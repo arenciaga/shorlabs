@@ -79,11 +79,15 @@ const getProjectHost = (projectUrl: string | null) => {
 }
 
 const getWebsiteIconUrl = (projectUrl: string | null) => {
-    const host = getProjectHost(projectUrl)
-    if (!host) return null
+    const normalized = normalizeUrl(projectUrl)
+    if (!normalized) return null
 
-    // Uses domain-based website icon lookup (not direct /favicon.ico fetching).
-    return `https://logo.clearbit.com/${host}`
+    try {
+        const origin = new URL(normalized).origin
+        return `${origin}/favicon.ico`
+    } catch {
+        return null
+    }
 }
 
 function ProjectAvatar({ projectId, projectName, projectUrl }: { projectId: string; projectName: string; projectUrl: string | null }) {
@@ -319,6 +323,7 @@ export default function ProjectsPage() {
                                 {filteredProjects.map((project) => {
                                     const status = STATUS_CONFIG[project.status] || STATUS_CONFIG.PENDING
                                     const displayUrl = project.custom_url || project.function_url
+                                    const normalizedDisplayUrl = normalizeUrl(displayUrl)
                                     const projectHost = getProjectHost(displayUrl)
                                     return (
                                         <Link
@@ -331,6 +336,7 @@ export default function ProjectsPage() {
                                                 <div className="flex items-start justify-between mb-4">
                                                 <div className="flex items-center gap-3 min-w-0">
                                                         <ProjectAvatar
+                                                            key={`avatar-${displayUrl || project.project_id}`}
                                                             projectId={project.project_id}
                                                             projectName={project.name}
                                                             projectUrl={displayUrl}
@@ -382,12 +388,12 @@ export default function ProjectsPage() {
                                                         >
                                                             <Github className="h-3.5 w-3.5" />
                                                         </button>
-                                                        {displayUrl && (
+                                                        {normalizedDisplayUrl && (
                                                             <button
                                                                 onClick={(e) => {
                                                                     e.preventDefault()
                                                                     e.stopPropagation()
-                                                                    window.open(displayUrl, "_blank")
+                                                                    window.open(normalizedDisplayUrl, "_blank")
                                                                 }}
                                                                 className="p-1.5 rounded-md text-zinc-300 hover:text-zinc-600 hover:bg-zinc-50 transition-colors cursor-pointer"
                                                             >

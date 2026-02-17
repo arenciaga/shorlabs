@@ -5,12 +5,39 @@ import { getAllPosts } from "@/lib/blog";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = {
-  title: "Blog",
+  title: "Shorlabs Blog | Deployment, Cloud Cost Optimization, and Growth Playbooks",
   description:
-    "Latest articles, tutorials, and updates from the Shorlabs team on backend deployments and developer tooling.",
+    "Practical guides for indie builders, startups, and enterprise teams to reduce cloud costs, deploy faster, and scale reliably with modern backend and full-stack workflows.",
   alternates: {
     canonical: "/blog",
   },
+  openGraph: {
+    title: "Shorlabs Blog | Deployment, Cloud Cost Optimization, and Growth Playbooks",
+    description:
+      "Practical guides for indie builders, startups, and enterprise teams to reduce cloud costs, deploy faster, and scale reliably with modern backend and full-stack workflows.",
+    url: "https://shorlabs.com/blog",
+    type: "website",
+    siteName: "Shorlabs",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Shorlabs Blog | Deployment, Cloud Cost Optimization, and Growth Playbooks",
+    description:
+      "Practical guides for indie builders, startups, and enterprise teams to reduce cloud costs, deploy faster, and scale reliably with modern backend and full-stack workflows.",
+  },
+  keywords: [
+    "deployment tutorials",
+    "cloud cost optimization",
+    "serverless backend",
+    "FastAPI deployment",
+    "Django deployment",
+    "Flask deployment",
+    "startup infrastructure",
+    "enterprise deployment",
+    "SaaS scaling",
+    "developer growth",
+    "Shorlabs",
+  ],
 };
 
 function formatDate(dateStr: string) {
@@ -30,7 +57,7 @@ export default function Blog() {
     "@type": "Blog",
     name: "Shorlabs Blog",
     description:
-      "Latest articles, tutorials, and updates from the Shorlabs team on backend deployments and developer tooling.",
+      "Practical guides for indie builders, startups, and enterprise teams to reduce cloud costs, deploy faster, and scale reliably with modern backend and full-stack workflows.",
     url: "https://shorlabs.com/blog",
     publisher: {
       "@type": "Organization",

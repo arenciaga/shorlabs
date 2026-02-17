@@ -3,6 +3,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { notFound } from "next/navigation";
 import { MDXRemote } from "next-mdx-remote/rsc";
+import { isValidElement, type HTMLAttributes, type ReactNode } from "react";
 import { getAllPosts, getPostBySlug } from "@/lib/blog";
 
 export function generateStaticParams() {
@@ -37,20 +38,46 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
+function slugifyHeading(text: string) {
+  const slug = text
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-");
+
+  return slug || "section";
+}
+
 /* Extract headings from markdown content for the TOC */
 function extractHeadings(content: string) {
   const headings: { text: string; level: number; id: string }[] = [];
+  const slugCounts = new Map<string, number>();
   const regex = /^(#{2,3})\s+(.+)$/gm;
   let match;
   while ((match = regex.exec(content)) !== null) {
     const text = match[2].trim();
-    const id = text
-      .toLowerCase()
-      .replace(/[^a-z0-9\s-]/g, "")
-      .replace(/\s+/g, "-");
+    const baseId = slugifyHeading(text);
+    const count = slugCounts.get(baseId) ?? 0;
+    slugCounts.set(baseId, count + 1);
+    const id = count === 0 ? baseId : `${baseId}-${count}`;
     headings.push({ text, level: match[1].length, id });
   }
   return headings;
+}
+
+function getTextFromNode(node: ReactNode): string {
+  if (typeof node === "string" || typeof node === "number") {
+    return String(node);
+  }
+
+  if (Array.isArray(node)) {
+    return node.map(getTextFromNode).join("");
+  }
+
+  if (isValidElement(node)) {
+    return getTextFromNode(node.props.children);
+  }
+
+  return "";
 }
 
 function formatDate(dateStr: string) {
@@ -105,6 +132,28 @@ export default async function BlogPost({ params }: Props) {
   }
 
   const headings = extractHeadings(post.content);
+  const renderedHeadingCounts = new Map<string, number>();
+
+  const getHeadingId = (children: ReactNode) => {
+    const headingText = getTextFromNode(children).trim();
+    const baseId = slugifyHeading(headingText);
+    const count = renderedHeadingCounts.get(baseId) ?? 0;
+    renderedHeadingCounts.set(baseId, count + 1);
+    return count === 0 ? baseId : `${baseId}-${count}`;
+  };
+
+  const mdxComponents = {
+    h2: ({ children, ...props }: HTMLAttributes<HTMLHeadingElement>) => (
+      <h2 id={getHeadingId(children)} {...props}>
+        {children}
+      </h2>
+    ),
+    h3: ({ children, ...props }: HTMLAttributes<HTMLHeadingElement>) => (
+      <h3 id={getHeadingId(children)} {...props}>
+        {children}
+      </h3>
+    ),
+  };
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -246,8 +295,8 @@ export default async function BlogPost({ params }: Props) {
           )}
 
           {/* MDX content */}
-          <div className="prose prose-neutral max-w-none text-sm sm:text-base lg:text-[1.05rem] leading-relaxed lg:leading-[1.8] prose-headings:scroll-mt-20 prose-h2:text-lg prose-h2:sm:text-xl prose-h2:lg:text-2xl prose-h2:font-bold prose-h2:tracking-tight prose-h2:mt-8 prose-h2:lg:mt-10 prose-h2:mb-3 prose-h3:text-base prose-h3:sm:text-lg prose-h3:font-semibold prose-h3:tracking-tight prose-h3:mt-6 prose-h3:lg:mt-8 prose-h3:mb-2 prose-p:mb-4 prose-code:text-[0.9em] prose-code:bg-accent prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-pre:rounded-xl prose-pre:p-4 prose-pre:sm:p-5 prose-pre:overflow-x-auto">
-            <MDXRemote source={post.content} />
+          <div className="prose max-w-none text-sm sm:text-base lg:text-[1.05rem] leading-relaxed lg:leading-[1.8] text-foreground prose-headings:text-foreground prose-strong:text-foreground prose-p:text-foreground prose-li:text-foreground prose-blockquote:text-foreground prose-a:text-foreground prose-a:font-medium prose-a:no-underline hover:prose-a:opacity-70 prose-headings:scroll-mt-20 prose-h2:text-lg prose-h2:sm:text-xl prose-h2:lg:text-2xl prose-h2:font-bold prose-h2:tracking-tight prose-h2:mt-8 prose-h2:lg:mt-10 prose-h2:mb-3 prose-h3:text-base prose-h3:sm:text-lg prose-h3:font-semibold prose-h3:tracking-tight prose-h3:mt-6 prose-h3:lg:mt-8 prose-h3:mb-2 prose-p:mb-4 prose-code:text-[0.9em] prose-code:bg-accent prose-code:text-foreground prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-pre:rounded-xl prose-pre:p-4 prose-pre:sm:p-5 prose-pre:overflow-x-auto prose-pre:text-foreground prose-pre:bg-accent">
+            <MDXRemote source={post.content} components={mdxComponents} />
           </div>
         </article>
       </div>

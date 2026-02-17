@@ -7,7 +7,6 @@ import Link from "next/link"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card"
 import { UpgradeModal, useUpgradeModal } from "@/components/upgrade-modal"
 import { UsagePanel } from "@/components/UsagePanel"
 import { useIsPro } from "@/hooks/use-is-pro"
@@ -63,40 +62,57 @@ const getProjectGradient = (id: string) => {
     return gradients[Math.abs(hash) % gradients.length]
 }
 
-const getFaviconUrl = (projectUrl: string | null) => {
-    if (!projectUrl) return null
+const normalizeUrl = (rawUrl: string | null) => {
+    if (!rawUrl) return null
+    return /^https?:\/\//i.test(rawUrl) ? rawUrl : `https://${rawUrl}`
+}
+
+const getProjectHost = (projectUrl: string | null) => {
+    const normalized = normalizeUrl(projectUrl)
+    if (!normalized) return null
 
     try {
-        const normalizedUrl = /^https?:\/\//i.test(projectUrl) ? projectUrl : `https://${projectUrl}`
-        const parsedUrl = new URL(normalizedUrl)
-        return `${parsedUrl.origin}/favicon.ico`
+        return new URL(normalized).hostname
     } catch {
         return null
     }
 }
 
-function ProjectAvatar({ projectId, projectName, projectUrl }: { projectId: string; projectName: string; projectUrl: string | null }) {
-    const [hasFaviconError, setHasFaviconError] = useState(false)
-    const faviconUrl = getFaviconUrl(projectUrl)
+const getWebsiteIconUrl = (projectUrl: string | null) => {
+    const host = getProjectHost(projectUrl)
+    if (!host) return null
 
-    if (!faviconUrl || hasFaviconError) {
+    // Uses domain-based website icon lookup (not direct /favicon.ico fetching).
+    return `https://logo.clearbit.com/${host}`
+}
+
+function ProjectAvatar({ projectId, projectName, projectUrl }: { projectId: string; projectName: string; projectUrl: string | null }) {
+    const [iconLoadError, setIconLoadError] = useState(false)
+    const iconLabel = (projectName || "?").trim().charAt(0).toUpperCase()
+    const websiteIconUrl = getWebsiteIconUrl(projectUrl)
+
+    if (websiteIconUrl && !iconLoadError) {
         return (
-            <div
-                className="w-10 h-10 shrink-0 rounded-full"
-                style={{ background: getProjectGradient(projectId) }}
-            />
+            <div className="w-10 h-10 shrink-0 rounded-full overflow-hidden bg-white border border-zinc-200">
+                <img
+                    src={websiteIconUrl}
+                    alt={`${projectName} website icon`}
+                    className="w-full h-full object-cover"
+                    loading="lazy"
+                    referrerPolicy="no-referrer"
+                    onError={() => setIconLoadError(true)}
+                />
+            </div>
         )
     }
 
     return (
-        <div className="w-10 h-10 shrink-0 rounded-full overflow-hidden bg-white border border-zinc-200">
-            <img
-                src={faviconUrl}
-                alt={`${projectName} favicon`}
-                className="w-full h-full object-cover"
-                loading="lazy"
-                onError={() => setHasFaviconError(true)}
-            />
+        <div
+            className="w-10 h-10 shrink-0 rounded-full flex items-center justify-center text-white text-sm font-semibold"
+            style={{ background: getProjectGradient(projectId) }}
+            aria-label={`${projectName} icon`}
+        >
+            {iconLabel}
         </div>
     )
 }
@@ -302,6 +318,8 @@ export default function ProjectsPage() {
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                                 {filteredProjects.map((project) => {
                                     const status = STATUS_CONFIG[project.status] || STATUS_CONFIG.PENDING
+                                    const displayUrl = project.custom_url || project.function_url
+                                    const projectHost = getProjectHost(displayUrl)
                                     return (
                                         <Link
                                             key={project.project_id}
@@ -315,15 +333,15 @@ export default function ProjectsPage() {
                                                         <ProjectAvatar
                                                             projectId={project.project_id}
                                                             projectName={project.name}
-                                                            projectUrl={project.custom_url || project.function_url}
+                                                            projectUrl={displayUrl}
                                                         />
                                                         <div className="min-w-0">
                                                             <h3 className="font-semibold text-[15px] text-zinc-900 group-hover:text-black transition-colors truncate">
                                                                 {project.name.toLowerCase().replace(/_/g, '-')}
                                                             </h3>
-                                                            {(project.custom_url || project.function_url) && (
+                                                            {projectHost && (
                                                                 <p className="text-xs text-zinc-400 truncate mt-0.5">
-                                                                    {(project.custom_url || project.function_url)!.replace("https://", "").split("/")[0]}
+                                                                    {projectHost}
                                                                 </p>
                                                             )}
                                                         </div>
@@ -364,12 +382,12 @@ export default function ProjectsPage() {
                                                         >
                                                             <Github className="h-3.5 w-3.5" />
                                                         </button>
-                                                        {(project.custom_url || project.function_url) && (
+                                                        {displayUrl && (
                                                             <button
                                                                 onClick={(e) => {
                                                                     e.preventDefault()
                                                                     e.stopPropagation()
-                                                                    window.open((project.custom_url || project.function_url)!, "_blank")
+                                                                    window.open(displayUrl, "_blank")
                                                                 }}
                                                                 className="p-1.5 rounded-md text-zinc-300 hover:text-zinc-600 hover:bg-zinc-50 transition-colors cursor-pointer"
                                                             >

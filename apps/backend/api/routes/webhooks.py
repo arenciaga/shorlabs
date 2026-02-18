@@ -107,18 +107,29 @@ async def github_webhook(request: Request):
         print(f"[webhook] push {full_name}: no matching project in org. org projects (sample): {repo_list}")
         return {"status": "ok", "deployments_triggered": 0, "reason": "no_matching_projects"}
 
-    # Optional: only deploy when push is to project's default branch (if we stored it)
-    # For now we deploy on every push to any branch (like many platforms default).
     github_token = await get_or_refresh_token_for_org(org_id)
     if not github_token:
         print(f"[webhook] push {full_name}: no GitHub token for org_id={org_id}")
         return {"status": "error", "reason": "no_github_token", "deployments_triggered": 0}
 
+    # Extract the branch name from ref (e.g. "refs/heads/main" → "main")
+    pushed_branch = ref.replace("refs/heads/", "") if ref.startswith("refs/heads/") else ref
+
     triggered = 0
+    skipped = 0
     for project in matching:
         project_id = project.get("project_id")
         if not project_id:
             continue
+
+        # Only deploy when push is to the project's production branch
+        # Default to "main" if not configured (also accept "master" as legacy fallback)
+        production_branch = project.get("branch") or project.get("default_branch") or "main"
+        if pushed_branch != production_branch:
+            print(f"[webhook] push {full_name}: skipping project_id={project_id} (pushed to '{pushed_branch}', production branch is '{production_branch}')")
+            skipped += 1
+            continue
+
         root_directory = project.get("root_directory") or "./"
         start_command = project.get("start_command") or "uvicorn main:app --host 0.0.0.0 --port 8080"
         env_vars = _json_safe_env_vars(project.get("env_vars") or {})
@@ -138,7 +149,7 @@ async def github_webhook(request: Request):
             timeout=timeout,
             ephemeral_storage=ephemeral_storage,
         )
-        print(f"[webhook] push {full_name}: triggered deploy for project_id={project_id}")
+        print(f"[webhook] push {full_name}@{pushed_branch}: triggered deploy for project_id={project_id}")
         triggered += 1
 
     return {
@@ -146,5 +157,7 @@ async def github_webhook(request: Request):
         "event": "push",
         "repository": full_name,
         "ref": ref,
+        "branch": pushed_branch,
         "deployments_triggered": triggered,
+        "deployments_skipped": skipped,
     }

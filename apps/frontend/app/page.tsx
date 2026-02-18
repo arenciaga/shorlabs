@@ -7,9 +7,9 @@ import { CTASection } from "@/components/CTASection";
 import { Footer } from "@/components/Footer";
 import SectionNavigation from "@/components/SectionNavigation";
 
-const homepageTitle = "Shorlabs | Ship Software in Peace.";
+const homepageTitle = "Shorlabs | The Full-Stack Deployment Platform";
 const homepageDescription =
-  "Deploy your frontend and backend, serverless. Pay only when your code runs.";
+  "Deploy your frontend and backend from one place. Serverless, so you only pay when your code runs.";
 
 export const metadata: Metadata = {
   title: {

@@ -21,9 +21,9 @@ const geistMono = Geist_Mono({
   display: "swap",
 });
 
-const homepageTitle = "Shorlabs | Ship Software in Peace.";
+const homepageTitle = "Shorlabs | The Full-Stack Deployment Platform";
 const homepageDescription =
-  "Deploy your frontend and backend, serverless. Pay only when your code runs.";
+  "Deploy your frontend and backend from one place. Serverless, so you only pay when your code runs.";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://shorlabs.com"),

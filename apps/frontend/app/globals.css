@@ -101,3 +101,171 @@
     background-position: -200% 0;
   }
 }
+
+/* ── rehype-pretty-code ─────────────────────────────── */
+
+/* Code block container */
+figure[data-rehype-pretty-code-figure] {
+  margin: 1.25rem -1rem;
+  max-width: calc(100% + 2rem);
+}
+
+@media (min-width: 640px) {
+  figure[data-rehype-pretty-code-figure] {
+    margin: 1.5rem 0;
+    max-width: 100%;
+  }
+}
+
+/* Pre block — force Shiki theme bg/color over everything */
+figure[data-rehype-pretty-code-figure] pre,
+.prose figure[data-rehype-pretty-code-figure] pre,
+.prose pre:has(> code[data-theme]) {
+  overflow-x: auto !important;
+  -webkit-overflow-scrolling: touch;
+  border-radius: 0 !important;
+  padding: 0.875rem 0 !important;
+  font-size: 0.8rem !important;
+  line-height: 1.6 !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  background-color: #24292e !important;
+  color: #e1e4e8 !important;
+  max-width: 100% !important;
+  word-break: normal !important;
+  overflow-wrap: normal !important;
+}
+
+@media (min-width: 640px) {
+
+  figure[data-rehype-pretty-code-figure] pre,
+  .prose figure[data-rehype-pretty-code-figure] pre,
+  .prose pre:has(> code[data-theme]) {
+    border-radius: 0.625rem !important;
+    padding: 1rem 0 !important;
+    font-size: 0.85rem !important;
+    line-height: 1.7 !important;
+  }
+}
+
+@media (min-width: 1024px) {
+
+  figure[data-rehype-pretty-code-figure] pre,
+  .prose figure[data-rehype-pretty-code-figure] pre,
+  .prose pre:has(> code[data-theme]) {
+    border-radius: 0.75rem !important;
+    font-size: 0.875rem !important;
+  }
+}
+
+/* Code inside pre — kill any prose overrides */
+figure[data-rehype-pretty-code-figure] pre code,
+.prose figure[data-rehype-pretty-code-figure] pre code,
+.prose pre code[data-theme] {
+  background: transparent !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+  font-size: inherit !important;
+  color: inherit !important;
+  white-space: pre !important;
+  display: block !important;
+  width: fit-content !important;
+  min-width: 100% !important;
+}
+
+/* Each line */
+figure[data-rehype-pretty-code-figure] pre [data-line] {
+  padding: 0 0.875rem;
+}
+
+@media (min-width: 640px) {
+  figure[data-rehype-pretty-code-figure] pre [data-line] {
+    padding: 0 1.25rem;
+  }
+}
+
+/* Highlighted lines */
+figure[data-rehype-pretty-code-figure] pre [data-highlighted-line] {
+  background-color: rgba(255, 255, 255, 0.06);
+}
+
+/* Highlighted words/chars */
+figure[data-rehype-pretty-code-figure] [data-highlighted-chars] {
+  background-color: rgba(255, 255, 255, 0.12);
+  border-radius: 0.25rem;
+  padding: 0.125rem 0.25rem;
+}
+
+/* Code block title (e.g. ```py title="main.py") */
+figure[data-rehype-pretty-code-figure] figcaption[data-rehype-pretty-code-title] {
+  font-size: 0.75rem;
+  font-family: var(--font-mono);
+  color: #ccc;
+  padding: 0.4rem 0.875rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: none;
+  border-radius: 0;
+  background: #1e1e1e;
+}
+
+@media (min-width: 640px) {
+  figure[data-rehype-pretty-code-figure] figcaption[data-rehype-pretty-code-title] {
+    font-size: 0.8rem;
+    padding: 0.5rem 1.25rem;
+    border-radius: 0.625rem 0.625rem 0 0;
+  }
+}
+
+@media (min-width: 1024px) {
+  figure[data-rehype-pretty-code-figure] figcaption[data-rehype-pretty-code-title] {
+    border-radius: 0.75rem 0.75rem 0 0;
+  }
+}
+
+figure[data-rehype-pretty-code-figure]:has(figcaption) pre {
+  border-radius: 0 0 0 0 !important;
+}
+
+@media (min-width: 640px) {
+  figure[data-rehype-pretty-code-figure]:has(figcaption) pre {
+    border-radius: 0 0 0.625rem 0.625rem !important;
+  }
+}
+
+@media (min-width: 1024px) {
+  figure[data-rehype-pretty-code-figure]:has(figcaption) pre {
+    border-radius: 0 0 0.75rem 0.75rem !important;
+  }
+}
+
+/* Inline code (NOT inside a code block) */
+.prose :not(pre)>code:not([data-theme]) {
+  font-size: 0.85em;
+  background-color: var(--accent);
+  color: var(--foreground);
+  padding: 0.125rem 0.35rem;
+  border-radius: 0.25rem;
+  word-break: break-word;
+}
+
+@media (min-width: 640px) {
+  .prose :not(pre)>code:not([data-theme]) {
+    font-size: 0.9em;
+    padding: 0.15rem 0.4rem;
+  }
+}
+
+/* Inline code highlighted by rehype-pretty-code */
+.prose code[data-theme] {
+  font-size: 0.85em;
+  padding: 0.125rem 0.3rem;
+  border-radius: 0.25rem;
+  background-color: rgba(0, 0, 0, 0.05) !important;
+  word-break: break-word;
+}
+
+@media (min-width: 640px) {
+  .prose code[data-theme] {
+    font-size: 0.875em;
+    padding: 0.15rem 0.35rem;
+  }
+}

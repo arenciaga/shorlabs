@@ -1,0 +1,172 @@
+---
+title: "How to Deploy a FastAPI App in Under 5 Minutes (No Docker Required)"
+date: "2026-02-24"
+summary: "Most Python deployment guides assume you know Docker, YAML, and cloud consoles. This one doesn't. Here's how to go from a FastAPI app in a GitHub repo to a live production URL in under 5 minutes — for free."
+author: "Aryan Kashyap"
+category: "Tutorial"
+image: "/images/blog/fastapi-deploy-hero.png"
+---
+
+## Why deploying Python backends is still painful
+
+You built something great with FastAPI. The API works locally, the routes are clean, and you're ready to share it with the world.
+
+Then you Google "how to deploy FastAPI" and get hit with a wall of complexity:
+
+- Write a Dockerfile
+- Set up a reverse proxy with Nginx
+- Provision an EC2 instance (or figure out ECS/Fargate)
+- Configure security groups, IAM roles, and environment variables in the AWS console
+- Set up a CI/CD pipeline to automate future deployments
+
+For a framework that takes 10 lines of code to write a working API, that's a lot of overhead just to put it on the internet.
+
+There's a simpler way. You can deploy a FastAPI app straight from your GitHub repo, without touching Docker, without writing YAML, and without opening the AWS console. It takes about 5 minutes, and it's free.
+
+## What you need
+
+Two things:
+
+1. **A GitHub repo** with a FastAPI app in it. Even a basic `main.py` with a single route works.
+2. **A Shorlabs account.** It's free — no credit card required.
+
+That's it. No Docker installed, no cloud accounts to configure, no CLI tools to learn.
+
+Here's a minimal FastAPI app that works out of the box:
+
+```python
+from fastapi import FastAPI
+
+app = FastAPI()
+
+@app.get("/")
+def read_root():
+    return {"message": "Hello from FastAPI!"}
+
+@app.get("/health")
+def health_check():
+    return {"status": "ok"}
+```
+
+If your app looks something like this (or is way more complex — doesn't matter), you're good to go.
+
+## Step 1: Connect your GitHub repo
+
+Head to [shorlabs.com](https://shorlabs.com) and sign in with Google. You'll land on your projects dashboard.
+
+Click **New Project**. Shorlabs will ask you to connect your GitHub account. Once connected, you'll see a list of your repositories. Pick the one with your FastAPI app.
+
+That's the first step done. No SSH keys, no deploy tokens — just a standard GitHub OAuth connection.
+
+## Step 2: Configure your project
+
+After selecting your repo, you'll see a configuration screen. Here's what each option means:
+
+**Project Name** — Give your project a name. This becomes part of your free subdomain (e.g., `my-api.shorlabs.com`).
+
+**Root Directory** — If your FastAPI app is in the root of your repo, leave this as `./`. If it's nested in a subfolder like `backend/`, set it to `backend/`.
+
+**Start Command** — Shorlabs auto-detects FastAPI and suggests the right command. For most apps, it will be:
+
+```
+uvicorn main:app --host 0.0.0.0 --port 8080
+```
+
+If your app entry point is in a different file, just adjust the `main:app` part. For example, if your file is `server.py` and your FastAPI instance is called `application`, use `uvicorn server:application --host 0.0.0.0 --port 8080`.
+
+**Memory** — Defaults to 1 GB. This is plenty for most FastAPI apps. You can bump it up later if you need to.
+
+**Timeout** — How long each request can run before timing out. Default is 30 seconds. If you're doing heavy processing (ML inference, large file uploads), increase this.
+
+**Ephemeral Storage** — Temporary disk space available during each request. Default is 1 GB. Most apps don't need to change this.
+
+## Step 3: Deploy
+
+Click **<u>Deploy</u>**. That's it.
+
+Behind the scenes, Shorlabs clones your repo, installs your Python dependencies from `requirements.txt`, packages everything into a serverless function, and deploys it. You'll see real-time logs streaming as this happens.
+
+The whole process usually takes 60 to 90 seconds. Once it's done, your project status changes to **LIVE**, and you get a URL like:
+
+```
+https://your-project.shorlabs.com
+```
+
+Hit that URL in your browser or with `curl`, and you'll see your FastAPI response.
+
+```bash
+curl https://your-project.shorlabs.com/
+# {"message": "Hello from FastAPI!"}
+```
+
+Your FastAPI app is now live on the internet. No Docker. No YAML. No AWS console.
+
+## Setting environment variables
+
+Most real apps need environment variables — database URLs, API keys, secret tokens. You don't want these hardcoded in your repo.
+
+In your project dashboard, go to the **Environment Variables** section. Add your variables as key-value pairs:
+
+```
+DATABASE_URL = postgresql://user:pass@host:5432/db
+SECRET_KEY = your-secret-key-here
+OPENAI_API_KEY = sk-...
+```
+
+Click **Save Variables**. On your next deployment, these will be available to your app through `os.environ` — exactly how you'd use them locally.
+
+```python
+import os
+from fastapi import FastAPI
+
+app = FastAPI()
+DATABASE_URL = os.environ.get("DATABASE_URL")
+```
+
+No `.env` files to manage on a server. No secrets stored in your repo.
+
+## Connecting a custom domain
+
+Your app gets a free `*.shorlabs.com` subdomain automatically. But if you want to use your own domain (like `api.yourcompany.com`), you can set that up too.
+
+In your project settings, go to the **Domains** section and enter your domain. Shorlabs will give you a CNAME record to add in your DNS provider (Cloudflare, Namecheap, Route 53 — wherever you manage your domain).
+
+Add the CNAME record, wait a few minutes for DNS to propagate, and your custom domain is live with automatic SSL.
+
+## Viewing real-time logs
+
+One thing that makes debugging deployed apps painful is not being able to see what's happening. On traditional setups, you need to SSH into a server, or dig through CloudWatch, or set up a logging pipeline.
+
+On Shorlabs, go to your project dashboard and click **Logs**. You'll see a live stream of your function's output — every `print()` statement, every request, every error traceback.
+
+If something's wrong, you'll see it here in real time. No extra setup.
+
+## What about costs?
+
+Shorlabs uses a **pay-per-request** model. Your app runs on serverless infrastructure, which means:
+
+- **No idle costs.** If nobody is hitting your API, you're not paying anything.
+- **Free tier included.** The Hobby plan gives you 3,000 requests/month and 1,200 GB-seconds of compute — free, forever, no credit card required.
+- **Scale when you need to.** If your app takes off, you only pay for what you use ($0.60 per million requests).
+
+Compare that to a $7/month server that sits idle 95% of the time.
+
+## Redeploying
+
+Made changes to your code? Push to GitHub, then click **Redeploy** in your project dashboard. Shorlabs pulls the latest code, rebuilds, and swaps in the new version. Zero downtime.
+
+You can also set up **auto-deploy** so that every push to your main branch triggers a new deployment automatically — no manual clicks needed.
+
+## Wrapping up
+
+Here's what just happened:
+
+1. You connected a GitHub repo.
+2. You configured a project name, start command, and memory.
+3. You clicked **<u>Deploy</u>**.
+
+Your FastAPI app is now live on a production URL, with environment variables, custom domain support, real-time logs, and pay-per-request pricing. The whole thing took under 5 minutes.
+
+No Docker. No YAML. No DevOps.
+
+[Deploy your FastAPI app free →](https://shorlabs.com/sign-in)

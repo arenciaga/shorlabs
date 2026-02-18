@@ -3,6 +3,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { notFound } from "next/navigation";
 import { MDXRemote } from "next-mdx-remote/rsc";
+import rehypePrettyCode from "rehype-pretty-code";
 import { isValidElement, type HTMLAttributes, type ReactNode } from "react";
 import { getAllPosts, getPostBySlug } from "@/lib/blog";
 
@@ -207,7 +208,7 @@ export default async function BlogPost({ params }: Props) {
         <article>
           {/* Top bar */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-4 sm:pb-6 border-b border-border mb-4 sm:mb-6">
-          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3">
               <Link
                 href="/blog"
                 className="inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-foreground no-underline hover:opacity-70 transition-opacity"
@@ -294,9 +295,24 @@ export default async function BlogPost({ params }: Props) {
             </div>
           )}
 
-          {/* MDX content */}
-          <div className="prose max-w-none text-sm sm:text-base lg:text-[1.05rem] leading-relaxed lg:leading-[1.8] text-foreground prose-headings:text-foreground prose-strong:text-foreground prose-p:text-foreground prose-li:text-foreground prose-blockquote:text-foreground prose-a:text-foreground prose-a:font-medium prose-a:no-underline hover:prose-a:opacity-70 prose-headings:scroll-mt-20 prose-h2:text-lg prose-h2:sm:text-xl prose-h2:lg:text-2xl prose-h2:font-bold prose-h2:tracking-tight prose-h2:mt-8 prose-h2:lg:mt-10 prose-h2:mb-3 prose-h3:text-base prose-h3:sm:text-lg prose-h3:font-semibold prose-h3:tracking-tight prose-h3:mt-6 prose-h3:lg:mt-8 prose-h3:mb-2 prose-p:mb-4 prose-code:text-[0.9em] prose-code:bg-accent prose-code:text-foreground prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-pre:rounded-xl prose-pre:p-4 prose-pre:sm:p-5 prose-pre:overflow-x-auto prose-pre:text-foreground prose-pre:bg-accent">
-            <MDXRemote source={post.content} components={mdxComponents} />
+          <div className="prose max-w-none text-sm sm:text-base lg:text-[1.05rem] leading-relaxed lg:leading-[1.8] text-foreground prose-headings:text-foreground prose-strong:text-foreground prose-p:text-foreground prose-li:text-foreground prose-blockquote:text-foreground prose-a:text-foreground prose-a:font-medium prose-a:no-underline hover:prose-a:opacity-70 prose-headings:scroll-mt-20 prose-h2:text-lg prose-h2:sm:text-xl prose-h2:lg:text-2xl prose-h2:font-bold prose-h2:tracking-tight prose-h2:mt-8 prose-h2:lg:mt-10 prose-h2:mb-3 prose-h3:text-base prose-h3:sm:text-lg prose-h3:font-semibold prose-h3:tracking-tight prose-h3:mt-6 prose-h3:lg:mt-8 prose-h3:mb-2 prose-p:mb-4">
+            <MDXRemote
+              source={post.content}
+              components={mdxComponents}
+              options={{
+                mdxOptions: {
+                  rehypePlugins: [
+                    [
+                      rehypePrettyCode,
+                      {
+                        theme: "github-dark",
+                        keepBackground: true,
+                      },
+                    ],
+                  ],
+                },
+              }}
+            />
           </div>
         </article>
       </div>

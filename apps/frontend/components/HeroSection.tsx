@@ -27,7 +27,7 @@ const HeroSection = () => {
 
                     {/* Headline */}
                     <h1 className="text-3xl sm:text-3xl md:text-4xl lg:text-5xl font-semibold text-gray-900 leading-[1.15] tracking-tight max-w-2xl">
-                        The Open Source Full-Stack Deployment Platform
+                        Open Source Full-Stack Deployment Platform
                     </h1>
 
                     {/* Subtitle */}

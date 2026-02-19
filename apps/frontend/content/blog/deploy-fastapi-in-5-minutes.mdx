@@ -56,6 +56,8 @@ Head to [shorlabs.com](https://shorlabs.com) and sign in with Google. You'll lan
 
 Click **New Project**. Shorlabs will ask you to connect your GitHub account. Once connected, you'll see a list of your repositories. Pick the one with your FastAPI app.
 
+![Selecting the FAST_API repository from the GitHub repo list in Shorlabs](https://i.ibb.co/qYHnNW58/Screenshot-2026-02-19-at-14-26-50.png)
+
 That's the first step done. No SSH keys, no deploy tokens — just a standard GitHub OAuth connection.
 
 ## Step 2: Configure your project
@@ -80,6 +82,8 @@ If your app entry point is in a different file, just adjust the `main:app` part.
 
 **Ephemeral Storage** — Temporary disk space available during each request. Default is 1 GB. Most apps don't need to change this.
 
+![Compute configuration screen showing memory, timeout, and temporary storage options](https://i.ibb.co/WWwY5Gcd/Screenshot-2026-02-19-at-14-27-19.png)
+
 ## Step 3: Deploy
 
 Click **<u>Deploy</u>**. That's it.
@@ -94,10 +98,14 @@ https://your-project.shorlabs.com
 
 Hit that URL in your browser or with `curl`, and you'll see your FastAPI response.
 
+![Shorlabs dashboard showing the FAST_API project building in real time](https://i.ibb.co/Wvs334Qd/Screenshot-2026-02-19-at-14-27-38.png)
+
 ```bash
 curl https://your-project.shorlabs.com/
 # {"message": "Hello from FastAPI!"}
 ```
+
+![Terminal output showing a successful curl request returning a JSON response from the live FastAPI app](https://i.ibb.co/F4msysFT/Screenshot-2026-02-19-at-14-35-54.png)
 
 Your FastAPI app is now live on the internet. No Docker. No YAML. No AWS console.
 

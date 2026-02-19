@@ -11,6 +11,7 @@ const isPublicRoute = createRouteMatcher([
     '/sitemap.xml',
     '/robots.txt',
     '/feed.xml',
+    '/new(.*)', // GitHub App installation callback lands here with ?installation_id=...
 ])
 
 export default clerkMiddleware(async (auth, req) => {

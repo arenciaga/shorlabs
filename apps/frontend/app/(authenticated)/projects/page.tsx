@@ -24,6 +24,7 @@ interface Project {
     function_url: string | null
     custom_url: string | null
     subdomain: string | null
+    active_custom_domain: string | null
     created_at: string
     updated_at: string
     is_throttled?: boolean
@@ -319,7 +320,9 @@ export default function ProjectsPage() {
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                                 {filteredProjects.map((project) => {
                                     const status = STATUS_CONFIG[project.status] || STATUS_CONFIG.PENDING
-                                    const displayUrl = project.custom_url || project.function_url
+                                    const displayUrl = project.active_custom_domain
+                                        ? `https://${project.active_custom_domain}`
+                                        : (project.custom_url || project.function_url)
                                     const normalizedDisplayUrl = normalizeUrl(displayUrl)
                                     const projectHost = getProjectHost(displayUrl)
                                     return (
@@ -331,7 +334,7 @@ export default function ProjectsPage() {
                                             <div className="bg-white border border-zinc-200 rounded-xl p-5 transition-all duration-200 hover:border-zinc-300 hover:shadow-lg hover:shadow-zinc-200/50">
                                                 {/* Top: Icon + Name + Status */}
                                                 <div className="flex items-start justify-between mb-4">
-                                                <div className="flex items-center gap-3 min-w-0">
+                                                    <div className="flex items-center gap-3 min-w-0">
                                                         <ProjectAvatar
                                                             key={`avatar-${displayUrl || project.project_id}`}
                                                             projectId={project.project_id}

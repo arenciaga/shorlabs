@@ -339,12 +339,20 @@ async def get_projects(
     projects = list_projects(org_id)
 
     # Check org-level throttle state (single lookup for all projects)
-    from api.db.dynamodb import get_throttle_state
+    from api.db.dynamodb import get_throttle_state, list_project_domains
     throttle_state = get_throttle_state(org_id)
     is_throttled = bool(throttle_state and throttle_state.get("is_throttled"))
 
-    return [
-        {
+    result = []
+    for p in projects:
+        # Find first active custom domain for this project
+        domains = list_project_domains(p["project_id"])
+        active_domain = next(
+            (d["domain"] for d in domains if d.get("status") == "ACTIVE"),
+            None,
+        )
+
+        result.append({
             "project_id": p["project_id"],
             "organization_id": p.get("organization_id"),
             "name": p["name"],
@@ -354,12 +362,13 @@ async def get_projects(
             "function_url": p.get("function_url"),
             "subdomain": p.get("subdomain"),
             "custom_url": p.get("custom_url"),
+            "active_custom_domain": active_domain,
             "created_at": p["created_at"],
             "updated_at": p["updated_at"],
             "is_throttled": is_throttled,
-        }
-        for p in projects
-    ]
+        })
+
+    return result
 
 
 @router.get("/{project_id}")

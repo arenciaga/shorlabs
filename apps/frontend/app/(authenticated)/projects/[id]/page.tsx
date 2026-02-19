@@ -489,6 +489,12 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     const currentStepIndex = BUILD_STEPS.indexOf(project.status)
     const latestDeployment = deployments[0]
 
+    // Prefer active custom domain over the default shorlabs URL
+    const activeCustomDomain = data.custom_domains?.find(d => d.is_active)
+    const displayUrl = activeCustomDomain
+        ? `https://${activeCustomDomain.domain}`
+        : (project.custom_url || project.function_url)
+
     return (
         <>
             <div className="min-h-screen bg-zinc-50">
@@ -580,20 +586,20 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                                 <Globe className="h-4 w-4" />
                                 <span className="text-xs font-medium uppercase tracking-wider">Production</span>
                             </div>
-                            {(project.custom_url || project.function_url) ? (
+                            {displayUrl ? (
                                 <div className="flex items-center gap-3">
                                     <div className="flex-1 bg-zinc-50 rounded-xl px-4 py-3 font-mono text-sm text-zinc-700 border border-zinc-100 truncate">
-                                        {(project.custom_url || project.function_url)!.replace("https://", "")}
+                                        {displayUrl.replace("https://", "")}
                                     </div>
                                     <Button
                                         variant="ghost"
                                         size="icon"
-                                        onClick={() => copyToClipboard((project.custom_url || project.function_url)!)}
+                                        onClick={() => copyToClipboard(displayUrl)}
                                         className="h-10 w-10 rounded-xl hover:bg-zinc-100 shrink-0"
                                     >
                                         {copied ? <Check className="h-4 w-4 text-emerald-500" /> : <Copy className="h-4 w-4" />}
                                     </Button>
-                                    <a href={(project.custom_url || project.function_url)!} target="_blank" rel="noopener noreferrer">
+                                    <a href={displayUrl} target="_blank" rel="noopener noreferrer">
                                         <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl hover:bg-zinc-100 shrink-0">
                                             <ExternalLink className="h-4 w-4" />
                                         </Button>

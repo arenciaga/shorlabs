@@ -21,7 +21,7 @@ const geistMono = Geist_Mono({
   display: "swap",
 });
 
-const homepageTitle = "Shorlabs | The Full-Stack Deployment Platform";
+const homepageTitle = "Shorlabs | The Open Source Full-Stack Deployment Platform";
 const homepageDescription =
   "Deploy your frontend and backend from one place. Serverless, so you only pay when your code runs.";
 

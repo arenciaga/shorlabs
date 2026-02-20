@@ -433,7 +433,7 @@ function ConfigureProjectContent() {
 
 
     return (
-        <div className="min-h-screen bg-zinc-50">
+        <div className="min-h-screen bg-white">
             <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
                 {/* Navigation */}
                 <Link
@@ -534,7 +534,7 @@ function ConfigureProjectContent() {
                                 : "text-zinc-500 hover:text-zinc-700"
                                 }`}
                         >
-                            
+
                             {section.label}
                             {activeSection === section.id && (
                                 <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-zinc-900" />
@@ -729,7 +729,7 @@ function ConfigureProjectContent() {
 export default function ConfigureProjectPage() {
     return (
         <Suspense fallback={
-            <div className="min-h-screen bg-zinc-50 flex items-center justify-center">
+            <div className="min-h-screen bg-white flex items-center justify-center">
                 <Loader2 className="h-6 w-6 animate-spin text-zinc-400" />
             </div>
         }>

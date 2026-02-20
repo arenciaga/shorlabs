@@ -1,4 +1,4 @@
-import { AppNavbar } from "@/components/app-navbar"
+import { NavbarWrapper } from "@/components/navbar-wrapper"
 
 export default function AuthenticatedLayout({
     children,
@@ -7,7 +7,7 @@ export default function AuthenticatedLayout({
 }) {
     return (
         <>
-            <AppNavbar />
+            <NavbarWrapper />
             <main className="w-full">
                 {children}
             </main>

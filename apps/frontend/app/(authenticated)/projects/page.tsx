@@ -197,23 +197,12 @@ export default function ProjectsPage() {
 
     return (
         <div className="min-h-screen bg-white">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
-                {/* Page Header */}
-                <div className="mb-8">
-                    <h1 className="text-2xl font-semibold text-zinc-900 tracking-tight mb-1 flex items-center gap-2">
-                        Projects
-                        {mounted && isPro && (
-                            <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-700 rounded-full">
-                                {planLabel}
-                            </span>
-                        )}
-                    </h1>
-                    <p className="text-zinc-500 text-sm">Deploy and manage your applications</p>
-                </div>
+            <div className="px-4 sm:px-6 py-6 sm:py-8">
+
 
                 {/* Search & Actions Bar */}
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-6 sm:mb-8">
-                    <div className="relative flex-1 sm:max-w-md">
+                    <div className="relative flex-1">
                         <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
                         <Input
                             type="text"

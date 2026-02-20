@@ -448,7 +448,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     // Loading skeleton
     if (loading) {
         return (
-            <div className="min-h-screen bg-zinc-50">
+            <div className="min-h-screen bg-white">
                 <div className="max-w-6xl mx-auto px-8 py-10">
                     <div className="animate-pulse">
                         <div className="h-4 w-20 bg-zinc-200 rounded mb-8" />
@@ -456,10 +456,10 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                         <div className="h-5 w-48 bg-zinc-100 rounded mb-8" />
                         <div className="grid grid-cols-3 gap-4 mb-8">
                             {[1, 2, 3].map(i => (
-                                <div key={i} className="h-24 bg-white rounded-2xl border border-zinc-200" />
+                                <div key={i} className="h-24 bg-zinc-50 rounded-2xl border border-zinc-200" />
                             ))}
                         </div>
-                        <div className="h-64 bg-white rounded-2xl border border-zinc-200" />
+                        <div className="h-64 bg-zinc-50 rounded-2xl border border-zinc-200" />
                     </div>
                 </div>
             </div>
@@ -468,7 +468,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
 
     if (error || !data) {
         return (
-            <div className="min-h-screen bg-zinc-50 flex items-center justify-center">
+            <div className="min-h-screen bg-white flex items-center justify-center">
                 <div className="text-center">
                     <div className="w-16 h-16 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-4">
                         <AlertCircle className="h-8 w-8 text-red-500" />
@@ -497,7 +497,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
 
     return (
         <>
-            <div className="min-h-screen bg-zinc-50">
+            <div className="min-h-screen bg-white">
                 <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
                     {/* Navigation */}
                     <Link
@@ -581,7 +581,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                     {/* Stats Cards */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 sm:mb-8">
                         {/* Production URL */}
-                        <div className="md:col-span-2 bg-white rounded-2xl border border-zinc-200 p-4 sm:p-5 ">
+                        <div className="md:col-span-2 bg-zinc-50 rounded-2xl border border-zinc-200 p-4 sm:p-5 ">
                             <div className="flex items-center gap-2 text-zinc-500 mb-3">
                                 <Globe className="h-4 w-4" />
                                 <span className="text-xs font-medium uppercase tracking-wider">Production</span>
@@ -611,7 +611,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                         </div>
 
                         {/* Last Deployment */}
-                        <div className="bg-white rounded-2xl border border-zinc-200 p-4 sm:p-5 ">
+                        <div className="bg-zinc-50 rounded-2xl border border-zinc-200 p-4 sm:p-5 ">
                             <div className="flex items-center gap-2 text-zinc-500 mb-3">
                                 <Activity className="h-4 w-4" />
                                 <span className="text-xs font-medium uppercase tracking-wider">Last Deploy</span>
@@ -641,7 +641,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
 
                     {/* Build Progress - Only show when building */}
                     {isBuilding && (
-                        <div className="bg-white rounded-2xl border border-zinc-200 p-6 mb-8 overflow-hidden">
+                        <div className="bg-zinc-50 rounded-2xl border border-zinc-200 p-6 mb-8 overflow-hidden">
                             <div className="flex items-center justify-between mb-6">
                                 <div className="flex items-center gap-3">
                                     <div className="w-10 h-10 rounded-xl bg-blue-900 flex items-center justify-center">
@@ -758,7 +758,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
 
                     {/* Deployments Tab */}
                     {activeTab === "deployments" && (
-                        <div className="bg-white rounded-2xl border border-zinc-200 overflow-hidden">
+                        <div className="bg-zinc-50 rounded-2xl border border-zinc-200 overflow-hidden">
                             {deployments.length === 0 ? (
                                 <div className="text-center py-16">
                                     <div className="w-12 h-12 rounded-full bg-zinc-100 flex items-center justify-center mx-auto mb-4">
@@ -845,7 +845,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
 
                     {/* Logs Tab */}
                     {activeTab === "logs" && (
-                        <div className="bg-white rounded-2xl border border-zinc-200 overflow-hidden">
+                        <div className="bg-zinc-50 rounded-2xl border border-zinc-200 overflow-hidden">
                             <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-100">
                                 <div className="flex items-center gap-3">
                                     <Terminal className="h-5 w-5 text-zinc-400" />
@@ -1018,7 +1018,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                             />
 
                             {/* Danger Zone */}
-                            <div className="bg-white rounded-2xl border border-red-200 overflow-hidden">
+                            <div className="bg-zinc-50 rounded-2xl border border-red-200 overflow-hidden">
                                 <div className="px-6 py-4 border-b border-red-100 bg-red-50">
                                     <h3 className="font-semibold text-red-900">Danger Zone</h3>
                                 </div>

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, Suspense } from "react"
 import { useUser, useAuth, useClerk } from "@clerk/nextjs"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Github, Search, ArrowLeft, Lock, Globe, Loader2, AlertCircle, GitBranch, ArrowUpRight, RefreshCw } from "lucide-react"
@@ -45,7 +45,7 @@ const LANGUAGE_COLORS: Record<string, string> = {
     "C#": "bg-green-600",
 }
 
-export default function ImportRepositoryPage() {
+function ImportRepositoryPageInner() {
     const router = useRouter()
     const { user, isLoaded: userLoaded } = useUser()
     const { getToken, orgId } = useAuth()
@@ -518,5 +518,17 @@ export default function ImportRepositoryPage() {
                 )}
             </div>
         </div>
+    )
+}
+
+export default function ImportRepositoryPage() {
+    return (
+        <Suspense fallback={
+            <div className="min-h-screen bg-white flex items-center justify-center">
+                <Loader2 className="h-6 w-6 animate-spin text-zinc-400" />
+            </div>
+        }>
+            <ImportRepositoryPageInner />
+        </Suspense>
     )
 }

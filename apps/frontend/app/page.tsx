@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
-import { HeroSection } from "@/components/HeroSection";
-import { HowItWorksSection } from "@/components/HowItWorksSection";
-import { FeatureSection } from "@/components/FeatureSection";
-import { PricingSection } from "@/components/PricingSection";
-import { CTASection } from "@/components/CTASection";
-import { Footer } from "@/components/Footer";
-import SectionNavigation from "@/components/SectionNavigation";
+import { Navbar } from "@/components/navbar";
+import { HeroSection } from "@/components/hero-section-brutalist";
+import { FeatureGrid } from "@/components/feature-grid";
+import { AboutSection } from "@/components/about-section";
+import { PricingSection } from "@/components/pricing-section-brutalist";
+import { GlitchMarquee } from "@/components/glitch-marquee";
+import { Footer } from "@/components/footer-brutalist";
 
 const homepageTitle = "Shorlabs | Open Source Full-Stack Deployment Platform";
 const homepageDescription =
@@ -31,20 +31,22 @@ export default function Home() {
   };
 
   return (
-    <>
+    <div className="min-h-screen dot-grid-bg">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
           __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c"),
         }}
       />
-      <SectionNavigation />
-      <HeroSection />
-      <FeatureSection />
-      <HowItWorksSection />
-      <PricingSection />
-      <CTASection />
+      <Navbar />
+      <main>
+        <HeroSection />
+        <FeatureGrid />
+        <AboutSection />
+        <PricingSection />
+        <GlitchMarquee />
+      </main>
       <Footer />
-    </>
+    </div>
   );
 }

@@ -1,23 +1,16 @@
-import { cookies } from "next/headers"
-import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
-import { AppSidebar } from "@/components/app-sidebar"
+import { AppNavbar } from "@/components/app-navbar"
 
-export default async function AuthenticatedLayout({
+export default function AuthenticatedLayout({
     children,
 }: {
     children: React.ReactNode
 }) {
-    const cookieStore = await cookies()
-    const sidebarState = cookieStore.get("sidebar_state")?.value
-    const defaultOpen = sidebarState ? sidebarState === "true" : true
-
     return (
-        <SidebarProvider defaultOpen={defaultOpen}>
-            <AppSidebar />
+        <>
+            <AppNavbar />
             <main className="w-full">
-                <SidebarTrigger className="md:hidden p-4" />
                 {children}
             </main>
-        </SidebarProvider>
+        </>
     )
 }

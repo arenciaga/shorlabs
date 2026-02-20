@@ -196,7 +196,7 @@ export default function ProjectsPage() {
 
 
     return (
-        <div className="min-h-screen bg-zinc-50">
+        <div className="min-h-screen bg-white">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
                 {/* Page Header */}
                 <div className="mb-8">
@@ -220,7 +220,7 @@ export default function ProjectsPage() {
                             placeholder="Search Projects..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="pl-10 h-10 text-sm bg-white border-zinc-200 rounded-lg w-full focus:ring-2 focus:ring-zinc-100 focus:border-zinc-300 transition-all"
+                            className="pl-10 h-10 text-sm bg-zinc-50 border-zinc-200 rounded-lg w-full focus:ring-2 focus:ring-zinc-100 focus:border-zinc-300 transition-all"
                         />
                     </div>
                     <div className="flex items-center gap-2 sm:gap-3">
@@ -286,7 +286,7 @@ export default function ProjectsPage() {
                                 {[...Array(4)].map((_, i) => (
                                     <div
                                         key={i}
-                                        className="bg-white border border-zinc-200 rounded-xl overflow-hidden"
+                                        className="bg-zinc-50 border border-zinc-200 rounded-xl overflow-hidden"
                                     >
                                         <div className="p-5 pb-4">
                                             <div className="flex items-start justify-between mb-4">
@@ -298,7 +298,7 @@ export default function ProjectsPage() {
                                                 <div className="h-4 w-36 bg-gradient-to-r from-zinc-200 via-zinc-100 to-zinc-200 rounded bg-[length:200%_100%] animate-[shimmer_1.5s_ease-in-out_infinite]" />
                                             </div>
                                         </div>
-                                        <div className="px-5 py-3 bg-zinc-50 border-t border-zinc-100 flex items-center justify-between">
+                                        <div className="px-5 py-3 bg-zinc-100 border-t border-zinc-200 flex items-center justify-between">
                                             <div className="h-3 w-20 bg-zinc-200 rounded" />
                                             <div className="h-6 w-6 bg-zinc-200 rounded" />
                                         </div>
@@ -331,7 +331,7 @@ export default function ProjectsPage() {
                                             href={`/projects/${project.project_id}`}
                                             className="group block"
                                         >
-                                            <div className="bg-white border border-zinc-200 rounded-xl p-5 transition-all duration-200 hover:border-zinc-300 hover:shadow-lg hover:shadow-zinc-200/50">
+                                            <div className="bg-zinc-50 border border-zinc-200 rounded-xl p-5 transition-all duration-200 hover:border-zinc-300 hover:shadow-lg hover:shadow-zinc-200/50">
                                                 {/* Top: Icon + Name + Status */}
                                                 <div className="flex items-start justify-between mb-4">
                                                     <div className="flex items-center gap-3 min-w-0">
@@ -362,7 +362,7 @@ export default function ProjectsPage() {
 
                                                 {/* GitHub repo badge */}
                                                 <div className="flex items-center gap-1.5 mb-4">
-                                                    <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-zinc-50 border border-zinc-100 rounded-full">
+                                                    <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-zinc-100 border border-zinc-200 rounded-full">
                                                         <Github className="h-3 w-3 text-zinc-500" />
                                                         <span className="text-xs text-zinc-600 truncate max-w-[200px]">{project.github_repo}</span>
                                                     </div>

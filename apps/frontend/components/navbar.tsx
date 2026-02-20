@@ -13,7 +13,6 @@ export function Navbar() {
       <nav className="w-full border border-foreground/20 bg-background/80 backdrop-blur-sm px-3 py-2.5 sm:px-5 sm:py-3 lg:px-8">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 sm:gap-3">
-            <Rocket size={16} strokeWidth={1.5} />
             <span className="text-[10px] sm:text-xs font-mono tracking-[0.15em] uppercase font-bold">
               SHORLABS
             </span>

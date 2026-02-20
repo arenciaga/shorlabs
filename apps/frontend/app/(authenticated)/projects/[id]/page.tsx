@@ -52,6 +52,7 @@ import { StartCommandInput } from "@/components/StartCommandInput"
 import { DeploymentLogs } from "@/components/DeploymentLogs"
 import { EnvironmentVariablesEditor } from "@/components/EnvironmentVariablesEditor"
 import { CustomDomains } from "@/components/CustomDomains"
+import { LazyLog, ScrollFollow } from "@melloware/react-logviewer"
 import { useIsPro } from "@/hooks/use-is-pro"
 import { trackEvent } from "@/lib/amplitude"
 
@@ -155,7 +156,6 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     // Logs state
     const [logs, setLogs] = useState<{ timestamp: string; message: string; level: string }[]>([])
     const [logsLoading, setLogsLoading] = useState(false)
-    const logsContainerRef = useRef<HTMLDivElement>(null)
 
     // Deployment logs expansion state
     const [expandedDeployId, setExpandedDeployId] = useState<string | null>(null)
@@ -874,55 +874,55 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                                 </Button>
                             </div>
 
-                            <div
-                                ref={logsContainerRef}
-                                className="h-96 overflow-y-auto bg-zinc-900 p-4 font-mono text-xs"
-                            >
+                            <div style={{ height: "384px" }}>
                                 {logsLoading && logs.length === 0 ? (
-                                    <div className="flex items-center justify-center h-full">
+                                    <div className="flex items-center justify-center h-full bg-zinc-900">
                                         <Loader2 className="h-6 w-6 text-zinc-500 animate-spin" />
                                     </div>
                                 ) : logs.length === 0 ? (
-                                    <div className="flex flex-col items-center justify-center h-full text-zinc-500">
+                                    <div className="flex flex-col items-center justify-center h-full bg-zinc-900 text-zinc-500">
                                         <Terminal className="h-8 w-8 mb-3 opacity-50" />
-                                        <p>No logs available</p>
+                                        <p className="text-sm">No logs available</p>
                                         <p className="text-zinc-600 text-xs mt-1">
                                             Invoke your function to see runtime logs
                                         </p>
                                     </div>
                                 ) : (
-                                    <div className="space-y-1">
-                                        {logs.map((log, index) => {
-                                            const levelColor = log.level === "ERROR"
-                                                ? "text-red-400"
-                                                : log.level === "WARN"
-                                                    ? "text-amber-400"
-                                                    : log.level === "SUCCESS"
-                                                        ? "text-emerald-400"
-                                                        : "text-zinc-300"
-                                            return (
-                                                <div key={index} className="flex gap-3 leading-relaxed">
-                                                    <span className="text-zinc-600 shrink-0 select-none">
-                                                        {new Date(log.timestamp).toLocaleTimeString("en-US", {
-                                                            hour: "2-digit",
-                                                            minute: "2-digit",
-                                                            second: "2-digit",
-                                                            hour12: false,
-                                                        })}
-                                                    </span>
-                                                    <span className={levelColor}>
-                                                        {log.message}
-                                                    </span>
-                                                </div>
-                                            )
-                                        })}
-                                    </div>
+                                    <ScrollFollow
+                                        startFollowing
+                                        render={({ follow, onScroll }) => (
+                                            <LazyLog
+                                                text={logs
+                                                    .map((log) => {
+                                                        const time = (() => {
+                                                            try { return new Date(log.timestamp).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }) }
+                                                            catch { return log.timestamp }
+                                                        })()
+                                                        const prefix = log.level === "ERROR" ? "\x1b[31m" : log.level === "WARN" ? "\x1b[33m" : log.level === "SUCCESS" ? "\x1b[32m" : "\x1b[36m"
+                                                        return `\x1b[2m${time}\x1b[0m  ${prefix}${log.message}\x1b[0m`
+                                                    })
+                                                    .join("\n")}
+                                                follow={follow}
+                                                onScroll={onScroll}
+                                                enableSearch
+                                                extraLines={1}
+                                                style={{
+                                                    background: "#18181b",
+                                                    color: "#d4d4d8",
+                                                    fontFamily: "var(--font-mono, 'JetBrains Mono', ui-monospace, monospace)",
+                                                    fontSize: "12px",
+                                                    height: "100%",
+                                                    width: "100%",
+                                                }}
+                                            />
+                                        )}
+                                    />
                                 )}
                             </div>
 
                             <div className="px-6 py-3 border-t border-zinc-100 bg-zinc-50">
                                 <p className="text-xs text-zinc-500">
-                                    {logs.length} log entries
+                                    {logs.length} log {logs.length === 1 ? "entry" : "entries"}
                                 </p>
                             </div>
                         </div>

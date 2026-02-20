@@ -13,6 +13,7 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { trackEvent } from "@/lib/amplitude"
+import { LazyLog, ScrollFollow } from "@melloware/react-logviewer"
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 
@@ -47,6 +48,39 @@ const BUILD_PHASES = [
     "COMPLETED",
 ]
 
+/** Convert a LogEntry array into a single newline-delimited string for LazyLog */
+function logsToText(logs: LogEntry[]): string {
+    if (logs.length === 0) return ""
+    return logs
+        .map((log) => {
+            const time = (() => {
+                try {
+                    return new Date(log.timestamp).toLocaleTimeString("en-US", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        second: "2-digit",
+                        hour12: false,
+                    })
+                } catch {
+                    return log.timestamp
+                }
+            })()
+
+            // ANSI color codes per level so LazyLog renders them nicely
+            const prefix =
+                log.level === "ERROR"
+                    ? "\x1b[31m" // red
+                    : log.level === "WARN"
+                    ? "\x1b[33m" // yellow
+                    : log.level === "SUCCESS"
+                    ? "\x1b[32m" // green
+                    : "\x1b[0m"  // default
+
+            return `\x1b[2m${time}\x1b[0m  ${prefix}${log.message}\x1b[0m`
+        })
+        .join("\n")
+}
+
 export function DeploymentLogs({
     projectId,
     deployId,
@@ -63,15 +97,7 @@ export function DeploymentLogs({
     const [error, setError] = useState<string | null>(null)
     const [currentPhase, setCurrentPhase] = useState<string>("QUEUED")
     const [isStreaming, setIsStreaming] = useState(false)
-    const logsContainerRef = useRef<HTMLDivElement>(null)
-    const eventSourceRef = useRef<EventSource | null>(null)
-
-    // Auto-scroll to bottom when new logs arrive
-    useEffect(() => {
-        if (logsContainerRef.current && isExpanded) {
-            logsContainerRef.current.scrollTop = logsContainerRef.current.scrollHeight
-        }
-    }, [logs, isExpanded])
+    const streamingRef = useRef(false)
 
     // Fetch logs (for completed builds)
     const fetchLogs = useCallback(async () => {
@@ -81,13 +107,10 @@ export function DeploymentLogs({
             const token = await getToken()
             const url = new URL(`${API_BASE_URL}/api/deployments/${projectId}/${deployId}/logs`)
             url.searchParams.append("org_id", orgId)
-            const response = await fetch(
-                url.toString(),
-                { headers: { Authorization: `Bearer ${token}` } }
-            )
-            if (!response.ok) {
-                throw new Error("Failed to fetch logs")
-            }
+            const response = await fetch(url.toString(), {
+                headers: { Authorization: `Bearer ${token}` },
+            })
+            if (!response.ok) throw new Error("Failed to fetch logs")
             const data = await response.json()
             setLogs(data.logs || [])
         } catch (err) {
@@ -97,61 +120,54 @@ export function DeploymentLogs({
         }
     }, [getToken, projectId, deployId, orgId])
 
-    // Start SSE streaming (for in-progress builds)
+    // Start polling (for in-progress builds)
     const startStreaming = useCallback(async () => {
-        if (eventSourceRef.current) {
-            eventSourceRef.current.close()
-        }
-
+        streamingRef.current = true
         setIsStreaming(true)
         setError(null)
 
         try {
             const token = await getToken()
-            // Note: EventSource doesn't support headers, so we'll poll instead
-            // for SSE with auth, using a custom fetch-based approach
-            const pollLogs = async () => {
-                while (isStreaming) {
+
+            const poll = async () => {
+                while (streamingRef.current) {
                     try {
                         const pollUrl = new URL(`${API_BASE_URL}/api/deployments/${projectId}/${deployId}/logs`)
                         pollUrl.searchParams.append("org_id", orgId)
-                        const response = await fetch(
-                            pollUrl.toString(),
-                            { headers: { Authorization: `Bearer ${token}` } }
-                        )
+                        const response = await fetch(pollUrl.toString(), {
+                            headers: { Authorization: `Bearer ${token}` },
+                        })
                         if (response.ok) {
                             const data = await response.json()
                             setLogs(data.logs || [])
 
-                            // Check if complete
                             if (data.status === "SUCCEEDED" || data.status === "FAILED") {
-                                // Track deployment completion
-                                trackEvent('Deployment Completed', {
+                                trackEvent("Deployment Completed", {
                                     project_id: projectId,
                                     deployment_id: deployId,
                                     build_id: buildId,
                                     status: data.status,
                                 })
-
+                                streamingRef.current = false
                                 setIsStreaming(false)
                                 onComplete?.()
                                 break
                             }
                         }
                     } catch {
-                        // Ignore polling errors
+                        // ignore individual polling errors
                     }
-                    await new Promise(resolve => setTimeout(resolve, 2000))
+                    await new Promise((resolve) => setTimeout(resolve, 2000))
                 }
             }
 
-            pollLogs()
-
+            poll()
         } catch (err) {
             setError(err instanceof Error ? err.message : "Failed to start streaming")
             setIsStreaming(false)
+            streamingRef.current = false
         }
-    }, [getToken, projectId, deployId, orgId, onComplete, isStreaming])
+    }, [getToken, projectId, deployId, orgId, buildId, onComplete])
 
     // Load logs when expanded
     useEffect(() => {
@@ -164,16 +180,15 @@ export function DeploymentLogs({
         }
 
         return () => {
-            if (eventSourceRef.current) {
-                eventSourceRef.current.close()
-            }
+            streamingRef.current = false
             setIsStreaming(false)
         }
-    }, [isExpanded, status, fetchLogs, startStreaming])
+    }, [isExpanded, status]) // eslint-disable-line react-hooks/exhaustive-deps
 
-    // Get phase index for progress
     const phaseIndex = BUILD_PHASES.indexOf(currentPhase)
     const progressPercent = Math.max(0, Math.min(100, (phaseIndex / (BUILD_PHASES.length - 1)) * 100))
+
+    const logText = logsToText(logs)
 
     return (
         <div className="border-t border-zinc-100">
@@ -258,51 +273,42 @@ export function DeploymentLogs({
                         )}
                     </div>
 
-                    {/* Log Output */}
-                    <div
-                        ref={logsContainerRef}
-                        className="h-80 overflow-y-auto bg-zinc-900 rounded-xl p-4 font-mono text-xs"
-                    >
+                    {/* Log viewer */}
+                    <div className="rounded-xl overflow-hidden" style={{ height: "320px" }}>
                         {loading && logs.length === 0 ? (
-                            <div className="flex items-center justify-center h-full">
+                            <div className="flex items-center justify-center h-full bg-zinc-900">
                                 <Loader2 className="h-6 w-6 text-zinc-500 animate-spin" />
                             </div>
                         ) : error ? (
-                            <div className="flex flex-col items-center justify-center h-full text-red-400">
+                            <div className="flex flex-col items-center justify-center h-full bg-zinc-900 text-red-400">
                                 <XCircle className="h-6 w-6 mb-2" />
-                                <p>{error}</p>
+                                <p className="text-sm">{error}</p>
                             </div>
                         ) : logs.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center h-full text-zinc-500">
+                            <div className="flex flex-col items-center justify-center h-full bg-zinc-900 text-zinc-500">
                                 <Terminal className="h-8 w-8 mb-3 opacity-50" />
-                                <p>Waiting for logs...</p>
+                                <p className="text-sm">Waiting for logs...</p>
                             </div>
                         ) : (
-                            <div className="space-y-0.5">
-                                {logs.map((log, index) => {
-                                    const levelColor =
-                                        log.level === "ERROR"
-                                            ? "text-red-400"
-                                            : log.level === "WARN"
-                                                ? "text-amber-400"
-                                                : log.level === "SUCCESS"
-                                                    ? "text-emerald-400"
-                                                    : "text-zinc-300"
-                                    return (
-                                        <div key={index} className="flex gap-3 leading-relaxed">
-                                            <span className="text-zinc-600 shrink-0 select-none">
-                                                {new Date(log.timestamp).toLocaleTimeString("en-US", {
-                                                    hour: "2-digit",
-                                                    minute: "2-digit",
-                                                    second: "2-digit",
-                                                    hour12: false,
-                                                })}
-                                            </span>
-                                            <span className={levelColor}>{log.message}</span>
-                                        </div>
-                                    )
-                                })}
-                            </div>
+                            <ScrollFollow
+                                startFollowing
+                                render={({ follow, onScroll }) => (
+                                    <LazyLog
+                                        text={logText}
+                                        follow={follow}
+                                        onScroll={onScroll}
+                                        enableSearch
+                                        extraLines={1}
+                                        lineClassName="font-mono text-xs"
+                                        style={{
+                                            background: "#18181b", // zinc-900
+                                            color: "#d4d4d8",      // zinc-300
+                                            fontFamily: "var(--font-mono, 'JetBrains Mono', ui-monospace, monospace)",
+                                            fontSize: "12px",
+                                        }}
+                                    />
+                                )}
+                            />
                         )}
                     </div>
 

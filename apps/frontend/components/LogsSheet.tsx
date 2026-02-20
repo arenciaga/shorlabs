@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef, useCallback } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useAuth } from "@clerk/nextjs"
 import { RefreshCw, Terminal, Loader2 } from "lucide-react"
 
@@ -12,6 +12,7 @@ import {
     SheetTitle,
     SheetDescription,
 } from "@/components/ui/sheet"
+import { LazyLog, ScrollFollow } from "@melloware/react-logviewer"
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 
@@ -28,19 +29,42 @@ interface LogsSheetProps {
     onOpenChange: (open: boolean) => void
 }
 
-const LOG_LEVEL_STYLES: Record<string, string> = {
-    INFO: "text-neutral-600",
-    WARN: "text-amber-600",
-    ERROR: "text-red-600",
-    SUCCESS: "text-emerald-600",
+/** Convert LogEntry array into a newline-delimited ANSI-colored string for LazyLog */
+function logsToText(logs: LogEntry[]): string {
+    if (logs.length === 0) return ""
+    return logs
+        .map((log) => {
+            const time = (() => {
+                try {
+                    return new Date(log.timestamp).toLocaleTimeString("en-US", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        second: "2-digit",
+                        hour12: false,
+                    })
+                } catch {
+                    return log.timestamp
+                }
+            })()
+
+            const prefix =
+                log.level === "ERROR"
+                    ? "\x1b[31m"  // red
+                    : log.level === "WARN"
+                        ? "\x1b[33m"  // yellow
+                        : log.level === "SUCCESS"
+                            ? "\x1b[32m"  // green
+                            : "\x1b[36m"  // cyan for INFO
+
+            return `\x1b[2m${time}\x1b[0m  ${prefix}${log.message}\x1b[0m`
+        })
+        .join("\n")
 }
 
 export function LogsSheet({ projectId, projectName, open, onOpenChange }: LogsSheetProps) {
     const { getToken } = useAuth()
     const [logs, setLogs] = useState<LogEntry[]>([])
     const [loading, setLoading] = useState(false)
-    const [autoScroll, setAutoScroll] = useState(true)
-    const logsContainerRef = useRef<HTMLDivElement>(null)
 
     const fetchLogs = useCallback(async () => {
         if (!open) return
@@ -55,55 +79,31 @@ export function LogsSheet({ projectId, projectName, open, onOpenChange }: LogsSh
                 }
             )
 
-            if (!response.ok) {
-                throw new Error("Failed to fetch logs")
-            }
+            if (!response.ok) throw new Error("Failed to fetch logs")
 
             const data = await response.json()
             setLogs(data.logs || [])
         } catch (err) {
             console.error("Error fetching logs:", err)
-            setLogs([{ timestamp: new Date().toISOString(), message: "Failed to load logs", level: "ERROR" }])
+            setLogs([
+                {
+                    timestamp: new Date().toISOString(),
+                    message: "Failed to load logs",
+                    level: "ERROR",
+                },
+            ])
         } finally {
             setLoading(false)
         }
     }, [getToken, projectId, open])
 
-    // Fetch logs when sheet opens
     useEffect(() => {
         if (open) {
             fetchLogs()
         }
     }, [open, fetchLogs])
 
-    // Auto-scroll to bottom when new logs arrive
-    useEffect(() => {
-        if (autoScroll && logsContainerRef.current) {
-            logsContainerRef.current.scrollTop = logsContainerRef.current.scrollHeight
-        }
-    }, [logs, autoScroll])
-
-    // Handle scroll to toggle auto-scroll
-    const handleScroll = () => {
-        if (!logsContainerRef.current) return
-        const { scrollTop, scrollHeight, clientHeight } = logsContainerRef.current
-        // If user scrolled up, disable auto-scroll; if near bottom, enable it
-        setAutoScroll(scrollHeight - scrollTop - clientHeight < 50)
-    }
-
-    const formatTimestamp = (timestamp: string) => {
-        try {
-            const date = new Date(timestamp)
-            return date.toLocaleTimeString("en-US", {
-                hour: "2-digit",
-                minute: "2-digit",
-                second: "2-digit",
-                hour12: false,
-            })
-        } catch {
-            return timestamp
-        }
-    }
+    const logText = logsToText(logs)
 
     return (
         <Sheet open={open} onOpenChange={onOpenChange}>
@@ -131,51 +131,54 @@ export function LogsSheet({ projectId, projectName, open, onOpenChange }: LogsSh
                     </div>
                 </SheetHeader>
 
-                {/* Logs Container */}
-                <div
-                    ref={logsContainerRef}
-                    onScroll={handleScroll}
-                    className="flex-1 overflow-y-auto bg-neutral-50 p-4 font-mono text-xs"
-                >
+                {/* Log Viewer */}
+                <div className="flex-1 relative overflow-hidden">
                     {loading && logs.length === 0 ? (
-                        <div className="flex items-center justify-center h-full">
+                        <div className="flex items-center justify-center h-full bg-neutral-950">
                             <Loader2 className="h-6 w-6 text-neutral-500 animate-spin" />
                         </div>
                     ) : logs.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center h-full text-neutral-500">
+                        <div className="flex flex-col items-center justify-center h-full bg-neutral-950 text-neutral-500">
                             <Terminal className="h-8 w-8 mb-3 opacity-50" />
-                            <p>No logs available</p>
-                            <p className="text-neutral-400 text-xs mt-1">
+                            <p className="text-sm">No logs available</p>
+                            <p className="text-neutral-600 text-xs mt-1">
                                 Invoke your function to see runtime logs
                             </p>
                         </div>
                     ) : (
-                        <div className="space-y-0.5">
-                            {logs.map((log, index) => (
-                                <div key={index} className="flex gap-3 leading-relaxed">
-                                    <span className="text-neutral-400 shrink-0 select-none">
-                                        {formatTimestamp(log.timestamp)}
-                                    </span>
-                                    <span className={LOG_LEVEL_STYLES[log.level] || "text-neutral-600"}>
-                                        {log.message}
-                                    </span>
-                                </div>
-                            ))}
-                        </div>
+                        <ScrollFollow
+                            startFollowing
+                            render={({ follow, onScroll }) => (
+                                <LazyLog
+                                    text={logText}
+                                    follow={follow}
+                                    onScroll={onScroll}
+                                    enableSearch
+                                    extraLines={1}
+                                    style={{
+                                        background: "#0a0a0a",
+                                        color: "#e5e5e5",
+                                        fontFamily:
+                                            "var(--font-mono, 'JetBrains Mono', ui-monospace, monospace)",
+                                        fontSize: "12px",
+                                        height: "100%",
+                                        width: "100%",
+                                    }}
+                                />
+                            )}
+                        />
                     )}
                 </div>
 
-                {/* Footer with auto-scroll indicator */}
+                {/* Footer */}
                 <div className="px-6 py-2 border-t border-neutral-200 bg-white shrink-0">
                     <div className="flex items-center justify-between text-xs">
                         <span className="text-neutral-500">
-                            {logs.length} log entries
+                            {logs.length} log {logs.length === 1 ? "entry" : "entries"}
                         </span>
-                        {autoScroll && (
-                            <span className="text-neutral-400">
-                                Auto-scroll enabled
-                            </span>
-                        )}
+                        <span className="text-neutral-400 text-xs">
+                            {loading ? "Refreshing..." : "Live · auto-scroll"}
+                        </span>
                     </div>
                 </div>
             </SheetContent>

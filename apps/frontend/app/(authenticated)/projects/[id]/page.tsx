@@ -449,7 +449,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     if (loading) {
         return (
             <div className="min-h-screen bg-white">
-                <div className="max-w-6xl mx-auto px-8 py-10">
+                <div className="px-4 sm:px-6 lg:px-8 py-6">
                     <div className="animate-pulse">
                         <div className="h-4 w-20 bg-zinc-200 rounded mb-8" />
                         <div className="h-10 w-64 bg-zinc-200 rounded-lg mb-2" />
@@ -498,60 +498,57 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     return (
         <>
             <div className="min-h-screen bg-white">
-                <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
-                    {/* Navigation */}
-                    <Link
-                        href="/projects"
-                        className="inline-flex items-center gap-1.5 text-sm text-zinc-500 hover:text-zinc-900 transition-colors mb-8 group"
-                    >
-                        <ArrowLeft className="h-4 w-4 transition-transform group-hover:-translate-x-1" />
-                        <span>Projects</span>
-                    </Link>
+                <div className="px-4 sm:px-6 lg:px-8">
+                    {/* Breadcrumb */}
+                    <div className="flex items-center gap-2 pt-5 pb-4">
+                        <Link
+                            href="/projects"
+                            className="inline-flex items-center gap-1.5 text-sm text-zinc-400 hover:text-zinc-900 transition-colors group"
+                        >
+                            <ArrowLeft className="h-3.5 w-3.5 transition-transform group-hover:-translate-x-0.5" />
+                            <span>Projects</span>
+                        </Link>
+                        <span className="text-zinc-300">/</span>
+                        <span className="text-sm text-zinc-900 font-medium truncate">{project.name}</span>
+                    </div>
 
-                    {/* Header */}
-                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6 sm:mb-8">
-                        <div>
-                            <div className="flex flex-wrap items-center gap-3 sm:gap-4 mb-2">
-                                <h1 className="text-2xl sm:text-3xl font-bold text-zinc-900 tracking-tight">{project.name}</h1>
-                                <div className={`flex items-center gap-2 px-3 py-1 rounded-full bg-white border border-zinc-200 shadow-sm ${statusConfig.bgGlow}`}>
-                                    <span className={`w-2 h-2 rounded-full ${statusConfig.dot} ${isBuilding ? 'animate-pulse' : ''}`} />
-                                    <span className={`text-sm font-medium ${statusConfig.color}`}>{statusConfig.label}</span>
-                                </div>
+                    {/* Header — compact single row */}
+                    <div className="flex items-center gap-3 py-3 mb-4">
+                        {/* Name + status */}
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                            <h1 className="text-xl font-semibold text-zinc-900 tracking-tight truncate">{project.name}</h1>
+                            <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-zinc-50 border border-zinc-200 shrink-0 ${statusConfig.bgGlow}`}>
+                                <span className={`w-1.5 h-1.5 rounded-full ${statusConfig.dot} ${isBuilding ? 'animate-pulse' : ''}`} />
+                                <span className={`text-xs font-medium ${statusConfig.color}`}>{statusConfig.label}</span>
                             </div>
                             <a
                                 href={project.github_url}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="inline-flex items-center gap-2 text-zinc-500 hover:text-zinc-900 transition-colors"
+                                className="hidden sm:inline-flex items-center gap-1.5 text-zinc-400 hover:text-zinc-900 transition-colors shrink-0"
                             >
-                                <Github className="h-4 w-4" />
-                                <span className="font-mono text-sm">{project.github_repo}</span>
+                                <Github className="h-3.5 w-3.5" />
+                                <span className="font-mono text-xs">{project.github_repo}</span>
                                 <ExternalLink className="h-3 w-3" />
                             </a>
                         </div>
 
-                        <div className="flex flex-col items-end gap-1">
-                            <Button
-                                onClick={handleRedeploy}
-                                disabled={isBuilding || redeploying || project.is_throttled}
-                                className="bg-zinc-900 hover:bg-zinc-800 text-white rounded-full h-10 px-5 shadow-lg shadow-zinc-900/10"
-                                title={
-                                    project.is_throttled
-                                        ? "Redeploy is paused while your organization is over quota."
-                                        : isBuilding
-                                            ? "A deployment is already in progress. Your redeploy request will run automatically as soon as capacity is available."
-                                            : "Trigger a new deployment with the latest settings."
-                                }
-                            >
-                                <RotateCw className={`h-4 w-4 mr-2 ${redeploying ? 'animate-spin' : ''}`} />
-                                {project.is_throttled ? "Paused" : "Redeploy"}
-                            </Button>
-                            {!project.is_throttled && isBuilding && (
-                                <p className="text-xs text-zinc-500 max-w-xs text-right">
-                                    A deployment is currently running or queued. Your redeploy request will run automatically when it reaches the front of the queue—no need to click again.
-                                </p>
-                            )}
-                        </div>
+                        {/* Redeploy button */}
+                        <Button
+                            onClick={handleRedeploy}
+                            disabled={isBuilding || redeploying || project.is_throttled}
+                            className="bg-zinc-900 hover:bg-zinc-800 text-white rounded-full h-9 px-4 text-sm shrink-0"
+                            title={
+                                project.is_throttled
+                                    ? "Redeploy is paused while your organization is over quota."
+                                    : isBuilding
+                                        ? "A deployment is in progress — will auto-queue."
+                                        : "Trigger a new deployment."
+                            }
+                        >
+                            <RotateCw className={`h-3.5 w-3.5 mr-1.5 ${redeploying ? 'animate-spin' : ''}`} />
+                            {project.is_throttled ? "Paused" : "Redeploy"}
+                        </Button>
                     </div>
 
                     {/* Throttle Banner */}
@@ -692,405 +689,407 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                         </div>
                     )}
 
-                    {/* Tabs */}
-                    <div className="flex items-center gap-1 mb-6 border-b border-zinc-200 overflow-x-auto">
-                        <button
-                            onClick={() => setActiveTab("deployments")}
-                            className={`px-3 sm:px-4 py-3 text-sm font-medium transition-colors relative whitespace-nowrap ${activeTab === "deployments"
-                                ? "text-zinc-900"
-                                : "text-zinc-500 hover:text-zinc-700"
-                                }`}
-                        >
-                            Deployments
-                            {activeTab === "deployments" && (
-                                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-zinc-900" />
-                            )}
-                        </button>
-                        <button
-                            onClick={() => setActiveTab("domains")}
-                            className={`px-3 sm:px-4 py-3 text-sm font-medium transition-colors relative whitespace-nowrap ${activeTab === "domains"
-                                ? "text-zinc-900"
-                                : "text-zinc-500 hover:text-zinc-700"
-                                }`}
-                        >
-                            Domains
-                            {activeTab === "domains" && (
-                                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-zinc-900" />
-                            )}
-                        </button>
-                        <button
-                            onClick={() => setActiveTab("logs")}
-                            className={`px-3 sm:px-4 py-3 text-sm font-medium transition-colors relative whitespace-nowrap ${activeTab === "logs"
-                                ? "text-zinc-900"
-                                : "text-zinc-500 hover:text-zinc-700"
-                                }`}
-                        >
-                            Logs
-                            {activeTab === "logs" && (
-                                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-zinc-900" />
-                            )}
-                        </button>
-                        <button
-                            onClick={() => setActiveTab("compute")}
-                            className={`px-3 sm:px-4 py-3 text-sm font-medium transition-colors relative whitespace-nowrap ${activeTab === "compute"
-                                ? "text-zinc-900"
-                                : "text-zinc-500 hover:text-zinc-700"
-                                }`}
-                        >
-                            Compute
-                            {activeTab === "compute" && (
-                                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-zinc-900" />
-                            )}
-                        </button>
-                        <button
-                            onClick={() => setActiveTab("settings")}
-                            className={`px-3 sm:px-4 py-3 text-sm font-medium transition-colors relative whitespace-nowrap ${activeTab === "settings"
-                                ? "text-zinc-900"
-                                : "text-zinc-500 hover:text-zinc-700"
-                                }`}
-                        >
-                            Settings
-                            {activeTab === "settings" && (
-                                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-zinc-900" />
-                            )}
-                        </button>
+                    {/* Tabs — sticky */}
+                    <div className="sticky top-14 z-40 bg-white -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8">
+                        <div className="flex items-center gap-1 border-b border-zinc-200 overflow-x-auto">
+                            <button
+                                onClick={() => setActiveTab("deployments")}
+                                className={`px-3 sm:px-4 py-3 text-sm font-medium transition-colors relative whitespace-nowrap ${activeTab === "deployments"
+                                    ? "text-zinc-900"
+                                    : "text-zinc-500 hover:text-zinc-700"
+                                    }`}
+                            >
+                                Deployments
+                                {activeTab === "deployments" && (
+                                    <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-zinc-900" />
+                                )}
+                            </button>
+                            <button
+                                onClick={() => setActiveTab("domains")}
+                                className={`px-3 sm:px-4 py-3 text-sm font-medium transition-colors relative whitespace-nowrap ${activeTab === "domains"
+                                    ? "text-zinc-900"
+                                    : "text-zinc-500 hover:text-zinc-700"
+                                    }`}
+                            >
+                                Domains
+                                {activeTab === "domains" && (
+                                    <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-zinc-900" />
+                                )}
+                            </button>
+                            <button
+                                onClick={() => setActiveTab("logs")}
+                                className={`px-3 sm:px-4 py-3 text-sm font-medium transition-colors relative whitespace-nowrap ${activeTab === "logs"
+                                    ? "text-zinc-900"
+                                    : "text-zinc-500 hover:text-zinc-700"
+                                    }`}
+                            >
+                                Logs
+                                {activeTab === "logs" && (
+                                    <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-zinc-900" />
+                                )}
+                            </button>
+                            <button
+                                onClick={() => setActiveTab("compute")}
+                                className={`px-3 sm:px-4 py-3 text-sm font-medium transition-colors relative whitespace-nowrap ${activeTab === "compute"
+                                    ? "text-zinc-900"
+                                    : "text-zinc-500 hover:text-zinc-700"
+                                    }`}
+                            >
+                                Compute
+                                {activeTab === "compute" && (
+                                    <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-zinc-900" />
+                                )}
+                            </button>
+                            <button
+                                onClick={() => setActiveTab("settings")}
+                                className={`px-3 sm:px-4 py-3 text-sm font-medium transition-colors relative whitespace-nowrap ${activeTab === "settings"
+                                    ? "text-zinc-900"
+                                    : "text-zinc-500 hover:text-zinc-700"
+                                    }`}
+                            >
+                                Settings
+                                {activeTab === "settings" && (
+                                    <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-zinc-900" />
+                                )}
+                            </button>
+                        </div>
                     </div>
+                    <div className="py-6">
 
-                    {/* Deployments Tab */}
-                    {activeTab === "deployments" && (
-                        <div className="bg-zinc-50 rounded-2xl border border-zinc-200 overflow-hidden">
-                            {deployments.length === 0 ? (
-                                <div className="text-center py-16">
-                                    <div className="w-12 h-12 rounded-full bg-zinc-100 flex items-center justify-center mx-auto mb-4">
-                                        <Clock className="h-6 w-6 text-zinc-400" />
+                        {/* Deployments Tab */}
+                        {activeTab === "deployments" && (
+                            <div className="bg-zinc-50 rounded-2xl border border-zinc-200 overflow-hidden">
+                                {deployments.length === 0 ? (
+                                    <div className="text-center py-16">
+                                        <div className="w-12 h-12 rounded-full bg-zinc-100 flex items-center justify-center mx-auto mb-4">
+                                            <Clock className="h-6 w-6 text-zinc-400" />
+                                        </div>
+                                        <p className="text-zinc-500">No deployments yet</p>
                                     </div>
-                                    <p className="text-zinc-500">No deployments yet</p>
-                                </div>
-                            ) : (
-                                <div className="divide-y divide-zinc-100">
-                                    {deployments.map((deployment, index) => {
-                                        const isLatest = index === 0
-                                        const isExpanded = expandedDeployId === deployment.deploy_id
-                                        return (
-                                            <div key={deployment.deploy_id}>
-                                                <div
-                                                    onClick={() => setExpandedDeployId(isExpanded ? null : deployment.deploy_id)}
-                                                    className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 px-4 sm:px-6 py-4 hover:bg-zinc-50 transition-colors cursor-pointer"
-                                                >
-                                                    <div className="flex-1 min-w-0">
-                                                        <div className="flex items-center gap-2">
-                                                            <p className="font-mono text-sm font-medium text-zinc-900">
-                                                                {deployment.deploy_id}
+                                ) : (
+                                    <div className="divide-y divide-zinc-100">
+                                        {deployments.map((deployment, index) => {
+                                            const isLatest = index === 0
+                                            const isExpanded = expandedDeployId === deployment.deploy_id
+                                            return (
+                                                <div key={deployment.deploy_id}>
+                                                    <div
+                                                        onClick={() => setExpandedDeployId(isExpanded ? null : deployment.deploy_id)}
+                                                        className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 px-4 sm:px-6 py-4 hover:bg-zinc-50 transition-colors cursor-pointer"
+                                                    >
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="flex items-center gap-2">
+                                                                <p className="font-mono text-sm font-medium text-zinc-900">
+                                                                    {deployment.deploy_id}
+                                                                </p>
+                                                                {isLatest && (
+                                                                    <span className="text-xs font-medium text-zinc-500 bg-zinc-100 px-2 py-0.5 rounded-full">
+                                                                        Current
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            <p className="text-sm text-zinc-500 mt-0.5">
+                                                                {new Date(deployment.started_at).toLocaleDateString("en-US", {
+                                                                    month: "short",
+                                                                    day: "numeric",
+                                                                    year: "numeric",
+                                                                    hour: "2-digit",
+                                                                    minute: "2-digit",
+                                                                })}
                                                             </p>
-                                                            {isLatest && (
-                                                                <span className="text-xs font-medium text-zinc-500 bg-zinc-100 px-2 py-0.5 rounded-full">
-                                                                    Current
-                                                                </span>
-                                                            )}
                                                         </div>
-                                                        <p className="text-sm text-zinc-500 mt-0.5">
-                                                            {new Date(deployment.started_at).toLocaleDateString("en-US", {
-                                                                month: "short",
-                                                                day: "numeric",
-                                                                year: "numeric",
-                                                                hour: "2-digit",
-                                                                minute: "2-digit",
-                                                            })}
-                                                        </p>
-                                                    </div>
 
-                                                    <div className={`
+                                                        <div className={`
                                                     text-xs font-medium px-3 py-1.5 rounded-full
                                                     ${deployment.status === "SUCCEEDED" ? "text-emerald-700 bg-emerald-50" : ""}
                                                     ${deployment.status === "FAILED" ? "text-red-700 bg-red-50" : ""}
                                                     ${deployment.status === "IN_PROGRESS" ? "text-blue-900 bg-blue-50" : ""}
                                                 `}>
-                                                        {deployment.status === "SUCCEEDED" && "Ready"}
-                                                        {deployment.status === "FAILED" && "Failed"}
-                                                        {deployment.status === "IN_PROGRESS" && "Building"}
+                                                            {deployment.status === "SUCCEEDED" && "Ready"}
+                                                            {deployment.status === "FAILED" && "Failed"}
+                                                            {deployment.status === "IN_PROGRESS" && "Building"}
+                                                        </div>
                                                     </div>
+
+                                                    {/* Expandable Build Logs */}
+                                                    {isExpanded && (
+                                                        <DeploymentLogs
+                                                            projectId={project.project_id}
+                                                            deployId={deployment.deploy_id}
+                                                            buildId={deployment.build_id}
+                                                            orgId={orgId!}
+                                                            status={deployment.status}
+                                                            isExpanded={true}
+                                                            onToggle={() => setExpandedDeployId(null)}
+                                                            onComplete={() => fetchProject()}
+                                                        />
+                                                    )}
                                                 </div>
-
-                                                {/* Expandable Build Logs */}
-                                                {isExpanded && (
-                                                    <DeploymentLogs
-                                                        projectId={project.project_id}
-                                                        deployId={deployment.deploy_id}
-                                                        buildId={deployment.build_id}
-                                                        orgId={orgId!}
-                                                        status={deployment.status}
-                                                        isExpanded={true}
-                                                        onToggle={() => setExpandedDeployId(null)}
-                                                        onComplete={() => fetchProject()}
-                                                    />
-                                                )}
-                                            </div>
-                                        )
-                                    })}
-                                </div>
-                            )}
-                        </div>
-                    )}
-
-                    {/* Domains Tab */}
-                    {activeTab === "domains" && (
-                        <CustomDomains
-                            projectId={id}
-                            orgId={orgId ?? null}
-                            subdomain={project.subdomain ?? null}
-                            customDomains={data?.custom_domains}
-                            onRefetch={fetchProject}
-                        />
-                    )}
-
-                    {/* Logs Tab */}
-                    {activeTab === "logs" && (
-                        <div className="bg-zinc-50 rounded-2xl border border-zinc-200 overflow-hidden">
-                            <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-100">
-                                <div className="flex items-center gap-3">
-                                    <Terminal className="h-5 w-5 text-zinc-400" />
-                                    <h3 className="font-semibold text-zinc-900">Runtime Logs</h3>
-                                </div>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={fetchLogs}
-                                    disabled={logsLoading}
-                                    className="rounded-full"
-                                >
-                                    <RefreshCw className={`h-4 w-4 mr-2 ${logsLoading ? 'animate-spin' : ''}`} />
-                                    Refresh
-                                </Button>
-                            </div>
-
-                            <div style={{ height: "384px" }}>
-                                {logsLoading && logs.length === 0 ? (
-                                    <div className="flex items-center justify-center h-full bg-zinc-50">
-                                        <Loader2 className="h-6 w-6 text-zinc-400 animate-spin" />
+                                            )
+                                        })}
                                     </div>
-                                ) : logs.length === 0 ? (
-                                    <div className="flex flex-col items-center justify-center h-full bg-zinc-50 text-zinc-400">
-                                        <Terminal className="h-8 w-8 mb-3 opacity-40" />
-                                        <p className="text-sm">No logs available</p>
-                                        <p className="text-zinc-400 text-xs mt-1">
-                                            Invoke your function to see runtime logs
-                                        </p>
-                                    </div>
-                                ) : (
-                                    <ScrollFollow
-                                        startFollowing
-                                        render={({ follow, onScroll }) => (
-                                            <LazyLog
-                                                text={logs
-                                                    .map((log) => {
-                                                        const time = (() => {
-                                                            try { return new Date(log.timestamp).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }) }
-                                                            catch { return log.timestamp }
-                                                        })()
-                                                        const tsColor = "\x1b[38;2;161;161;170m" // zinc-400
-                                                        const prefix = log.level === "ERROR" ? "\x1b[38;2;220;38;38m" : log.level === "WARN" ? "\x1b[38;2;217;119;6m" : log.level === "SUCCESS" ? "\x1b[38;2;5;150;105m" : "\x1b[38;2;63;63;70m"
-                                                        return `${tsColor}${time}\x1b[0m  ${prefix}${log.message}\x1b[0m`
-                                                    })
-                                                    .join("\n")}
-                                                follow={follow}
-                                                onScroll={onScroll}
-                                                enableSearch
-                                                extraLines={1}
-                                                style={{
-                                                    background: "#f4f4f5",
-                                                    color: "#3f3f46",
-                                                    fontFamily: "var(--font-mono, 'JetBrains Mono', ui-monospace, monospace)",
-                                                    fontSize: "12px",
-                                                    height: "100%",
-                                                    width: "100%",
-                                                }}
-                                            />
-                                        )}
-                                    />
                                 )}
                             </div>
+                        )}
 
-                            <div className="px-6 py-3 border-t border-zinc-100 bg-zinc-50">
-                                <p className="text-xs text-zinc-500">
-                                    {logs.length} log {logs.length === 1 ? "entry" : "entries"}
-                                </p>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Compute Tab */}
-                    {activeTab === "compute" && (
-                        <div className="space-y-6">
-                            <ComputeSettings
-                                memory={editingCompute ? memoryValue : (project.memory || 1024)}
-                                timeout={editingCompute ? timeoutValue : (project.timeout || 30)}
-                                ephemeralStorage={editingCompute ? ephemeralStorageValue : (project.ephemeral_storage || 1024)}
-                                onMemoryChange={(value) => {
-                                    if (!editingCompute) {
-                                        startEditingCompute({ memory: value })
-                                    } else {
-                                        setMemoryValue(value)
-                                    }
-                                }}
-                                onTimeoutChange={(value) => {
-                                    if (!editingCompute) {
-                                        startEditingCompute({ timeout: value })
-                                    } else {
-                                        setTimeoutValue(value)
-                                    }
-                                }}
-                                onEphemeralStorageChange={(value) => {
-                                    if (!editingCompute) {
-                                        startEditingCompute({ ephemeral_storage: value })
-                                    } else {
-                                        setEphemeralStorageValue(value)
-                                    }
-                                }}
-                                plan={currentPlan ?? "hobby"}
-                                onUpgradeClick={openUpgradeModal}
+                        {/* Domains Tab */}
+                        {activeTab === "domains" && (
+                            <CustomDomains
+                                projectId={id}
+                                orgId={orgId ?? null}
+                                subdomain={project.subdomain ?? null}
+                                customDomains={data?.custom_domains}
+                                onRefetch={fetchProject}
                             />
+                        )}
 
-                            {/* Save Button */}
-                            {editingCompute && (
-                                <div className="flex gap-2">
+                        {/* Logs Tab */}
+                        {activeTab === "logs" && (
+                            <div className="bg-zinc-50 rounded-2xl border border-zinc-200 overflow-hidden">
+                                <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-100">
+                                    <div className="flex items-center gap-3">
+                                        <Terminal className="h-5 w-5 text-zinc-400" />
+                                        <h3 className="font-semibold text-zinc-900">Runtime Logs</h3>
+                                    </div>
                                     <Button
                                         variant="outline"
-                                        onClick={() => setEditingCompute(false)}
+                                        size="sm"
+                                        onClick={fetchLogs}
+                                        disabled={logsLoading}
                                         className="rounded-full"
                                     >
-                                        Cancel
-                                    </Button>
-                                    <Button
-                                        onClick={saveCompute}
-                                        disabled={savingCompute}
-                                        className="bg-zinc-900 hover:bg-zinc-800 text-white rounded-full"
-                                    >
-                                        {savingCompute && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                                        Save Compute Settings
+                                        <RefreshCw className={`h-4 w-4 mr-2 ${logsLoading ? 'animate-spin' : ''}`} />
+                                        Refresh
                                     </Button>
                                 </div>
-                            )}
 
-                            {/* Info Note */}
-                            <div className="bg-blue-50 rounded-2xl border border-blue-100 p-6">
-                                <div className="flex items-start gap-4">
-                                    <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center shrink-0">
-                                        <Cpu className="h-5 w-5 text-blue-600" />
-                                    </div>
-                                    <div>
-                                        <h4 className="font-semibold text-blue-900 mb-1">Compute Configuration</h4>
-                                        <p className="text-sm text-blue-700">
-                                            Changes to compute settings will take effect on the next deployment. Redeploy your project to apply the new configuration.
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Settings Tab */}
-                    {activeTab === "settings" && (
-                        <div className="space-y-6">
-                            {/* Start Command */}
-                            <StartCommandInput
-                                value={editingStartCommand ? startCommandValue : (project.start_command || "")}
-                                onChange={setStartCommandValue}
-                                disabled={!editingStartCommand}
-                                onStartEdit={startEditingStartCommand}
-                                isEditMode={editingStartCommand}
-                                onSave={saveStartCommand}
-                                onCancel={() => setEditingStartCommand(false)}
-                                isSaving={savingStartCommand}
-                            />
-
-                            {/* Environment Variables */}
-                            <EnvironmentVariablesEditor
-                                envVars={envVarsList}
-                                onChange={setEnvVarsList}
-                                showImport={true}
-                                readOnly={!editingEnvVars}
-                                existingEnvVars={project.env_vars}
-                                onStartEdit={startEditingEnvVars}
-                                isEditing={editingEnvVars}
-                                onCancelEdit={() => setEditingEnvVars(false)}
-                                onSave={saveEnvVars}
-                                isSaving={savingEnvVars}
-                            />
-
-                            {/* Danger Zone */}
-                            <div className="bg-zinc-50 rounded-2xl border border-red-200 overflow-hidden">
-                                <div className="px-6 py-4 border-b border-red-100 bg-red-50">
-                                    <h3 className="font-semibold text-red-900">Danger Zone</h3>
-                                </div>
-                                <div className="p-4 sm:p-6">
-                                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                                        <div>
-                                            <p className="font-medium text-zinc-900">Delete this project</p>
-                                            <p className="text-sm text-zinc-500">Once deleted, this cannot be undone.</p>
+                                <div style={{ height: "384px" }}>
+                                    {logsLoading && logs.length === 0 ? (
+                                        <div className="flex items-center justify-center h-full bg-zinc-50">
+                                            <Loader2 className="h-6 w-6 text-zinc-400 animate-spin" />
                                         </div>
-                                        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-                                            <AlertDialogTrigger asChild>
-                                                <Button
-                                                    variant="outline"
-                                                    className="text-red-600 border-red-200 hover:bg-red-50 rounded-full"
-                                                >
-                                                    <Trash2 className="h-4 w-4 mr-2" />
-                                                    Delete Project
-                                                </Button>
-                                            </AlertDialogTrigger>
-                                            <AlertDialogContent className="max-w-md rounded-2xl">
-                                                <AlertDialogHeader>
-                                                    <AlertDialogTitle className="text-xl">Delete Project</AlertDialogTitle>
-                                                    <AlertDialogDescription>
-                                                        This will permanently delete <strong>{project.name}</strong> and all its deployments.
-                                                    </AlertDialogDescription>
-                                                </AlertDialogHeader>
-                                                <div className="space-y-4 py-4">
-                                                    <div>
-                                                        <label className="text-sm text-zinc-600 block mb-2">
-                                                            Type <code className="bg-zinc-100 px-1.5 py-0.5 rounded text-zinc-800">{project.name}</code> to confirm
-                                                        </label>
-                                                        <Input
-                                                            value={confirmProjectName}
-                                                            onChange={(e) => setConfirmProjectName(e.target.value)}
-                                                            placeholder={project.name}
-                                                            className="font-mono"
-                                                        />
-                                                    </div>
-                                                    <div>
-                                                        <label className="text-sm text-zinc-600 block mb-2">
-                                                            Type <code className="bg-zinc-100 px-1.5 py-0.5 rounded text-zinc-800">delete my project</code> to confirm
-                                                        </label>
-                                                        <Input
-                                                            value={confirmPhrase}
-                                                            onChange={(e) => setConfirmPhrase(e.target.value)}
-                                                            placeholder="delete my project"
-                                                        />
-                                                    </div>
-                                                </div>
-                                                <AlertDialogFooter>
-                                                    <AlertDialogCancel className="rounded-full">Cancel</AlertDialogCancel>
-                                                    <AlertDialogAction
-                                                        onClick={handleDeleteProject}
-                                                        disabled={deleting || confirmProjectName !== project.name || confirmPhrase !== "delete my project"}
-                                                        className="bg-red-600 hover:bg-red-700 rounded-full"
-                                                    >
-                                                        {deleting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                                                        Delete Project
-                                                    </AlertDialogAction>
-                                                </AlertDialogFooter>
-                                            </AlertDialogContent>
-                                        </AlertDialog>
+                                    ) : logs.length === 0 ? (
+                                        <div className="flex flex-col items-center justify-center h-full bg-zinc-50 text-zinc-400">
+                                            <Terminal className="h-8 w-8 mb-3 opacity-40" />
+                                            <p className="text-sm">No logs available</p>
+                                            <p className="text-zinc-400 text-xs mt-1">
+                                                Invoke your function to see runtime logs
+                                            </p>
+                                        </div>
+                                    ) : (
+                                        <ScrollFollow
+                                            startFollowing
+                                            render={({ follow, onScroll }) => (
+                                                <LazyLog
+                                                    text={logs
+                                                        .map((log) => {
+                                                            const time = (() => {
+                                                                try { return new Date(log.timestamp).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }) }
+                                                                catch { return log.timestamp }
+                                                            })()
+                                                            const tsColor = "\x1b[38;2;161;161;170m" // zinc-400
+                                                            const prefix = log.level === "ERROR" ? "\x1b[38;2;220;38;38m" : log.level === "WARN" ? "\x1b[38;2;217;119;6m" : log.level === "SUCCESS" ? "\x1b[38;2;5;150;105m" : "\x1b[38;2;63;63;70m"
+                                                            return `${tsColor}${time}\x1b[0m  ${prefix}${log.message}\x1b[0m`
+                                                        })
+                                                        .join("\n")}
+                                                    follow={follow}
+                                                    onScroll={onScroll}
+                                                    enableSearch
+                                                    extraLines={1}
+                                                    style={{
+                                                        background: "#f4f4f5",
+                                                        color: "#3f3f46",
+                                                        fontFamily: "var(--font-mono, 'JetBrains Mono', ui-monospace, monospace)",
+                                                        fontSize: "12px",
+                                                        height: "100%",
+                                                        width: "100%",
+                                                    }}
+                                                />
+                                            )}
+                                        />
+                                    )}
+                                </div>
+
+                                <div className="px-6 py-3 border-t border-zinc-100 bg-zinc-50">
+                                    <p className="text-xs text-zinc-500">
+                                        {logs.length} log {logs.length === 1 ? "entry" : "entries"}
+                                    </p>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Compute Tab */}
+                        {activeTab === "compute" && (
+                            <div className="space-y-6">
+                                <ComputeSettings
+                                    memory={editingCompute ? memoryValue : (project.memory || 1024)}
+                                    timeout={editingCompute ? timeoutValue : (project.timeout || 30)}
+                                    ephemeralStorage={editingCompute ? ephemeralStorageValue : (project.ephemeral_storage || 1024)}
+                                    onMemoryChange={(value) => {
+                                        if (!editingCompute) {
+                                            startEditingCompute({ memory: value })
+                                        } else {
+                                            setMemoryValue(value)
+                                        }
+                                    }}
+                                    onTimeoutChange={(value) => {
+                                        if (!editingCompute) {
+                                            startEditingCompute({ timeout: value })
+                                        } else {
+                                            setTimeoutValue(value)
+                                        }
+                                    }}
+                                    onEphemeralStorageChange={(value) => {
+                                        if (!editingCompute) {
+                                            startEditingCompute({ ephemeral_storage: value })
+                                        } else {
+                                            setEphemeralStorageValue(value)
+                                        }
+                                    }}
+                                    plan={currentPlan ?? "hobby"}
+                                    onUpgradeClick={openUpgradeModal}
+                                />
+
+                                {/* Save Button */}
+                                {editingCompute && (
+                                    <div className="flex gap-2">
+                                        <Button
+                                            variant="outline"
+                                            onClick={() => setEditingCompute(false)}
+                                            className="rounded-full"
+                                        >
+                                            Cancel
+                                        </Button>
+                                        <Button
+                                            onClick={saveCompute}
+                                            disabled={savingCompute}
+                                            className="bg-zinc-900 hover:bg-zinc-800 text-white rounded-full"
+                                        >
+                                            {savingCompute && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                                            Save Compute Settings
+                                        </Button>
+                                    </div>
+                                )}
+
+                                {/* Info Note */}
+                                <div className="bg-blue-50 rounded-2xl border border-blue-100 p-6">
+                                    <div className="flex items-start gap-4">
+                                        <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center shrink-0">
+                                            <Cpu className="h-5 w-5 text-blue-600" />
+                                        </div>
+                                        <div>
+                                            <h4 className="font-semibold text-blue-900 mb-1">Compute Configuration</h4>
+                                            <p className="text-sm text-blue-700">
+                                                Changes to compute settings will take effect on the next deployment. Redeploy your project to apply the new configuration.
+                                            </p>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                        </div>
-                    )}
-                </div>
-            </div>
+                        )}
 
+                        {/* Settings Tab */}
+                        {activeTab === "settings" && (
+                            <div className="space-y-6">
+                                {/* Start Command */}
+                                <StartCommandInput
+                                    value={editingStartCommand ? startCommandValue : (project.start_command || "")}
+                                    onChange={setStartCommandValue}
+                                    disabled={!editingStartCommand}
+                                    onStartEdit={startEditingStartCommand}
+                                    isEditMode={editingStartCommand}
+                                    onSave={saveStartCommand}
+                                    onCancel={() => setEditingStartCommand(false)}
+                                    isSaving={savingStartCommand}
+                                />
 
-            {/* Upgrade Modal */}
+                                {/* Environment Variables */}
+                                <EnvironmentVariablesEditor
+                                    envVars={envVarsList}
+                                    onChange={setEnvVarsList}
+                                    showImport={true}
+                                    readOnly={!editingEnvVars}
+                                    existingEnvVars={project.env_vars}
+                                    onStartEdit={startEditingEnvVars}
+                                    isEditing={editingEnvVars}
+                                    onCancelEdit={() => setEditingEnvVars(false)}
+                                    onSave={saveEnvVars}
+                                    isSaving={savingEnvVars}
+                                />
+
+                                {/* Danger Zone */}
+                                <div className="bg-zinc-50 rounded-2xl border border-red-200 overflow-hidden">
+                                    <div className="px-6 py-4 border-b border-red-100 bg-red-50">
+                                        <h3 className="font-semibold text-red-900">Danger Zone</h3>
+                                    </div>
+                                    <div className="p-4 sm:p-6">
+                                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                                            <div>
+                                                <p className="font-medium text-zinc-900">Delete this project</p>
+                                                <p className="text-sm text-zinc-500">Once deleted, this cannot be undone.</p>
+                                            </div>
+                                            <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+                                                <AlertDialogTrigger asChild>
+                                                    <Button
+                                                        variant="outline"
+                                                        className="text-red-600 border-red-200 hover:bg-red-50 rounded-full"
+                                                    >
+                                                        <Trash2 className="h-4 w-4 mr-2" />
+                                                        Delete Project
+                                                    </Button>
+                                                </AlertDialogTrigger>
+                                                <AlertDialogContent className="max-w-md rounded-2xl">
+                                                    <AlertDialogHeader>
+                                                        <AlertDialogTitle className="text-xl">Delete Project</AlertDialogTitle>
+                                                        <AlertDialogDescription>
+                                                            This will permanently delete <strong>{project.name}</strong> and all its deployments.
+                                                        </AlertDialogDescription>
+                                                    </AlertDialogHeader>
+                                                    <div className="space-y-4 py-4">
+                                                        <div>
+                                                            <label className="text-sm text-zinc-600 block mb-2">
+                                                                Type <code className="bg-zinc-100 px-1.5 py-0.5 rounded text-zinc-800">{project.name}</code> to confirm
+                                                            </label>
+                                                            <Input
+                                                                value={confirmProjectName}
+                                                                onChange={(e) => setConfirmProjectName(e.target.value)}
+                                                                placeholder={project.name}
+                                                                className="font-mono"
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <label className="text-sm text-zinc-600 block mb-2">
+                                                                Type <code className="bg-zinc-100 px-1.5 py-0.5 rounded text-zinc-800">delete my project</code> to confirm
+                                                            </label>
+                                                            <Input
+                                                                value={confirmPhrase}
+                                                                onChange={(e) => setConfirmPhrase(e.target.value)}
+                                                                placeholder="delete my project"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                    <AlertDialogFooter>
+                                                        <AlertDialogCancel className="rounded-full">Cancel</AlertDialogCancel>
+                                                        <AlertDialogAction
+                                                            onClick={handleDeleteProject}
+                                                            disabled={deleting || confirmProjectName !== project.name || confirmPhrase !== "delete my project"}
+                                                            className="bg-red-600 hover:bg-red-700 rounded-full"
+                                                        >
+                                                            {deleting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                                                            Delete Project
+                                                        </AlertDialogAction>
+                                                    </AlertDialogFooter>
+                                                </AlertDialogContent>
+                                            </AlertDialog>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>{/* end py-6 tab content */}
+                </div>{/* end px-4 padding */}
+            </div>{/* end min-h-screen */}
+
             <UpgradeModal isOpen={upgradeModalOpen} onClose={closeUpgradeModal} />
         </>
     )

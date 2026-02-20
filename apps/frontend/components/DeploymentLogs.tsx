@@ -48,7 +48,16 @@ const BUILD_PHASES = [
     "COMPLETED",
 ]
 
-/** Convert a LogEntry array into a single newline-delimited string for LazyLog */
+// ANSI RGB escape helpers — tuned for light zinc backgrounds
+const ANSI = {
+    reset: "\x1b[0m",
+    timestamp: "\x1b[38;2;161;161;170m", // zinc-400
+    error: "\x1b[38;2;220;38;38m",   // red-600
+    warn: "\x1b[38;2;217;119;6m",   // amber-600
+    success: "\x1b[38;2;5;150;105m",   // emerald-600
+    info: "\x1b[38;2;63;63;70m",    // zinc-700 (default)
+}
+
 function logsToText(logs: LogEntry[]): string {
     if (logs.length === 0) return ""
     return logs
@@ -66,17 +75,13 @@ function logsToText(logs: LogEntry[]): string {
                 }
             })()
 
-            // ANSI color codes per level so LazyLog renders them nicely
-            const prefix =
-                log.level === "ERROR"
-                    ? "\x1b[31m" // red
-                    : log.level === "WARN"
-                    ? "\x1b[33m" // yellow
-                    : log.level === "SUCCESS"
-                    ? "\x1b[32m" // green
-                    : "\x1b[0m"  // default
+            const color =
+                log.level === "ERROR" ? ANSI.error :
+                    log.level === "WARN" ? ANSI.warn :
+                        log.level === "SUCCESS" ? ANSI.success :
+                            ANSI.info
 
-            return `\x1b[2m${time}\x1b[0m  ${prefix}${log.message}\x1b[0m`
+            return `${ANSI.timestamp}${time}${ANSI.reset}  ${color}${log.message}${ANSI.reset}`
         })
         .join("\n")
 }
@@ -120,7 +125,7 @@ export function DeploymentLogs({
         }
     }, [getToken, projectId, deployId, orgId])
 
-    // Start polling (for in-progress builds)
+    // Polling (for in-progress builds)
     const startStreaming = useCallback(async () => {
         streamingRef.current = true
         setIsStreaming(true)
@@ -169,7 +174,6 @@ export function DeploymentLogs({
         }
     }, [getToken, projectId, deployId, orgId, buildId, onComplete])
 
-    // Load logs when expanded
     useEffect(() => {
         if (!isExpanded) return
 
@@ -187,7 +191,6 @@ export function DeploymentLogs({
 
     const phaseIndex = BUILD_PHASES.indexOf(currentPhase)
     const progressPercent = Math.max(0, Math.min(100, (phaseIndex / (BUILD_PHASES.length - 1)) * 100))
-
     const logText = logsToText(logs)
 
     return (
@@ -217,7 +220,7 @@ export function DeploymentLogs({
             {/* Expanded Content */}
             {isExpanded && (
                 <div className="px-4 sm:px-6 pb-4">
-                    {/* Build Progress (for in-progress builds) */}
+                    {/* Build Progress */}
                     {status === "IN_PROGRESS" && (
                         <div className="mb-4">
                             <div className="flex items-center justify-between mb-2">
@@ -273,20 +276,20 @@ export function DeploymentLogs({
                         )}
                     </div>
 
-                    {/* Log viewer */}
-                    <div className="rounded-xl overflow-hidden" style={{ height: "320px" }}>
+                    {/* Log Viewer — light zinc, consistent with page */}
+                    <div className="rounded-xl overflow-hidden border border-zinc-200" style={{ height: "320px" }}>
                         {loading && logs.length === 0 ? (
-                            <div className="flex items-center justify-center h-full bg-zinc-900">
-                                <Loader2 className="h-6 w-6 text-zinc-500 animate-spin" />
+                            <div className="flex items-center justify-center h-full bg-zinc-50">
+                                <Loader2 className="h-6 w-6 text-zinc-400 animate-spin" />
                             </div>
                         ) : error ? (
-                            <div className="flex flex-col items-center justify-center h-full bg-zinc-900 text-red-400">
+                            <div className="flex flex-col items-center justify-center h-full bg-zinc-50 text-red-500">
                                 <XCircle className="h-6 w-6 mb-2" />
                                 <p className="text-sm">{error}</p>
                             </div>
                         ) : logs.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center h-full bg-zinc-900 text-zinc-500">
-                                <Terminal className="h-8 w-8 mb-3 opacity-50" />
+                            <div className="flex flex-col items-center justify-center h-full bg-zinc-50 text-zinc-400">
+                                <Terminal className="h-8 w-8 mb-3 opacity-40" />
                                 <p className="text-sm">Waiting for logs...</p>
                             </div>
                         ) : (
@@ -299,10 +302,9 @@ export function DeploymentLogs({
                                         onScroll={onScroll}
                                         enableSearch
                                         extraLines={1}
-                                        lineClassName="font-mono text-xs"
                                         style={{
-                                            background: "#18181b", // zinc-900
-                                            color: "#d4d4d8",      // zinc-300
+                                            background: "#f4f4f5", // zinc-100
+                                            color: "#3f3f46",      // zinc-700
                                             fontFamily: "var(--font-mono, 'JetBrains Mono', ui-monospace, monospace)",
                                             fontSize: "12px",
                                         }}

@@ -777,17 +777,6 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                                                     onClick={() => setExpandedDeployId(isExpanded ? null : deployment.deploy_id)}
                                                     className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 px-4 sm:px-6 py-4 hover:bg-zinc-50 transition-colors cursor-pointer"
                                                 >
-                                                    <div className={`
-                                                    w-10 h-10 rounded-xl flex items-center justify-center shrink-0 self-start sm:self-center
-                                                    ${deployment.status === "SUCCEEDED" ? "bg-emerald-50" : ""}
-                                                    ${deployment.status === "FAILED" ? "bg-red-50" : ""}
-                                                    ${deployment.status === "IN_PROGRESS" ? "bg-blue-50" : ""}
-                                                `}>
-                                                        {deployment.status === "SUCCEEDED" && <CheckCircle2 className="h-5 w-5 text-emerald-500" />}
-                                                        {deployment.status === "FAILED" && <XCircle className="h-5 w-5 text-red-500" />}
-                                                        {deployment.status === "IN_PROGRESS" && <Loader2 className="h-5 w-5 text-blue-900 animate-spin" />}
-                                                    </div>
-
                                                     <div className="flex-1 min-w-0">
                                                         <div className="flex items-center gap-2">
                                                             <p className="font-mono text-sm font-medium text-zinc-900">
@@ -876,14 +865,14 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
 
                             <div style={{ height: "384px" }}>
                                 {logsLoading && logs.length === 0 ? (
-                                    <div className="flex items-center justify-center h-full bg-zinc-900">
-                                        <Loader2 className="h-6 w-6 text-zinc-500 animate-spin" />
+                                    <div className="flex items-center justify-center h-full bg-zinc-50">
+                                        <Loader2 className="h-6 w-6 text-zinc-400 animate-spin" />
                                     </div>
                                 ) : logs.length === 0 ? (
-                                    <div className="flex flex-col items-center justify-center h-full bg-zinc-900 text-zinc-500">
-                                        <Terminal className="h-8 w-8 mb-3 opacity-50" />
+                                    <div className="flex flex-col items-center justify-center h-full bg-zinc-50 text-zinc-400">
+                                        <Terminal className="h-8 w-8 mb-3 opacity-40" />
                                         <p className="text-sm">No logs available</p>
-                                        <p className="text-zinc-600 text-xs mt-1">
+                                        <p className="text-zinc-400 text-xs mt-1">
                                             Invoke your function to see runtime logs
                                         </p>
                                     </div>
@@ -898,8 +887,9 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                                                             try { return new Date(log.timestamp).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }) }
                                                             catch { return log.timestamp }
                                                         })()
-                                                        const prefix = log.level === "ERROR" ? "\x1b[31m" : log.level === "WARN" ? "\x1b[33m" : log.level === "SUCCESS" ? "\x1b[32m" : "\x1b[36m"
-                                                        return `\x1b[2m${time}\x1b[0m  ${prefix}${log.message}\x1b[0m`
+                                                        const tsColor = "\x1b[38;2;161;161;170m" // zinc-400
+                                                        const prefix = log.level === "ERROR" ? "\x1b[38;2;220;38;38m" : log.level === "WARN" ? "\x1b[38;2;217;119;6m" : log.level === "SUCCESS" ? "\x1b[38;2;5;150;105m" : "\x1b[38;2;63;63;70m"
+                                                        return `${tsColor}${time}\x1b[0m  ${prefix}${log.message}\x1b[0m`
                                                     })
                                                     .join("\n")}
                                                 follow={follow}
@@ -907,8 +897,8 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                                                 enableSearch
                                                 extraLines={1}
                                                 style={{
-                                                    background: "#18181b",
-                                                    color: "#d4d4d8",
+                                                    background: "#f4f4f5",
+                                                    color: "#3f3f46",
                                                     fontFamily: "var(--font-mono, 'JetBrains Mono', ui-monospace, monospace)",
                                                     fontSize: "12px",
                                                     height: "100%",

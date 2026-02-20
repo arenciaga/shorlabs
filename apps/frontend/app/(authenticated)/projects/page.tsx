@@ -209,7 +209,7 @@ export default function ProjectsPage() {
                             placeholder="Search Projects..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="pl-10 h-10 text-sm bg-zinc-50 border-zinc-200 rounded-lg w-full focus:ring-2 focus:ring-zinc-100 focus:border-zinc-300 transition-all"
+                            className="pl-10 h-10 text-sm bg-zinc-50 border-zinc-200 rounded-full w-full focus:ring-2 focus:ring-zinc-100 focus:border-zinc-300 transition-all"
                         />
                     </div>
                     <div className="flex items-center gap-2 sm:gap-3">

@@ -149,21 +149,15 @@ export default function SettingsPage() {
     }
 
     return (
-        <div className="min-h-screen bg-zinc-50">
-            <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
-                {/* Header */}
-                <div className="mb-2">
-                    <h1 className="text-2xl font-bold text-zinc-900 tracking-tight">Settings</h1>
-                    <p className="text-sm text-zinc-500 mt-1">Manage your integrations and preferences</p>
-                </div>
+        <div className="min-h-screen bg-white">
+            <div className="px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
 
                 {/* Tab Navigation */}
                 <div className="flex items-center gap-1 mb-6 border-b border-zinc-200">
                     <button
                         onClick={() => setActiveTab("integrations")}
-                        className={`px-3 sm:px-4 py-3 text-sm font-medium transition-colors relative whitespace-nowrap ${
-                            activeTab === "integrations" ? "text-zinc-900" : "text-zinc-500 hover:text-zinc-700"
-                        }`}
+                        className={`px-3 sm:px-4 py-3 text-sm font-medium transition-colors relative whitespace-nowrap ${activeTab === "integrations" ? "text-zinc-900" : "text-zinc-500 hover:text-zinc-700"
+                            }`}
                     >
                         Integrations
                         {activeTab === "integrations" && (
@@ -172,9 +166,8 @@ export default function SettingsPage() {
                     </button>
                     <button
                         onClick={() => setActiveTab("billing")}
-                        className={`px-3 sm:px-4 py-3 text-sm font-medium transition-colors relative whitespace-nowrap ${
-                            activeTab === "billing" ? "text-zinc-900" : "text-zinc-500 hover:text-zinc-700"
-                        }`}
+                        className={`px-3 sm:px-4 py-3 text-sm font-medium transition-colors relative whitespace-nowrap ${activeTab === "billing" ? "text-zinc-900" : "text-zinc-500 hover:text-zinc-700"
+                            }`}
                     >
                         Billing
                         {activeTab === "billing" && (
@@ -185,291 +178,289 @@ export default function SettingsPage() {
 
                 {/* Integrations Tab */}
                 {activeTab === "integrations" && (
-                <div className="space-y-6">
-                    <div>
-                        <h2 className="text-sm font-semibold text-zinc-900 uppercase tracking-wider mb-4">Integrations</h2>
+                    <div className="space-y-6">
+                        <div>
+                            <h2 className="text-sm font-semibold text-zinc-900 uppercase tracking-wider mb-4">Integrations</h2>
 
-                        {/* GitHub Connection Card */}
-                        <div className="bg-white rounded-2xl border border-zinc-200 overflow-hidden">
-                            {/* Card Header */}
-                            <div className="px-4 py-4 sm:px-6 sm:py-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-zinc-100">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 shrink-0 rounded-xl bg-zinc-900 flex items-center justify-center">
-                                        <Github className="h-5 w-5 text-white" />
+                            {/* GitHub Connection Card */}
+                            <div className="bg-white rounded-2xl border border-zinc-200 overflow-hidden">
+                                {/* Card Header */}
+                                <div className="px-4 py-4 sm:px-6 sm:py-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-zinc-100">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 shrink-0 rounded-xl bg-zinc-900 flex items-center justify-center">
+                                            <Github className="h-5 w-5 text-white" />
+                                        </div>
+                                        <div>
+                                            <p className="font-semibold text-zinc-900">GitHub</p>
+                                            <p className="text-xs text-zinc-500">Deploy from your repositories</p>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <p className="font-semibold text-zinc-900">GitHub</p>
-                                        <p className="text-xs text-zinc-500">Deploy from your repositories</p>
-                                    </div>
+
+                                    {!loading && connection && (
+                                        <span className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full self-start sm:self-auto ${connection.connected
+                                                ? 'bg-emerald-50 text-emerald-700'
+                                                : 'bg-zinc-100 text-zinc-500'
+                                            }`}>
+                                            <span className={`w-1.5 h-1.5 rounded-full ${connection.connected ? 'bg-emerald-500' : 'bg-zinc-400'
+                                                }`} />
+                                            {connection.connected ? 'Connected' : 'Not connected'}
+                                        </span>
+                                    )}
                                 </div>
 
-                                {!loading && connection && (
-                                    <span className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full self-start sm:self-auto ${
-                                        connection.connected
-                                            ? 'bg-emerald-50 text-emerald-700'
-                                            : 'bg-zinc-100 text-zinc-500'
-                                    }`}>
-                                        <span className={`w-1.5 h-1.5 rounded-full ${
-                                            connection.connected ? 'bg-emerald-500' : 'bg-zinc-400'
-                                        }`} />
-                                        {connection.connected ? 'Connected' : 'Not connected'}
-                                    </span>
-                                )}
-                            </div>
-
-                            {/* Card Body */}
-                            <div className="px-4 py-4 sm:px-6 sm:py-5">
-                                {loading ? (
-                                    <div className="flex items-center justify-center py-6">
-                                        <Loader2 className="h-5 w-5 animate-spin text-zinc-400" />
-                                    </div>
-                                ) : error ? (
-                                    <div className="flex flex-col items-center gap-3 py-4">
-                                        <div className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center">
-                                            <AlertCircle className="h-5 w-5 text-red-500" />
+                                {/* Card Body */}
+                                <div className="px-4 py-4 sm:px-6 sm:py-5">
+                                    {loading ? (
+                                        <div className="flex items-center justify-center py-6">
+                                            <Loader2 className="h-5 w-5 animate-spin text-zinc-400" />
                                         </div>
-                                        <p className="text-sm text-zinc-500">{error}</p>
-                                        <Button
-                                            onClick={fetchStatus}
-                                            variant="outline"
-                                            size="sm"
-                                            className="rounded-full"
-                                        >
-                                            <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
-                                            Retry
-                                        </Button>
-                                    </div>
-                                ) : connection?.connected ? (
-                                    /* Connected State */
-                                    <div className="space-y-5">
-                                        {/* Account Info */}
-                                        <div className="flex items-center gap-3">
-                                            {connection.avatar_url ? (
-                                                <img
-                                                    src={connection.avatar_url}
-                                                    alt={connection.username || 'GitHub'}
-                                                    className="w-12 h-12 rounded-full border border-zinc-200"
-                                                />
-                                            ) : (
-                                                <div className="w-12 h-12 rounded-full bg-zinc-100 flex items-center justify-center">
-                                                    <Github className="h-6 w-6 text-zinc-400" />
+                                    ) : error ? (
+                                        <div className="flex flex-col items-center gap-3 py-4">
+                                            <div className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center">
+                                                <AlertCircle className="h-5 w-5 text-red-500" />
+                                            </div>
+                                            <p className="text-sm text-zinc-500">{error}</p>
+                                            <Button
+                                                onClick={fetchStatus}
+                                                variant="outline"
+                                                size="sm"
+                                                className="rounded-full"
+                                            >
+                                                <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+                                                Retry
+                                            </Button>
+                                        </div>
+                                    ) : connection?.connected ? (
+                                        /* Connected State */
+                                        <div className="space-y-5">
+                                            {/* Account Info */}
+                                            <div className="flex items-center gap-3">
+                                                {connection.avatar_url ? (
+                                                    <img
+                                                        src={connection.avatar_url}
+                                                        alt={connection.username || 'GitHub'}
+                                                        className="w-12 h-12 rounded-full border border-zinc-200"
+                                                    />
+                                                ) : (
+                                                    <div className="w-12 h-12 rounded-full bg-zinc-100 flex items-center justify-center">
+                                                        <Github className="h-6 w-6 text-zinc-400" />
+                                                    </div>
+                                                )}
+                                                <div>
+                                                    <p className="font-medium text-zinc-900">{connection.username}</p>
+                                                    <p className="text-xs text-zinc-500">
+                                                        {connection.account_type === 'Organization' ? 'Organization' : 'Personal account'}
+                                                    </p>
                                                 </div>
-                                            )}
-                                            <div>
-                                                <p className="font-medium text-zinc-900">{connection.username}</p>
-                                                <p className="text-xs text-zinc-500">
-                                                    {connection.account_type === 'Organization' ? 'Organization' : 'Personal account'}
-                                                </p>
+                                            </div>
+
+                                            {/* Actions */}
+                                            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pt-3 border-t border-zinc-100">
+                                                <a
+                                                    href={`https://github.com/${connection.username}`}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="inline-flex items-center gap-1.5 text-sm text-zinc-600 hover:text-zinc-900 transition-colors"
+                                                >
+                                                    <ExternalLink className="h-3.5 w-3.5" />
+                                                    View on GitHub
+                                                </a>
+
+                                                <span className="hidden sm:inline text-zinc-200">|</span>
+
+                                                <a
+                                                    href="https://github.com/apps/shorlabs/installations/new"
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="inline-flex items-center gap-1.5 text-sm text-zinc-600 hover:text-zinc-900 transition-colors"
+                                                >
+                                                    <RefreshCw className="h-3.5 w-3.5" />
+                                                    Manage permissions
+                                                </a>
+
+                                                <span className="hidden sm:inline text-zinc-200">|</span>
+
+                                                <AlertDialog>
+                                                    <AlertDialogTrigger asChild>
+                                                        <button className="inline-flex items-center gap-1.5 text-sm text-red-500 hover:text-red-700 transition-colors">
+                                                            <Unplug className="h-3.5 w-3.5" />
+                                                            Disconnect
+                                                        </button>
+                                                    </AlertDialogTrigger>
+                                                    <AlertDialogContent className="rounded-2xl">
+                                                        <AlertDialogHeader>
+                                                            <AlertDialogTitle>Disconnect GitHub?</AlertDialogTitle>
+                                                            <AlertDialogDescription>
+                                                                This will revoke access to your GitHub repositories. Existing deployments will continue to work, but you won&apos;t be able to create new projects or redeploy until you reconnect.
+                                                            </AlertDialogDescription>
+                                                        </AlertDialogHeader>
+                                                        <AlertDialogFooter>
+                                                            <AlertDialogCancel className="rounded-full">Cancel</AlertDialogCancel>
+                                                            <AlertDialogAction
+                                                                onClick={handleDisconnect}
+                                                                className="bg-red-600 hover:bg-red-700 text-white rounded-full"
+                                                                disabled={disconnecting}
+                                                            >
+                                                                {disconnecting ? (
+                                                                    <>
+                                                                        <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                                                                        Disconnecting...
+                                                                    </>
+                                                                ) : (
+                                                                    'Disconnect'
+                                                                )}
+                                                            </AlertDialogAction>
+                                                        </AlertDialogFooter>
+                                                    </AlertDialogContent>
+                                                </AlertDialog>
                                             </div>
                                         </div>
-
-                                        {/* Actions */}
-                                        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pt-3 border-t border-zinc-100">
-                                            <a
-                                                href={`https://github.com/${connection.username}`}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="inline-flex items-center gap-1.5 text-sm text-zinc-600 hover:text-zinc-900 transition-colors"
+                                    ) : (
+                                        /* Not Connected State */
+                                        <div className="flex flex-col items-center gap-4 py-4">
+                                            <div className="w-14 h-14 rounded-2xl bg-zinc-100 flex items-center justify-center">
+                                                <Github className="h-7 w-7 text-zinc-400" />
+                                            </div>
+                                            <div className="text-center">
+                                                <p className="font-medium text-zinc-900 mb-1">No GitHub account connected</p>
+                                                <p className="text-sm text-zinc-500 max-w-sm">
+                                                    Connect your GitHub account to import repositories and deploy your projects.
+                                                </p>
+                                            </div>
+                                            <Button
+                                                onClick={handleConnect}
+                                                className="bg-zinc-900 hover:bg-zinc-800 text-white rounded-full h-10 px-6"
                                             >
-                                                <ExternalLink className="h-3.5 w-3.5" />
-                                                View on GitHub
-                                            </a>
-
-                                            <span className="hidden sm:inline text-zinc-200">|</span>
-
-                                            <a
-                                                href="https://github.com/apps/shorlabs/installations/new"
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="inline-flex items-center gap-1.5 text-sm text-zinc-600 hover:text-zinc-900 transition-colors"
-                                            >
-                                                <RefreshCw className="h-3.5 w-3.5" />
-                                                Manage permissions
-                                            </a>
-
-                                            <span className="hidden sm:inline text-zinc-200">|</span>
-
-                                            <AlertDialog>
-                                                <AlertDialogTrigger asChild>
-                                                    <button className="inline-flex items-center gap-1.5 text-sm text-red-500 hover:text-red-700 transition-colors">
-                                                        <Unplug className="h-3.5 w-3.5" />
-                                                        Disconnect
-                                                    </button>
-                                                </AlertDialogTrigger>
-                                                <AlertDialogContent className="rounded-2xl">
-                                                    <AlertDialogHeader>
-                                                        <AlertDialogTitle>Disconnect GitHub?</AlertDialogTitle>
-                                                        <AlertDialogDescription>
-                                                            This will revoke access to your GitHub repositories. Existing deployments will continue to work, but you won&apos;t be able to create new projects or redeploy until you reconnect.
-                                                        </AlertDialogDescription>
-                                                    </AlertDialogHeader>
-                                                    <AlertDialogFooter>
-                                                        <AlertDialogCancel className="rounded-full">Cancel</AlertDialogCancel>
-                                                        <AlertDialogAction
-                                                            onClick={handleDisconnect}
-                                                            className="bg-red-600 hover:bg-red-700 text-white rounded-full"
-                                                            disabled={disconnecting}
-                                                        >
-                                                            {disconnecting ? (
-                                                                <>
-                                                                    <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
-                                                                    Disconnecting...
-                                                                </>
-                                                            ) : (
-                                                                'Disconnect'
-                                                            )}
-                                                        </AlertDialogAction>
-                                                    </AlertDialogFooter>
-                                                </AlertDialogContent>
-                                            </AlertDialog>
+                                                <Github className="h-4 w-4 mr-2" />
+                                                Connect GitHub
+                                            </Button>
                                         </div>
-                                    </div>
-                                ) : (
-                                    /* Not Connected State */
-                                    <div className="flex flex-col items-center gap-4 py-4">
-                                        <div className="w-14 h-14 rounded-2xl bg-zinc-100 flex items-center justify-center">
-                                            <Github className="h-7 w-7 text-zinc-400" />
-                                        </div>
-                                        <div className="text-center">
-                                            <p className="font-medium text-zinc-900 mb-1">No GitHub account connected</p>
-                                            <p className="text-sm text-zinc-500 max-w-sm">
-                                                Connect your GitHub account to import repositories and deploy your projects.
-                                            </p>
-                                        </div>
-                                        <Button
-                                            onClick={handleConnect}
-                                            className="bg-zinc-900 hover:bg-zinc-800 text-white rounded-full h-10 px-6"
-                                        >
-                                            <Github className="h-4 w-4 mr-2" />
-                                            Connect GitHub
-                                        </Button>
-                                    </div>
-                                )}
+                                    )}
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
                 )}
 
                 {/* Billing Tab */}
                 {activeTab === "billing" && (
-                <div className="space-y-6">
-                    {/* Current Plan Card */}
-                    <div>
-                        <h2 className="text-sm font-semibold text-zinc-900 uppercase tracking-wider mb-4">Current Plan</h2>
-                        <div className="bg-white rounded-2xl border border-zinc-200 overflow-hidden">
-                            <div className="px-4 py-4 sm:px-6 sm:py-5">
-                                {!isPlanLoaded ? (
-                                    <div className="flex items-center justify-center py-6">
-                                        <Loader2 className="h-5 w-5 animate-spin text-zinc-400" />
-                                    </div>
-                                ) : (
-                                    <div className="space-y-5">
-                                        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 shrink-0 rounded-full" style={{ background: 'linear-gradient(135deg, #34d399, #a3e635, #facc15)' }} />
-                                                <div>
-                                                    <div className="flex flex-wrap items-center gap-2">
-                                                        <p className="font-semibold text-zinc-900">{planLabel}</p>
-                                                        {isCanceling ? (
-                                                            <Badge className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700">
-                                                                Cancels at period end
-                                                            </Badge>
-                                                        ) : activeProduct?.status === "trialing" ? (
-                                                            <Badge className="rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-700">
-                                                                Trial
-                                                            </Badge>
-                                                        ) : activeProduct?.status === "past_due" ? (
-                                                            <Badge className="rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-medium text-red-700">
-                                                                Past due
-                                                            </Badge>
-                                                        ) : isPro ? (
-                                                            <Badge className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
-                                                                Active
-                                                            </Badge>
-                                                        ) : null}
+                    <div className="space-y-6">
+                        {/* Current Plan Card */}
+                        <div>
+                            <h2 className="text-sm font-semibold text-zinc-900 uppercase tracking-wider mb-4">Current Plan</h2>
+                            <div className="bg-white rounded-2xl border border-zinc-200 overflow-hidden">
+                                <div className="px-4 py-4 sm:px-6 sm:py-5">
+                                    {!isPlanLoaded ? (
+                                        <div className="flex items-center justify-center py-6">
+                                            <Loader2 className="h-5 w-5 animate-spin text-zinc-400" />
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-5">
+                                            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-10 h-10 shrink-0 rounded-full" style={{ background: 'linear-gradient(135deg, #34d399, #a3e635, #facc15)' }} />
+                                                    <div>
+                                                        <div className="flex flex-wrap items-center gap-2">
+                                                            <p className="font-semibold text-zinc-900">{planLabel}</p>
+                                                            {isCanceling ? (
+                                                                <Badge className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700">
+                                                                    Cancels at period end
+                                                                </Badge>
+                                                            ) : activeProduct?.status === "trialing" ? (
+                                                                <Badge className="rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-700">
+                                                                    Trial
+                                                                </Badge>
+                                                            ) : activeProduct?.status === "past_due" ? (
+                                                                <Badge className="rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-medium text-red-700">
+                                                                    Past due
+                                                                </Badge>
+                                                            ) : isPro ? (
+                                                                <Badge className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
+                                                                    Active
+                                                                </Badge>
+                                                            ) : null}
+                                                        </div>
+                                                        <p className="text-sm text-zinc-500 mt-0.5">
+                                                            {planPrice} / month
+                                                            {isPro && activeProduct?.current_period_end && (
+                                                                <> · {activeProduct.status === "trialing" ? "Trial ends" : "Renews"} {new Date(activeProduct.current_period_end).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</>
+                                                            )}
+                                                        </p>
                                                     </div>
-                                                    <p className="text-sm text-zinc-500 mt-0.5">
-                                                        {planPrice} / month
-                                                        {isPro && activeProduct?.current_period_end && (
-                                                            <> · {activeProduct.status === "trialing" ? "Trial ends" : "Renews"} {new Date(activeProduct.current_period_end).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</>
-                                                        )}
+                                                </div>
+                                                <Button
+                                                    onClick={openUpgradeModal}
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="w-full sm:w-auto rounded-full shrink-0"
+                                                >
+                                                    Change Plan
+                                                </Button>
+                                            </div>
+
+                                            {/* Scheduled downgrade banner */}
+                                            {isCanceling && (
+                                                <div className="rounded-xl bg-amber-50 border border-amber-100 px-4 py-3">
+                                                    <p className="text-sm text-amber-800">
+                                                        Your plan will change to <span className="font-medium">{scheduledPlanLabel}</span> at the end of the current billing period
+                                                        {activeProduct?.current_period_end && (
+                                                            <> on {new Date(activeProduct.current_period_end).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</>
+                                                        )}.
                                                     </p>
                                                 </div>
-                                            </div>
-                                            <Button
-                                                onClick={openUpgradeModal}
-                                                variant="outline"
-                                                size="sm"
-                                                className="w-full sm:w-auto rounded-full shrink-0"
-                                            >
-                                                Change Plan
-                                            </Button>
+                                            )}
                                         </div>
-
-                                        {/* Scheduled downgrade banner */}
-                                        {isCanceling && (
-                                            <div className="rounded-xl bg-amber-50 border border-amber-100 px-4 py-3">
-                                                <p className="text-sm text-amber-800">
-                                                    Your plan will change to <span className="font-medium">{scheduledPlanLabel}</span> at the end of the current billing period
-                                                    {activeProduct?.current_period_end && (
-                                                        <> on {new Date(activeProduct.current_period_end).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</>
-                                                    )}.
-                                                </p>
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Payment & Invoices */}
-                    <div>
-                        <h2 className="text-sm font-semibold text-zinc-900 uppercase tracking-wider mb-4">Payment & Invoices</h2>
-                        <div className="bg-white rounded-2xl border border-zinc-200 overflow-hidden">
-                            <div className="px-4 py-4 sm:px-6 sm:py-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 shrink-0 rounded-xl bg-zinc-100 flex items-center justify-center">
-                                        <CreditCard className="h-5 w-5 text-zinc-400" />
-                                    </div>
-                                    <div className="min-w-0">
-                                        <p className="font-semibold text-zinc-900">Manage Billing</p>
-                                        <p className="text-xs text-zinc-500">Update payment method, view invoices, and manage your subscription</p>
-                                    </div>
-                                </div>
-                                <Button
-                                    onClick={async () => {
-                                        setBillingPortalLoading(true)
-                                        try {
-                                            const baseUrl = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : '')
-                                            await openBillingPortal({
-                                                returnUrl: `${baseUrl}/settings`,
-                                            })
-                                        } catch (err) {
-                                            console.error("Failed to open billing portal:", err)
-                                        } finally {
-                                            setBillingPortalLoading(false)
-                                        }
-                                    }}
-                                    disabled={billingPortalLoading || isCustomerLoading}
-                                    variant="outline"
-                                    size="sm"
-                                    className="w-full sm:w-auto rounded-full shrink-0"
-                                >
-                                    {billingPortalLoading ? (
-                                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                    ) : (
-                                        <>
-                                            Open Portal
-                                            <ArrowUpRight className="h-3.5 w-3.5 ml-1.5" />
-                                        </>
                                     )}
-                                </Button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Payment & Invoices */}
+                        <div>
+                            <h2 className="text-sm font-semibold text-zinc-900 uppercase tracking-wider mb-4">Payment & Invoices</h2>
+                            <div className="bg-white rounded-2xl border border-zinc-200 overflow-hidden">
+                                <div className="px-4 py-4 sm:px-6 sm:py-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 shrink-0 rounded-xl bg-zinc-100 flex items-center justify-center">
+                                            <CreditCard className="h-5 w-5 text-zinc-400" />
+                                        </div>
+                                        <div className="min-w-0">
+                                            <p className="font-semibold text-zinc-900">Manage Billing</p>
+                                            <p className="text-xs text-zinc-500">Update payment method, view invoices, and manage your subscription</p>
+                                        </div>
+                                    </div>
+                                    <Button
+                                        onClick={async () => {
+                                            setBillingPortalLoading(true)
+                                            try {
+                                                const baseUrl = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : '')
+                                                await openBillingPortal({
+                                                    returnUrl: `${baseUrl}/settings`,
+                                                })
+                                            } catch (err) {
+                                                console.error("Failed to open billing portal:", err)
+                                            } finally {
+                                                setBillingPortalLoading(false)
+                                            }
+                                        }}
+                                        disabled={billingPortalLoading || isCustomerLoading}
+                                        variant="outline"
+                                        size="sm"
+                                        className="w-full sm:w-auto rounded-full shrink-0"
+                                    >
+                                        {billingPortalLoading ? (
+                                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                        ) : (
+                                            <>
+                                                Open Portal
+                                                <ArrowUpRight className="h-3.5 w-3.5 ml-1.5" />
+                                            </>
+                                        )}
+                                    </Button>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
                 )}
 
                 <UpgradeModal isOpen={upgradeOpen} onClose={closeUpgradeModal} />

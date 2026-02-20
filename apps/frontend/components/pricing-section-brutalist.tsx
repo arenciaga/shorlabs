@@ -5,6 +5,10 @@ import { ArrowRight, Check } from "lucide-react"
 import { PLANS } from "@/lib/plans"
 import Link from "next/link"
 import { useAuth } from "@clerk/nextjs"
+import { Button } from "@/components/ui/button"
+import { Card } from "@/components/ui/card"
+import { Separator } from "@/components/ui/separator"
+import { Badge } from "@/components/ui/badge"
 
 /* ── scramble-in price effect ── */
 function ScramblePrice({ target, prefix = "$" }: { target: string; prefix?: string }) {
@@ -71,11 +75,11 @@ function PricingCard({ plan, index }: { plan: typeof PLANS[0]; index: number }) 
   const isHighlighted = plan.highlighted || false
 
   return (
-    <div
+    <Card
       className={`flex flex-col h-full ${
         isHighlighted
-          ? "border-2 border-foreground bg-foreground text-background"
-          : "border-2 border-foreground bg-background text-foreground"
+          ? "border-2 border-foreground bg-foreground text-background rounded-none py-0 shadow-none gap-0"
+          : "border-2 border-foreground bg-background text-foreground rounded-none py-0 shadow-none gap-0"
       }`}
     >
       {/* Card header */}
@@ -146,38 +150,34 @@ function PricingCard({ plan, index }: { plan: typeof PLANS[0]; index: number }) 
       {/* CTA */}
       <div className="px-5 pb-5 pt-3">
         {isSignedIn ? (
-          <Link href="/projects">
-            <button
-              className={`group w-full flex items-center justify-center gap-0 text-xs font-mono tracking-wider uppercase ${
+          <Button asChild className={`group w-full rounded-none h-9 px-0 text-xs font-mono tracking-wider uppercase ${
                 isHighlighted
                   ? "bg-background text-foreground"
                   : "bg-foreground text-background"
-              }`}
-            >
+              }`}>
+            <Link href="/projects" className="flex items-center justify-center gap-0">
               <span className="flex items-center justify-center w-9 h-9 bg-muted-foreground">
                 <ArrowRight size={14} strokeWidth={2} className="text-background" />
               </span>
               <span className="flex-1 py-2.5">Deploy Now</span>
-            </button>
-          </Link>
+            </Link>
+          </Button>
         ) : (
-          <Link href="/sign-in">
-            <button
-              className={`group w-full flex items-center justify-center gap-0 text-xs font-mono tracking-wider uppercase ${
+          <Button asChild className={`group w-full rounded-none h-9 px-0 text-xs font-mono tracking-wider uppercase ${
                 isHighlighted
                   ? "bg-background text-foreground"
                   : "bg-foreground text-background"
-              }`}
-            >
+              }`}>
+            <Link href="/sign-in" className="flex items-center justify-center gap-0">
               <span className="flex items-center justify-center w-9 h-9 bg-muted-foreground">
                 <ArrowRight size={14} strokeWidth={2} className="text-background" />
               </span>
               <span className="flex-1 py-2.5">Get Started</span>
-            </button>
-          </Link>
+            </Link>
+          </Button>
         )}
       </div>
-    </div>
+    </Card>
   )
 }
 
@@ -189,7 +189,7 @@ export function PricingSection() {
         <span className="text-[10px] tracking-[0.2em] uppercase text-muted-foreground font-mono whitespace-nowrap">
           {"// SECTION: PRICING_TIERS"}
         </span>
-        <div className="flex-1 border-t border-border" />
+        <Separator className="flex-1" />
         <BlinkDot />
         <span className="text-[10px] tracking-[0.2em] uppercase text-muted-foreground font-mono whitespace-nowrap">
           006
@@ -205,7 +205,9 @@ export function PricingSection() {
             Simple, transparent pricing. Start free, scale as you grow.
           </p>
         </div>
-        <StatusLine />
+        <Badge variant="outline" className="rounded-none font-mono text-[10px] tracking-widest uppercase">
+          <StatusLine />
+        </Badge>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-0">
@@ -215,10 +217,10 @@ export function PricingSection() {
       </div>
 
       <div className="flex items-center gap-3 mt-6">
-        <span className="text-[10px] tracking-[0.2em] uppercase text-muted-foreground font-mono leading-relaxed">
+        <Badge variant="outline" className="rounded-none font-mono text-[10px] tracking-[0.2em] uppercase text-muted-foreground leading-relaxed">
           {"* Pay per request pricing available. Cancel anytime."}
-        </span>
-        <div className="flex-1 border-t border-border" />
+        </Badge>
+        <Separator className="flex-1" />
       </div>
     </section>
   )

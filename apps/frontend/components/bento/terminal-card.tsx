@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { Card } from "@/components/ui/card"
 
 const LOG_LINES = [
   "> Connecting to GitHub...",
@@ -34,7 +35,7 @@ export function TerminalCard() {
   }, [])
 
   return (
-    <div className="flex flex-col h-full">
+    <Card className="flex flex-col h-full rounded-none border-0 bg-transparent py-0 shadow-none gap-0">
       <div className="flex items-center gap-2 border-b-2 border-foreground px-3 sm:px-4 py-2">
         <span className="h-2 w-2 bg-muted-foreground" />
         <span className="h-2 w-2 bg-foreground" />
@@ -57,6 +58,6 @@ export function TerminalCard() {
           <span className="text-xs text-muted-foreground font-mono animate-blink">{"_"}</span>
         </div>
       </div>
-    </div>
+    </Card>
   )
 }

@@ -1,6 +1,9 @@
 "use client"
 
 import { useEffect, useState, useRef } from "react"
+import { Card } from "@/components/ui/card"
+import { Separator } from "@/components/ui/separator"
+import { Badge } from "@/components/ui/badge"
 
 /* ── scramble text reveal ── */
 function ScrambleText({ text, className }: { text: string; className?: string }) {
@@ -91,14 +94,14 @@ const STATS = [
 
 function StatBlock({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex flex-col gap-1 border-2 border-foreground px-3 py-3 sm:px-4">
+    <Card className="flex flex-col gap-1 border-2 border-foreground rounded-none bg-transparent py-3 px-3 sm:px-4 shadow-none">
       <span className="text-[10px] tracking-[0.2em] uppercase text-muted-foreground font-mono">
         {label}
       </span>
       <span className="text-xl lg:text-2xl font-mono font-bold tracking-tight">
         <ScrambleText text={value} />
       </span>
-    </div>
+    </Card>
   )
 }
 
@@ -110,14 +113,14 @@ export function AboutSection() {
         <span className="text-[10px] tracking-[0.2em] uppercase text-muted-foreground font-mono whitespace-nowrap">
           {"// SECTION: ABOUT_SHORLABS"}
         </span>
-        <div className="flex-1 border-t border-border" />
+        <Separator className="flex-1" />
         <BlinkDot />
         <span className="text-[10px] tracking-[0.2em] uppercase text-muted-foreground font-mono whitespace-nowrap">
           005
         </span>
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-0 border-2 border-foreground">
+      <Card className="flex flex-col lg:flex-row gap-0 border-2 border-foreground rounded-none bg-transparent py-0 shadow-none">
         <div className="relative w-full lg:w-1/2 min-h-[240px] sm:min-h-[300px] lg:min-h-[500px] border-b-2 lg:border-b-0 lg:border-r-2 border-foreground overflow-hidden bg-foreground">
           <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between gap-2 px-3 sm:px-4 py-2 bg-foreground/80 backdrop-blur-sm">
             <span className="text-[10px] tracking-[0.2em] uppercase text-background/60 font-mono truncate">
@@ -144,12 +147,12 @@ export function AboutSection() {
 
         <div className="flex flex-col w-full lg:w-1/2">
           <div className="flex items-center justify-between px-4 sm:px-5 py-3 border-b-2 border-foreground">
-            <span className="text-[10px] tracking-[0.2em] uppercase text-muted-foreground font-mono">
+            <Badge variant="outline" className="rounded-none text-[10px] tracking-[0.2em] uppercase text-muted-foreground font-mono border-foreground/30">
               MANIFEST.md
-            </span>
-            <span className="text-[10px] tracking-[0.2em] uppercase text-muted-foreground font-mono">
+            </Badge>
+            <Badge variant="outline" className="rounded-none text-[10px] tracking-[0.2em] uppercase text-muted-foreground font-mono border-foreground/30">
               v1.0.0
-            </span>
+            </Badge>
           </div>
 
           <div className="flex-1 flex flex-col justify-between px-4 sm:px-5 py-6 lg:py-8">
@@ -187,7 +190,7 @@ export function AboutSection() {
             </div>
           </div>
         </div>
-      </div>
+      </Card>
     </section>
   )
 }

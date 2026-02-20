@@ -2,6 +2,8 @@
 
 import { useSignIn } from "@clerk/nextjs";
 import { trackEvent } from "@/lib/amplitude";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 interface GoogleSignInButtonProps {
     className?: string;
@@ -53,26 +55,17 @@ export const GoogleSignInButton = ({
     };
 
     return (
-        <button
+        <Button
             onClick={handleGoogleSignIn}
             disabled={!isLoaded}
-            className={`
-                inline-flex items-center justify-center gap-2.5
-                h-10 px-6
-                bg-white text-gray-700 font-medium text-sm
-                rounded-full
-                border border-gray-300
-                shadow-sm
-                hover:bg-gray-50 hover:border-gray-400
-                active:bg-gray-100
-                disabled:opacity-50 disabled:cursor-not-allowed
-                transition-all duration-150
-                cursor-pointer
-                ${className}
-            `}
+            variant="outline"
+            className={cn(
+                "h-10 rounded-none border-foreground/40 px-6 text-sm font-medium",
+                className
+            )}
         >
             <GoogleLogo />
             <span>{text}</span>
-        </button>
+        </Button>
     );
 };

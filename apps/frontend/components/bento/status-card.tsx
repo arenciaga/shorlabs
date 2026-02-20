@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { Card } from "@/components/ui/card"
 
 const REGIONS = [
   { name: "US-EAST-1", status: "ONLINE", latency: "12ms" },
@@ -20,7 +21,7 @@ export function StatusCard() {
   }, [])
 
   return (
-    <div className="flex flex-col h-full">
+    <Card className="flex flex-col h-full rounded-none border-0 bg-transparent py-0 shadow-none gap-0">
       <div className="flex items-center justify-between border-b-2 border-foreground px-3 sm:px-4 py-2">
         <span className="text-[10px] tracking-widest text-muted-foreground uppercase">
           edge_nodes.status
@@ -65,6 +66,6 @@ export function StatusCard() {
           </div>
         </div>
       </div>
-    </div>
+    </Card>
   )
 }

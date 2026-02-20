@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { Card } from "@/components/ui/card"
 
 interface ScrambleNumberProps {
   target: string
@@ -59,7 +60,7 @@ function ScrambleNumber({ target, label, delay = 0 }: ScrambleNumberProps) {
 
 export function MetricsCard() {
   return (
-    <div className="flex flex-col h-full">
+    <Card className="flex flex-col h-full rounded-none border-0 bg-transparent py-0 shadow-none gap-0">
       <div className="flex items-center justify-between border-b-2 border-foreground px-4 py-2">
         <span className="text-[10px] tracking-widest text-muted-foreground uppercase">
           deployment.metrics
@@ -72,6 +73,6 @@ export function MetricsCard() {
         <ScrambleNumber target="0ms" label="Cold Start" delay={1100} />
         <ScrambleNumber target="∞" label="Scale Limit" delay={1400} />
       </div>
-    </div>
+    </Card>
   )
 }

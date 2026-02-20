@@ -1,9 +1,10 @@
 "use client"
 
-import { Rocket } from "lucide-react"
 import Link from "next/link"
 import { useAuth } from "@clerk/nextjs"
 import { BookDemoButton } from "@/components/BookDemoButton"
+import { Button } from "@/components/ui/button"
+import { Separator } from "@/components/ui/separator"
 
 export function Navbar() {
   const { isSignedIn } = useAuth()
@@ -20,32 +21,39 @@ export function Navbar() {
 
           <div className="hidden lg:flex items-center gap-6 xl:gap-8">
             {["Features", "Pricing", "Blog"].map((link) => (
-              <a
+              <Button
                 key={link}
-                href={link === "Blog" ? "/blog" : `#${link.toLowerCase()}`}
-                className="text-[10px] xl:text-xs font-mono tracking-widest uppercase text-muted-foreground hover:text-foreground transition-colors duration-200"
+                asChild
+                variant="ghost"
+                size="sm"
+                className="h-auto px-0 py-0 text-[10px] xl:text-xs font-mono tracking-widest uppercase text-muted-foreground hover:text-foreground"
               >
-                {link}
-              </a>
+                <a href={link === "Blog" ? "/blog" : `#${link.toLowerCase()}`}>{link}</a>
+              </Button>
             ))}
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3">
             {isSignedIn ? (
-              <Link
-                href="/projects"
-                className="hidden md:block text-[10px] xl:text-xs font-mono tracking-widest uppercase text-muted-foreground hover:text-foreground transition-colors duration-200"
+              <Button
+                asChild
+                variant="ghost"
+                size="sm"
+                className="hidden md:inline-flex h-auto px-0 py-0 text-[10px] xl:text-xs font-mono tracking-widest uppercase text-muted-foreground hover:text-foreground"
               >
-                Dashboard
-              </Link>
+                <Link href="/projects">Dashboard</Link>
+              </Button>
             ) : (
-              <Link
-                href="/sign-in"
-                className="hidden md:block text-[10px] xl:text-xs font-mono tracking-widest uppercase text-muted-foreground hover:text-foreground transition-colors duration-200"
+              <Button
+                asChild
+                variant="ghost"
+                size="sm"
+                className="hidden md:inline-flex h-auto px-0 py-0 text-[10px] xl:text-xs font-mono tracking-widest uppercase text-muted-foreground hover:text-foreground"
               >
-                Sign In
-              </Link>
+                <Link href="/sign-in">Sign In</Link>
+              </Button>
             )}
+            <Separator orientation="vertical" className="hidden md:block h-5 bg-border" />
             <BookDemoButton className="bg-foreground text-background h-9 px-3 sm:px-4 text-[10px] sm:text-xs font-mono tracking-widest uppercase whitespace-nowrap">
               Book Demo
             </BookDemoButton>

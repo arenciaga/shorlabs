@@ -5,6 +5,9 @@ import { ArrowRight } from "lucide-react"
 import { useAuth } from "@clerk/nextjs"
 import Link from "next/link"
 import { GoogleSignInButton } from "@/components/GoogleSignInButton"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Card } from "@/components/ui/card"
 
 export function HeroSection() {
   const { isLoaded, isSignedIn } = useAuth()
@@ -13,6 +16,10 @@ export function HeroSection() {
     <section className="relative w-full px-4 pt-6 pb-10 sm:px-6 sm:pt-8 sm:pb-12 md:px-8 lg:px-12 lg:pt-10 lg:pb-16 xl:px-16">
       <div className="mx-auto w-full max-w-6xl">
         <div className="flex flex-col items-center text-center">
+          <Badge variant="outline" className="mb-4 rounded-none font-mono text-[10px] tracking-[0.2em] uppercase">
+            OPEN SOURCE FULL-STACK DEPLOYMENT
+          </Badge>
+
           <h1
             className="font-mono text-[2.15rem] sm:text-6xl lg:text-7xl xl:text-8xl tracking-tight text-foreground mb-2 select-none font-bold uppercase leading-[0.95]"
             style={{ letterSpacing: "-0.02em" }}
@@ -20,9 +27,9 @@ export function HeroSection() {
             DEPLOY. SCALE.
           </h1>
 
-          <div className="w-full max-w-4xl my-4 sm:my-5 lg:my-6">
+          <Card className="w-full max-w-4xl my-4 sm:my-5 lg:my-6 rounded-none border-2 border-foreground bg-transparent py-4 px-2 sm:px-3 shadow-none gap-0">
             <WorkflowDiagram />
-          </div>
+          </Card>
 
           <h1
             className="font-mono text-[2.15rem] sm:text-6xl lg:text-7xl xl:text-8xl tracking-tight text-foreground mb-4 sm:mb-5 select-none font-bold uppercase leading-[0.95]"
@@ -40,28 +47,28 @@ export function HeroSection() {
             {!isLoaded ? (
               <div className="h-10 w-40 bg-muted animate-pulse" />
             ) : isSignedIn ? (
-              <Link href="/projects" className="w-full sm:w-auto">
-                <button className="group flex w-full sm:w-auto items-center gap-0 bg-foreground text-background text-xs sm:text-sm font-mono tracking-wider uppercase">
+              <Button asChild className="group w-full sm:w-auto rounded-none bg-foreground text-background text-xs sm:text-sm font-mono tracking-wider uppercase h-10 px-0">
+                <Link href="/projects" className="flex items-center gap-0">
                   <span className="flex items-center justify-center w-10 h-10 bg-muted-foreground shrink-0">
                     <ArrowRight size={16} strokeWidth={2} className="text-background" />
                   </span>
                   <span className="px-4 sm:px-5 py-2.5 w-full sm:w-auto text-center">
                     Go to Projects
                   </span>
-                </button>
-              </Link>
+                </Link>
+              </Button>
             ) : (
               <>
-                <Link href="/sign-in" className="w-full sm:w-auto">
-                  <button className="group flex w-full sm:w-auto items-center gap-0 bg-foreground text-background text-xs sm:text-sm font-mono tracking-wider uppercase">
+                <Button asChild className="group w-full sm:w-auto rounded-none bg-foreground text-background text-xs sm:text-sm font-mono tracking-wider uppercase h-10 px-0">
+                  <Link href="/sign-in" className="flex items-center gap-0">
                     <span className="flex items-center justify-center w-10 h-10 bg-muted-foreground shrink-0">
                       <ArrowRight size={16} strokeWidth={2} className="text-background" />
                     </span>
                     <span className="px-4 sm:px-5 py-2.5 w-full sm:w-auto text-center">
                       Get Started
                     </span>
-                  </button>
-                </Link>
+                  </Link>
+                </Button>
                 <GoogleSignInButton
                   source="hero"
                   text="Continue With Google"

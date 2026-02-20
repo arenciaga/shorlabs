@@ -1,5 +1,8 @@
 "use client"
 
+import { Card } from "@/components/ui/card"
+import { Separator } from "@/components/ui/separator"
+
 const FRAMEWORKS = [
   "NEXT.JS",
   "REACT",
@@ -34,11 +37,11 @@ export function GlitchMarquee() {
         <span className="text-[10px] tracking-[0.2em] uppercase text-muted-foreground whitespace-nowrap">
           {"// FRAMEWORKS: SUPPORTED"}
         </span>
-        <div className="flex-1 border-t border-border" />
+        <Separator className="flex-1" />
         <span className="text-[10px] tracking-[0.2em] uppercase text-muted-foreground whitespace-nowrap">008</span>
       </div>
 
-      <div className="overflow-hidden border-2 border-foreground">
+      <Card className="overflow-hidden border-2 border-foreground rounded-none bg-transparent py-0 shadow-none gap-0">
         <div className="flex animate-marquee motion-reduce:animate-none" style={{ width: "max-content" }}>
           {[...FRAMEWORKS, ...FRAMEWORKS].map((name, i) => (
             <LogoBlock
@@ -48,7 +51,7 @@ export function GlitchMarquee() {
             />
           ))}
         </div>
-      </div>
+      </Card>
     </section>
   )
 }

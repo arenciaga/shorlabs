@@ -10,18 +10,15 @@ interface ScrambleNumberProps {
 
 function ScrambleNumber({ target, label, delay = 0 }: ScrambleNumberProps) {
   const [display, setDisplay] = useState(target.replace(/[0-9]/g, "0"))
-  const [scrambling, setScrambling] = useState(false)
 
   useEffect(() => {
     const timeout = setTimeout(() => {
-      setScrambling(true)
       let iterations = 0
       const maxIterations = 20
 
       const interval = setInterval(() => {
         if (iterations >= maxIterations) {
           setDisplay(target)
-          setScrambling(false)
           clearInterval(interval)
           return
         }
@@ -69,7 +66,7 @@ export function MetricsCard() {
         </span>
         <span className="inline-block h-2 w-2 bg-muted-foreground" />
       </div>
-      <div className="flex-1 flex flex-col justify-center gap-6 p-6">
+      <div className="flex-1 flex flex-col justify-center gap-5 sm:gap-6 p-4 sm:p-6">
         <ScrambleNumber target="<1s" label="Deploy Time" delay={500} />
         <ScrambleNumber target="99.9%" label="Uptime" delay={800} />
         <ScrambleNumber target="0ms" label="Cold Start" delay={1100} />

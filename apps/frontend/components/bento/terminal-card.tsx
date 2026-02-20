@@ -14,7 +14,7 @@ const LOG_LINES = [
 ]
 
 export function TerminalCard() {
-  const [lines, setLines] = useState<string[]>([])
+  const [lines, setLines] = useState<string[]>([LOG_LINES[0]])
   const [currentLine, setCurrentLine] = useState(0)
 
   useEffect(() => {
@@ -30,15 +30,12 @@ export function TerminalCard() {
       })
     }, 600)
 
-    // Add first line
-    setLines([LOG_LINES[0]])
-
     return () => clearInterval(interval)
   }, [])
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex items-center gap-2 border-b-2 border-foreground px-4 py-2">
+      <div className="flex items-center gap-2 border-b-2 border-foreground px-3 sm:px-4 py-2">
         <span className="h-2 w-2 bg-muted-foreground" />
         <span className="h-2 w-2 bg-foreground" />
         <span className="h-2 w-2 border border-foreground" />
@@ -46,12 +43,12 @@ export function TerminalCard() {
           terminal.shorlabs
         </span>
       </div>
-      <div className="flex-1 bg-foreground p-4 overflow-hidden">
+      <div className="flex-1 bg-foreground p-3 sm:p-4 overflow-hidden">
         <div className="flex flex-col gap-1">
           {lines.map((line, i) => (
             <span
               key={`${currentLine}-${i}`}
-              className="text-xs text-background font-mono block"
+              className="text-[11px] sm:text-xs text-background font-mono block break-all"
               style={{ opacity: i === lines.length - 1 ? 1 : 0.6 }}
             >
               {line}

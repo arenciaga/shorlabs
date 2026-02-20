@@ -45,37 +45,45 @@ function PillLabel({
 }
 
 export function WorkflowDiagram() {
-  const [mounted, setMounted] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
 
   useEffect(() => {
-    setMounted(true)
+    const updateViewport = () => {
+      setIsMobile(window.innerWidth < 768)
+    }
+    updateViewport()
+    window.addEventListener("resize", updateViewport)
+    return () => {
+      window.removeEventListener("resize", updateViewport)
+    }
   }, [])
 
-  if (!mounted) {
-    return <div className="h-[200px] w-full" />
-  }
-
-  const centerX = 400
-  const centerY = 100
+  const centerX = isMobile ? 180 : 400
+  const centerY = isMobile ? 120 : 100
+  const pillXLeft = isMobile ? 8 : 60
+  const pillXRight = isMobile ? 272 : 660
+  const pillWidth = isMobile ? 80 : 80
+  const rowGap = isMobile ? 72 : 60
+  const startY = isMobile ? 18 : 30
+  const viewWidth = isMobile ? 360 : 800
+  const viewHeight = isMobile ? 260 : 200
 
   return (
-    <div className="relative w-full max-w-[800px] mx-auto">
+    <div className="relative w-full mx-auto">
       <svg
-        viewBox="0 0 800 200"
+        viewBox={`0 0 ${viewWidth} ${viewHeight}`}
         className="w-full h-auto"
         role="img"
         aria-label="Workflow diagram showing connected deployment stages"
       >
-        {/* Left lines from center to left labels */}
         {LEFT_LABELS.map((_, i) => {
-          const pillX = 60
-          const pillY = 30 + i * 60
+          const pillY = startY + i * rowGap
           return (
             <line
               key={`left-line-${i}`}
               x1={centerX - 40}
               y1={centerY}
-              x2={pillX + 80}
+              x2={pillXLeft + pillWidth}
               y2={pillY + 13}
               stroke="currentColor"
               strokeWidth={1}
@@ -86,16 +94,14 @@ export function WorkflowDiagram() {
           )
         })}
 
-        {/* Right lines from center to right labels */}
         {RIGHT_LABELS.map((_, i) => {
-          const pillX = 660
-          const pillY = 30 + i * 60
+          const pillY = startY + i * rowGap
           return (
             <line
               key={`right-line-${i}`}
               x1={centerX + 40}
               y1={centerY}
-              x2={pillX}
+              x2={pillXRight}
               y2={pillY + 13}
               stroke="currentColor"
               strokeWidth={1}
@@ -106,27 +112,23 @@ export function WorkflowDiagram() {
           )
         })}
 
-        {/* Data packets flowing along lines */}
         {LEFT_LABELS.map((_, i) => {
-          const pillX = 60
-          const pillY = 30 + i * 60
+          const pillY = startY + i * rowGap
           return (
             <circle
               key={`left-packet-${i}`}
               r={3}
               fill="currentColor"
               opacity={0.6}
-              cx={pillX + 80}
+              cx={pillXLeft + pillWidth}
               cy={pillY + 13}
-              className="animate-move-left"
+              className={isMobile ? "" : "animate-move-left"}
               style={{ animationDelay: `${0.8 + i * 0.6}s` }}
             />
           )
         })}
 
         {RIGHT_LABELS.map((_, i) => {
-          const pillX = 660
-          const pillY = 30 + i * 60
           return (
             <circle
               key={`right-packet-${i}`}
@@ -135,35 +137,32 @@ export function WorkflowDiagram() {
               opacity={0.6}
               cx={centerX + 40}
               cy={centerY}
-              className="animate-move-right"
+              className={isMobile ? "" : "animate-move-right"}
               style={{ animationDelay: `${1.2 + i * 0.6}s` }}
             />
           )
         })}
 
-        {/* Left pill labels */}
         {LEFT_LABELS.map((label, i) => (
           <PillLabel
             key={`left-${label}`}
             label={label}
-            x={60}
-            y={30 + i * 60}
+            x={pillXLeft}
+            y={startY + i * rowGap}
             delay={0.1 + i * 0.1}
           />
         ))}
 
-        {/* Right pill labels */}
         {RIGHT_LABELS.map((label, i) => (
           <PillLabel
             key={`right-${label}`}
             label={label}
-            x={660}
-            y={30 + i * 60}
+            x={pillXRight}
+            y={startY + i * rowGap}
             delay={0.1 + i * 0.1}
           />
         ))}
 
-        {/* Center logo square */}
         <g>
           <rect
             x={centerX - 36}

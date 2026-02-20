@@ -1,12 +1,10 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { ArrowRight, Check, Minus } from "lucide-react"
+import { ArrowRight, Check } from "lucide-react"
 import { PLANS } from "@/lib/plans"
 import Link from "next/link"
 import { useAuth } from "@clerk/nextjs"
-
-const ease = [0.22, 1, 0.36, 1] as const
 
 /* ── scramble-in price effect ── */
 function ScramblePrice({ target, prefix = "$" }: { target: string; prefix?: string }) {
@@ -128,8 +126,7 @@ function PricingCard({ plan, index }: { plan: typeof PLANS[0]; index: number }) 
         }`}
       >
         <div className="flex flex-col gap-3">
-          {plan.features.map((feature, fi) => {
-            const Icon = feature.icon
+          {plan.features.map((feature) => {
             return (
               <div key={feature.label} className="flex items-start gap-3">
                 <Check
@@ -137,11 +134,7 @@ function PricingCard({ plan, index }: { plan: typeof PLANS[0]; index: number }) 
                   strokeWidth={2.5}
                   className="mt-0.5 shrink-0 text-muted-foreground"
                 />
-                <span
-                  className={`text-xs font-mono leading-relaxed ${
-                    isHighlighted ? "" : ""
-                  }`}
-                >
+                <span className="text-xs font-mono leading-relaxed">
                   {feature.label}
                 </span>
               </div>
@@ -191,42 +184,38 @@ function PricingCard({ plan, index }: { plan: typeof PLANS[0]; index: number }) 
 /* ── main pricing section ── */
 export function PricingSection() {
   return (
-    <section className="w-full px-6 py-20 lg:px-12">
-      {/* Section label */}
-      <div className="flex items-center gap-4 mb-8">
-        <span className="text-[10px] tracking-[0.2em] uppercase text-muted-foreground font-mono">
+    <section id="pricing" className="w-full px-4 py-14 sm:px-6 sm:py-16 lg:px-12 lg:py-20">
+      <div className="flex items-center gap-3 sm:gap-4 mb-6 sm:mb-8">
+        <span className="text-[10px] tracking-[0.2em] uppercase text-muted-foreground font-mono whitespace-nowrap">
           {"// SECTION: PRICING_TIERS"}
         </span>
         <div className="flex-1 border-t border-border" />
         <BlinkDot />
-        <span className="text-[10px] tracking-[0.2em] uppercase text-muted-foreground font-mono">
+        <span className="text-[10px] tracking-[0.2em] uppercase text-muted-foreground font-mono whitespace-nowrap">
           006
         </span>
       </div>
 
-      {/* Section header */}
-      <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6 mb-12">
+      <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4 sm:gap-6 mb-8 sm:mb-12">
         <div className="flex flex-col gap-3">
-          <h2 className="text-2xl lg:text-3xl font-mono font-bold tracking-tight uppercase text-foreground text-balance">
+          <h2 className="text-xl sm:text-2xl lg:text-3xl font-mono font-bold tracking-tight uppercase text-foreground text-balance">
             Select your plan
           </h2>
-          <p className="text-xs lg:text-sm font-mono text-muted-foreground leading-relaxed max-w-md">
+          <p className="text-xs sm:text-sm font-mono text-muted-foreground leading-relaxed max-w-md">
             Simple, transparent pricing. Start free, scale as you grow.
           </p>
         </div>
         <StatusLine />
       </div>
 
-      {/* Pricing grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-0">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-0">
         {PLANS.map((plan, i) => (
           <PricingCard key={plan.id} plan={plan} index={i} />
         ))}
       </div>
 
-      {/* Bottom note */}
       <div className="flex items-center gap-3 mt-6">
-        <span className="text-[10px] tracking-[0.2em] uppercase text-muted-foreground font-mono">
+        <span className="text-[10px] tracking-[0.2em] uppercase text-muted-foreground font-mono leading-relaxed">
           {"* Pay per request pricing available. Cancel anytime."}
         </span>
         <div className="flex-1 border-t border-border" />

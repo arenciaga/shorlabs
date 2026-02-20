@@ -55,13 +55,13 @@ export function DitherCard() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex items-center justify-between border-b-2 border-foreground px-4 py-2">
+      <div className="flex items-center justify-between border-b-2 border-foreground px-3 sm:px-4 py-2">
         <span className="text-[10px] tracking-widest text-muted-foreground uppercase">
           deployment.visual
         </span>
         <span className="text-[10px] tracking-widest text-muted-foreground">320x240</span>
       </div>
-      <div className="flex-1 flex items-center justify-center p-4 bg-background overflow-hidden">
+      <div className="flex-1 flex items-center justify-center p-3 sm:p-4 bg-background overflow-hidden">
         <canvas
           ref={canvasRef}
           className="w-full h-auto"

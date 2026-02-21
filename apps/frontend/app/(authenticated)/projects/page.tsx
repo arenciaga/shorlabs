@@ -101,7 +101,7 @@ function ProjectAvatar({ projectId, projectName, projectUrl }: { projectId: stri
                 <img
                     src={websiteIconUrl}
                     alt={`${projectName} website icon`}
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-cover rounded-full"
                     loading="lazy"
                     referrerPolicy="no-referrer"
                     onError={() => setIconLoadError(true)}

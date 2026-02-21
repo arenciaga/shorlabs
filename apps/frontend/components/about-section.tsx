@@ -57,8 +57,8 @@ export function AboutSection() {
           </span>
         </div>
 
-        <Card className="flex flex-col lg:flex-row gap-0 border-2 border-foreground rounded-none bg-transparent py-0 shadow-none overflow-hidden">
-          <div className="relative w-full lg:w-1/2 min-h-[240px] sm:min-h-[300px] lg:min-h-[500px] border-b-2 lg:border-b-0 lg:border-r-2 border-foreground overflow-hidden bg-foreground">
+        <Card className="flex flex-col gap-0 border-2 border-foreground rounded-none bg-transparent py-0 shadow-none overflow-hidden">
+          <div className="relative w-full min-h-[240px] sm:min-h-[300px] lg:min-h-[400px] border-b-2 border-foreground overflow-hidden bg-foreground">
             <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between gap-2 px-3 sm:px-4 py-2 bg-foreground/80 backdrop-blur-sm">
               <span className="text-[10px] tracking-[0.2em] uppercase text-background/60 font-mono truncate">
                 RENDER: deployment_infrastructure.obj
@@ -68,9 +68,16 @@ export function AboutSection() {
               </span>
             </div>
 
-            <div className="w-full h-full bg-muted flex items-center justify-center">
-              <span className="text-background/40 font-mono text-[10px] sm:text-xs px-3 text-center">DEPLOYMENT INFRASTRUCTURE</span>
-            </div>
+            <video
+              className="w-full h-full object-cover"
+              autoPlay
+              loop
+              muted
+              playsInline
+              preload="metadata"
+            >
+              <source src="/2.mp4" type="video/mp4" />
+            </video>
 
             <div className="absolute bottom-0 left-0 right-0 z-10 flex items-center justify-between px-3 sm:px-4 py-2 bg-foreground/80 backdrop-blur-sm">
               <span className="text-[10px] tracking-[0.2em] uppercase text-background/40 font-mono truncate">
@@ -82,7 +89,7 @@ export function AboutSection() {
             </div>
           </div>
 
-          <div className="flex flex-col w-full lg:w-1/2">
+          <div className="flex flex-col w-full">
             <div className="flex items-center justify-between px-4 sm:px-5 py-3 border-b-2 border-foreground">
               <Badge variant="outline" className="rounded-none text-[10px] tracking-[0.2em] uppercase text-muted-foreground font-mono border-foreground/30">
                 MANIFEST.md

@@ -58,7 +58,7 @@ export function AboutSection() {
         </div>
 
         <Card className="flex flex-col gap-0 border-2 border-foreground rounded-none bg-transparent py-0 shadow-none overflow-hidden">
-          <div className="relative w-full min-h-[240px] sm:min-h-[300px] lg:min-h-[400px] border-b-2 border-foreground overflow-hidden bg-foreground">
+          <div className="relative w-full min-h-[180px] sm:min-h-[220px] lg:min-h-[280px] border-b-2 border-foreground overflow-hidden bg-foreground">
             <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between gap-2 px-3 sm:px-4 py-2 bg-foreground/80 backdrop-blur-sm">
               <span className="text-[10px] tracking-[0.2em] uppercase text-background/60 font-mono truncate">
                 RENDER: deployment_infrastructure.obj

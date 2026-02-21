@@ -68,11 +68,14 @@ export function HeroSection() {
           <Card className="w-full max-w-5xl mt-6 sm:mt-7 lg:mt-8 rounded-none border-2 border-foreground bg-transparent py-0 px-0 shadow-none gap-0 overflow-hidden">
             <video
               className="w-full h-auto block"
+              autoPlay
+              loop
               muted
               playsInline
-              preload="none"
+              preload="metadata"
             >
               <source src="/Shorlabs-Demo.mp4" type="video/mp4" />
+              Your browser does not support the video tag.
             </video>
           </Card>
         </div>

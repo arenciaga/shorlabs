@@ -1,64 +1,130 @@
-import type { ReactNode } from 'react'
+"use client"
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import type { Plan } from '@/lib/plans'
-import { cn } from '@/lib/utils'
+import type { ReactNode } from "react"
+import Link from "next/link"
+import { useAuth } from "@clerk/nextjs"
+import { ArrowRight, Check } from "lucide-react"
+
+import { Button } from "@/components/ui/button"
+import { Card } from "@/components/ui/card"
+import type { Plan } from "@/lib/plans"
+import { cn } from "@/lib/utils"
+import { ScramblePrice } from "@/components/pricing-scramble-price"
 
 interface PricingCardProps {
     plan: Plan
+    index?: number
+    highlighted?: boolean
     renderBadge?: (plan: Plan) => ReactNode
     renderAction?: (plan: Plan) => ReactNode
-    highlighted?: boolean
+    hideDefaultAction?: boolean
     className?: string
 }
 
-export function PricingCard({ plan, renderBadge, renderAction, highlighted, className }: PricingCardProps) {
+export function PricingCard({
+    plan,
+    index,
+    highlighted,
+    renderBadge,
+    renderAction,
+    hideDefaultAction,
+    className,
+}: PricingCardProps) {
+    const { isSignedIn } = useAuth()
+    const isHighlighted = highlighted ?? plan.highlighted ?? false
+    const customAction = renderAction?.(plan)
+    const showDefaultAction = !hideDefaultAction && customAction == null
+
     return (
         <Card
             className={cn(
-                "h-full rounded-2xl border-zinc-200 bg-white shadow-none",
-                highlighted && "border-zinc-400 ring-1 ring-zinc-400",
-                className,
+                "flex h-full flex-col gap-0 rounded-none border-2 py-0 shadow-none",
+                isHighlighted
+                    ? "border-foreground bg-foreground text-background"
+                    : "border-foreground bg-background text-foreground",
+                className
             )}
         >
-            <CardHeader className="space-y-3 px-4 pb-2">
-                <div className="flex items-start justify-between gap-2">
-                    <CardTitle className="text-xl font-semibold tracking-tight text-zinc-900">
-                        {plan.name}
-                    </CardTitle>
+            <div
+                className={cn(
+                    "flex items-center justify-between border-b-2 px-5 py-3",
+                    isHighlighted ? "border-background/20" : "border-foreground"
+                )}
+            >
+                <span className="text-[10px] font-mono tracking-[0.2em] uppercase">
+                    {plan.name.toUpperCase()}
+                </span>
+                <div className="flex items-center gap-2">
                     {renderBadge?.(plan)}
+                    {typeof index === "number" && (
+                        <span className="text-[10px] font-mono tracking-[0.2em] opacity-50">
+                            {String(index + 1).padStart(2, "0")}
+                        </span>
+                    )}
                 </div>
+            </div>
 
-                <div className="flex items-end gap-1">
-                    <span className="text-3xl font-semibold leading-none text-zinc-900 sm:text-4xl">
-                        {plan.price}
+            <div className="px-5 pt-6 pb-4">
+                <div className="flex items-baseline gap-1">
+                    <span className="text-3xl lg:text-4xl">
+                        <ScramblePrice target={plan.price.replace("$", "")} />
                     </span>
-                    <span className="pb-0.5 text-sm text-zinc-500">{plan.period}</span>
+                    {plan.period && (
+                        <span
+                            className={cn(
+                                "text-xs font-mono tracking-widest uppercase",
+                                isHighlighted ? "text-background/50" : "text-muted-foreground"
+                            )}
+                        >
+                            {plan.period}
+                        </span>
+                    )}
                 </div>
-
-                <CardDescription className="text-sm leading-relaxed text-zinc-600">
+                <p
+                    className={cn(
+                        "mt-3 text-xs font-mono leading-relaxed",
+                        isHighlighted ? "text-background/60" : "text-muted-foreground"
+                    )}
+                >
                     {plan.description}
-                </CardDescription>
-            </CardHeader>
+                </p>
+            </div>
 
-            <CardContent className="flex flex-1 flex-col px-4 pt-0">
-                {renderAction?.(plan)}
+            <div
+                className={cn(
+                    "flex-1 border-t-2 px-5 py-4",
+                    isHighlighted ? "border-background/20" : "border-foreground"
+                )}
+            >
+                <div className="flex flex-col gap-3">
+                    {plan.features.map((feature) => (
+                        <div key={feature.label} className="flex items-start gap-3">
+                            <Check size={12} strokeWidth={2.5} className="mt-0.5 shrink-0 text-muted-foreground" />
+                            <span className="text-xs font-mono leading-relaxed">{feature.label}</span>
+                        </div>
+                    ))}
+                </div>
+            </div>
 
-                <ul className={cn("space-y-2", renderAction && "mt-4")}>
-                    {plan.features.map((feature) => {
-                        const Icon = feature.icon
-                        return (
-                            <li
-                                key={feature.label}
-                                className="flex items-center gap-2 text-sm text-zinc-600"
-                            >
-                                <Icon className="size-4 shrink-0 text-zinc-400" strokeWidth={2} />
-                                {feature.label}
-                            </li>
-                        )
-                    })}
-                </ul>
-            </CardContent>
+            <div className="px-5 pt-3 pb-5">
+                {customAction}
+                {showDefaultAction && (
+                    <Button
+                        asChild
+                        className={cn(
+                            "group h-9 w-full rounded-none px-0 text-xs font-mono tracking-wider uppercase",
+                            isHighlighted ? "bg-background text-foreground" : "bg-foreground text-background"
+                        )}
+                    >
+                        <Link href={isSignedIn ? "/projects" : "/sign-in"} className="flex items-center justify-center gap-0">
+                            <span className="flex h-9 w-9 items-center justify-center bg-muted-foreground">
+                                <ArrowRight size={14} strokeWidth={2} className="text-background" />
+                            </span>
+                            <span className="flex-1 py-2.5">{isSignedIn ? "Deploy Now" : "Get Started"}</span>
+                        </Link>
+                    </Button>
+                )}
+            </div>
         </Card>
     )
 }

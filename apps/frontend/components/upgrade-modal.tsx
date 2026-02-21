@@ -138,7 +138,7 @@ export function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
                     </SheetHeader>
 
                     <div className="mx-auto mt-6 grid w-full max-w-4xl grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3">
-                        {PLANS.map((plan) => {
+                        {PLANS.map((plan, index) => {
                             const isCurrent = currentPlan != null && plan.id === currentPlan
                             const isScheduledTarget = isDowngradeScheduled && plan.id === scheduledPlanId
                             const isLoading = loadingPlan === plan.id
@@ -167,7 +167,9 @@ export function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
                                 <PricingCard
                                     key={plan.id}
                                     plan={plan}
+                                    index={index}
                                     highlighted={isCurrent}
+                                    hideDefaultAction
                                     renderBadge={() => {
                                         if (isCurrent && isPaidPlan && isDowngradeScheduled) {
                                             return (

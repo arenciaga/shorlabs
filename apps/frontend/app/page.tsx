@@ -31,7 +31,7 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen dot-grid-bg">
+    <div className="min-h-screen dot-grid-bg overflow-x-clip">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{

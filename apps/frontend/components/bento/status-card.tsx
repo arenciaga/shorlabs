@@ -1,6 +1,5 @@
 "use client"
 
-import { useEffect, useState } from "react"
 import { Card } from "@/components/ui/card"
 
 const CAPABILITIES = [
@@ -11,15 +10,6 @@ const CAPABILITIES = [
 ]
 
 export function StatusCard() {
-  const [tick, setTick] = useState(0)
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setTick((t) => t + 1)
-    }, 2000)
-    return () => clearInterval(interval)
-  }, [])
-
   return (
     <Card className="flex flex-col h-full rounded-none border-0 bg-transparent py-0 shadow-none gap-0">
       <div className="flex items-center justify-between border-b-2 border-foreground px-3 sm:px-4 py-2">
@@ -27,7 +17,7 @@ export function StatusCard() {
           edge_nodes.status
         </span>
         <span className="text-[10px] tracking-widest text-muted-foreground">
-          {`TICK:${String(tick).padStart(4, "0")}`}
+          TICK:0001
         </span>
       </div>
       <div className="flex-1 flex flex-col p-3 sm:p-4 gap-0">

@@ -17,7 +17,7 @@ function StatusLine() {
 
 /* ── blinking cursor indicator ── */
 function BlinkDot() {
-  return <span className="inline-block h-2 w-2 bg-muted-foreground animate-blink" />
+  return <span className="inline-block h-2 w-2 bg-muted-foreground" />
 }
 
 /* ── main pricing section ── */

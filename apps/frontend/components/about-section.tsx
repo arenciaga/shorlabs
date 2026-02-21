@@ -1,85 +1,21 @@
 "use client"
 
-import { useEffect, useState, useRef } from "react"
 import { Card } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
 
-/* ── scramble text reveal ── */
 function ScrambleText({ text, className }: { text: string; className?: string }) {
-  const [display, setDisplay] = useState(text)
-  const ref = useRef<HTMLSpanElement>(null)
-  const [inView, setInView] = useState(false)
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_./:"
-
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setInView(true)
-        }
-      },
-      { threshold: 0.1 }
-    )
-    if (ref.current) observer.observe(ref.current)
-    return () => observer.disconnect()
-  }, [])
-
-  useEffect(() => {
-    if (!inView) return
-    let iteration = 0
-    const interval = setInterval(() => {
-      setDisplay(
-        text
-          .split("")
-          .map((char, i) => {
-            if (char === " ") return " "
-            if (i < iteration) return text[i]
-            return chars[Math.floor(Math.random() * chars.length)]
-          })
-          .join("")
-      )
-      iteration += 0.5
-      if (iteration >= text.length) {
-        setDisplay(text)
-        clearInterval(interval)
-      }
-    }, 30)
-    return () => clearInterval(interval)
-  }, [inView, text])
-
-  return (
-    <span ref={ref} className={className}>
-      {display}
-    </span>
-  )
+  return <span className={className}>{text}</span>
 }
 
-/* ── blinking cursor ── */
 function BlinkDot() {
-  return <span className="inline-block h-2 w-2 bg-muted-foreground animate-blink" />
+  return <span className="inline-block h-2 w-2 bg-muted-foreground" />
 }
 
-/* ── live uptime counter ── */
 function UptimeCounter() {
-  const [seconds, setSeconds] = useState(() => 31536000 + Math.floor(Math.random() * 1000000))
-
-  useEffect(() => {
-    const interval = setInterval(() => setSeconds((s) => s + 1), 1000)
-    return () => clearInterval(interval)
-  }, [])
-
-  const format = (n: number) => {
-    const d = Math.floor(n / 86400)
-    const h = Math.floor((n % 86400) / 3600)
-    const m = Math.floor((n % 3600) / 60)
-    const s = n % 60
-    return `${d}d ${String(h).padStart(2, "0")}h ${String(m).padStart(2, "0")}m ${String(s).padStart(2, "0")}s`
-  }
-
   return (
     <span className="font-mono text-muted-foreground" style={{ fontVariantNumeric: "tabular-nums" }}>
-      {format(seconds)}
+      365d 00h 00m 00s
     </span>
   )
 }

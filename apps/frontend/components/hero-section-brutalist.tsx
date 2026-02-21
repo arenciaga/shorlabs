@@ -32,7 +32,7 @@ export function HeroSection() {
 
           <div className="flex w-full max-w-md sm:max-w-none flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3">
             {!isLoaded ? (
-              <div className="h-10 w-40 bg-muted animate-pulse" />
+              <div className="h-10 w-40 bg-muted" />
             ) : isSignedIn ? (
               <Button asChild className="group w-full sm:w-auto rounded-none bg-foreground text-background text-xs sm:text-sm font-mono tracking-wider uppercase h-10 px-0">
                 <Link href="/projects" className="flex items-center gap-0">
@@ -59,7 +59,7 @@ export function HeroSection() {
                 <GoogleSignInButton
                   source="hero"
                   text="Continue With Google"
-                  className="w-full sm:w-auto text-[11px] sm:text-xs font-mono tracking-widest uppercase border border-foreground px-4 py-2.5 hover:bg-muted transition-colors rounded-none"
+                  className="w-full sm:w-auto text-[11px] sm:text-xs font-mono tracking-widest uppercase border border-foreground px-4 py-2.5 hover:bg-muted rounded-none"
                 />
               </>
             )}
@@ -68,11 +68,9 @@ export function HeroSection() {
           <Card className="w-full max-w-5xl mt-6 sm:mt-7 lg:mt-8 rounded-none border-2 border-foreground bg-transparent py-0 px-0 shadow-none gap-0 overflow-hidden">
             <video
               className="w-full h-auto block"
-              autoPlay
               muted
-              loop
               playsInline
-              preload="metadata"
+              preload="none"
             >
               <source src="/Shorlabs-Demo.mp4" type="video/mp4" />
             </video>

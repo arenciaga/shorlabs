@@ -1,6 +1,5 @@
 "use client"
 
-import { useEffect, useState } from "react"
 import { Card } from "@/components/ui/card"
 
 const LOG_LINES = [
@@ -15,25 +14,6 @@ const LOG_LINES = [
 ]
 
 export function TerminalCard() {
-  const [lines, setLines] = useState<string[]>([LOG_LINES[0]])
-  const [currentLine, setCurrentLine] = useState(0)
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentLine((prev) => {
-        const next = prev + 1
-        if (next >= LOG_LINES.length) {
-          setLines([])
-          return 0
-        }
-        setLines((l) => [...l.slice(-8), LOG_LINES[next]])
-        return next
-      })
-    }, 600)
-
-    return () => clearInterval(interval)
-  }, [])
-
   return (
     <Card className="flex flex-col h-full rounded-none border-0 bg-transparent py-0 shadow-none gap-0">
       <div className="flex items-center gap-2 border-b-2 border-foreground px-3 sm:px-4 py-2">
@@ -46,16 +26,16 @@ export function TerminalCard() {
       </div>
       <div className="flex-1 bg-foreground p-3 sm:p-4 overflow-hidden">
         <div className="flex flex-col gap-1">
-          {lines.map((line, i) => (
+          {LOG_LINES.map((line, i) => (
             <span
-              key={`${currentLine}-${i}`}
+              key={`${line}-${i}`}
               className="text-[11px] sm:text-xs text-background font-mono block break-all"
-              style={{ opacity: i === lines.length - 1 ? 1 : 0.6 }}
+              style={{ opacity: i === LOG_LINES.length - 1 ? 1 : 0.6 }}
             >
               {line}
             </span>
           ))}
-          <span className="text-xs text-muted-foreground font-mono animate-blink">{"_"}</span>
+          <span className="text-xs text-muted-foreground font-mono">{"_"}</span>
         </div>
       </div>
     </Card>

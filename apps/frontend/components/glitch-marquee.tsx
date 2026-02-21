@@ -57,13 +57,11 @@ const FRAMEWORKS: FrameworkItem[] = [
   { name: "CUSTOM COMMANDS", icon: CustomCommandsIcon },
 ]
 
-function LogoBlock({ framework, glitch }: { framework: FrameworkItem; glitch: boolean }) {
+function LogoBlock({ framework }: { framework: FrameworkItem }) {
   const Icon = framework.icon
   return (
     <div
-      className={`flex items-center justify-center px-5 sm:px-8 py-3 sm:py-4 border-r-2 border-foreground shrink-0 ${
-        glitch ? "animate-glitch" : ""
-      }`}
+      className="flex items-center justify-center px-5 sm:px-8 py-3 sm:py-4 border-r-2 border-foreground shrink-0"
     >
       <div className="flex items-center gap-2.5">
         <Icon />
@@ -76,8 +74,6 @@ function LogoBlock({ framework, glitch }: { framework: FrameworkItem; glitch: bo
 }
 
 export function GlitchMarquee() {
-  const glitchIndices = [2, 6]
-
   return (
     <section className="w-full py-12 px-4 sm:px-6 sm:py-14 lg:px-12 lg:py-16">
       <div className="mx-auto w-full max-w-7xl">
@@ -90,12 +86,11 @@ export function GlitchMarquee() {
         </div>
 
         <Card className="overflow-hidden border-2 border-foreground rounded-none bg-transparent py-0 shadow-none gap-0">
-          <div className="flex animate-marquee motion-reduce:animate-none" style={{ width: "max-content" }}>
+          <div className="flex" style={{ width: "max-content" }}>
             {[...FRAMEWORKS, ...FRAMEWORKS].map((framework, i) => (
               <LogoBlock
                 key={`${framework.name}-${i}`}
                 framework={framework}
-                glitch={glitchIndices.includes(i % FRAMEWORKS.length)}
               />
             ))}
           </div>

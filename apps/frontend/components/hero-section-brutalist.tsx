@@ -1,6 +1,5 @@
 "use client"
 
-import { WorkflowDiagram } from "@/components/workflow-diagram"
 import { ArrowRight } from "lucide-react"
 import { useAuth } from "@clerk/nextjs"
 import Link from "next/link"
@@ -24,23 +23,11 @@ export function HeroSection() {
             className="font-mono text-[2.15rem] sm:text-6xl lg:text-7xl xl:text-8xl tracking-tight text-foreground mb-2 select-none font-bold uppercase leading-[0.95]"
             style={{ letterSpacing: "-0.02em" }}
           >
-            DEPLOY. SCALE.
-          </h1>
-
-          <Card className="w-full max-w-4xl my-4 sm:my-5 lg:my-6 rounded-none border-2 border-foreground bg-transparent py-4 px-2 sm:px-3 shadow-none gap-0">
-            <WorkflowDiagram />
-          </Card>
-
-          <h1
-            className="font-mono text-[2.15rem] sm:text-6xl lg:text-7xl xl:text-8xl tracking-tight text-foreground mb-4 sm:mb-5 select-none font-bold uppercase leading-[0.95]"
-            aria-hidden="true"
-            style={{ letterSpacing: "-0.02em" }}
-          >
-            ROUTE.
+            SHIP FULL-STACK FASTER.
           </h1>
 
           <p className="text-xs sm:text-sm text-muted-foreground max-w-2xl mb-6 sm:mb-7 leading-relaxed font-mono px-1 sm:px-0">
-            Open Source Full-Stack Deployment Platform. Deploy your frontend and backend from one place. Serverless, so you only pay when your code runs.
+            Deploy full-stack apps from GitHub in minutes. Configure memory, timeout, environment variables, logs, and custom domains from one dashboard.
           </p>
 
           <div className="flex w-full max-w-md sm:max-w-none flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3">
@@ -77,6 +64,19 @@ export function HeroSection() {
               </>
             )}
           </div>
+
+          <Card className="w-full max-w-5xl mt-6 sm:mt-7 lg:mt-8 rounded-none border-2 border-foreground bg-transparent py-0 px-0 shadow-none gap-0 overflow-hidden">
+            <video
+              className="w-full h-auto block"
+              autoPlay
+              muted
+              loop
+              playsInline
+              preload="metadata"
+            >
+              <source src="/Shorlabs-Demo.mp4" type="video/mp4" />
+            </video>
+          </Card>
         </div>
       </div>
     </section>

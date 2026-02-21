@@ -86,10 +86,10 @@ function UptimeCounter() {
 
 /* ── stat block ── */
 const STATS = [
-  { label: "PROJECTS_DEPLOYED", value: "1.2K+" },
-  { label: "EDGE_REGIONS", value: "Global" },
-  { label: "REQUESTS_HANDLED", value: "50M+" },
-  { label: "AVG_DEPLOY_TIME", value: "<1s" },
+  { label: "TOTAL_INVOCATIONS", value: "592,843" },
+  { label: "HOBBY_INCLUDED", value: "3K REQ / 1.2K GB-S" },
+  { label: "REQUEST_PRICING", value: "$0.60 / 1M" },
+  { label: "FIRST_DEPLOY", value: "~60-90s" },
 ]
 
 function StatBlock({ label, value }: { label: string; value: string }) {
@@ -159,19 +159,19 @@ export function AboutSection() {
             <div className="flex-1 flex flex-col justify-between px-4 sm:px-5 py-6 lg:py-8">
               <div className="flex flex-col gap-6">
                 <h2 className="text-xl sm:text-2xl lg:text-3xl font-mono font-bold tracking-tight uppercase text-balance">
-                  Infrastructure built for
+                  Deployment workflow built for
                   <br />
-                  <span className="text-muted-foreground">rapid deployment</span>
+                  <span className="text-muted-foreground">fast iteration</span>
                 </h2>
 
                 <div className="flex flex-col gap-4">
                   <p className="text-xs sm:text-sm font-mono text-muted-foreground leading-relaxed">
-                    Deploy your frontend and backend from one place. Serverless, so you only pay when your code runs.
-                    No infrastructure to manage, no complexity to handle.
+                    Import a GitHub repository, review defaults, and deploy to a production URL from one place.
+                    Built-in logs and project settings make redeploys straightforward.
                   </p>
                   <p className="text-xs sm:text-sm font-mono text-muted-foreground leading-relaxed">
-                    Built by developers who understand the pain of deployment. We believe deployment should be simple,
-                    fast, and transparent.
+                    Configure environment variables, start commands, compute limits, and domains per project.
+                    Pay only for usage as your traffic grows.
                   </p>
                 </div>
 

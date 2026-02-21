@@ -5,13 +5,12 @@ import { Separator } from "@/components/ui/separator"
 
 const FRAMEWORKS = [
   "NEXT.JS",
-  "REACT",
   "FASTAPI",
   "EXPRESS",
   "FLASK",
   "DJANGO",
-  "VUE",
-  "SVELTE",
+  "NODE.JS",
+  "CUSTOM COMMANDS",
 ]
 
 function LogoBlock({ name, glitch }: { name: string; glitch: boolean }) {

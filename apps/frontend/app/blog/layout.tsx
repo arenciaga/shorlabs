@@ -1,4 +1,4 @@
-import SectionNavigation from "@/components/SectionNavigation";
+import { Navbar } from "@/components/navbar";
 
 export default function BlogLayout({
     children,
@@ -7,9 +7,8 @@ export default function BlogLayout({
 }>) {
     return (
         <>
-            <SectionNavigation />
-            {/* offset for the fixed navbar height (h-14 = 56px) */}
-            <main style={{ paddingTop: 56 }}>{children}</main>
+            <Navbar />
+            <main>{children}</main>
         </>
     );
 }

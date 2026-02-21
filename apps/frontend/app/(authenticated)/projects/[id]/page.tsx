@@ -452,14 +452,14 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                 <div className="px-4 sm:px-6 lg:px-8 py-6">
                     <div className="animate-pulse">
                         <div className="h-4 w-20 bg-zinc-200 rounded mb-8" />
-                        <div className="h-10 w-64 bg-zinc-200 rounded-lg mb-2" />
+                        <div className="h-10 w-64 bg-zinc-200 rounded-none mb-2" />
                         <div className="h-5 w-48 bg-zinc-100 rounded mb-8" />
                         <div className="grid grid-cols-3 gap-4 mb-8">
                             {[1, 2, 3].map(i => (
-                                <div key={i} className="h-24 bg-zinc-50 rounded-2xl border border-zinc-200" />
+                                <div key={i} className="h-24 bg-zinc-50 rounded-none border border-zinc-200" />
                             ))}
                         </div>
-                        <div className="h-64 bg-zinc-50 rounded-2xl border border-zinc-200" />
+                        <div className="h-64 bg-zinc-50 rounded-none border border-zinc-200" />
                     </div>
                 </div>
             </div>
@@ -553,9 +553,9 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
 
                     {/* Throttle Banner */}
                     {project.is_throttled && (
-                        <div className="bg-red-50 border border-red-200 rounded-2xl p-5 mb-6">
+                        <div className="bg-red-50 border border-red-200 rounded-none p-5 mb-6">
                             <div className="flex items-start gap-4">
-                                <div className="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center shrink-0">
+                                <div className="w-10 h-10 rounded-none bg-red-100 flex items-center justify-center shrink-0">
                                     <AlertCircle className="h-5 w-5 text-red-500" />
                                 </div>
                                 <div className="flex-1">
@@ -578,26 +578,26 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                     {/* Stats Cards */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 sm:mb-8">
                         {/* Production URL */}
-                        <div className="md:col-span-2 bg-zinc-50 rounded-2xl border border-zinc-200 p-4 sm:p-5 ">
+                        <div className="md:col-span-2 bg-zinc-50 rounded-none border border-zinc-200 p-4 sm:p-5 ">
                             <div className="flex items-center gap-2 text-zinc-500 mb-3">
                                 <Globe className="h-4 w-4" />
                                 <span className="text-xs font-medium uppercase tracking-wider">Production</span>
                             </div>
                             {displayUrl ? (
                                 <div className="flex items-center gap-3">
-                                    <div className="flex-1 bg-zinc-50 rounded-xl px-4 py-3 font-mono text-sm text-zinc-700 border border-zinc-100 truncate">
+                                    <div className="flex-1 bg-zinc-50 rounded-none px-4 py-3 font-mono text-sm text-zinc-700 border border-zinc-100 truncate">
                                         {displayUrl.replace("https://", "")}
                                     </div>
                                     <Button
                                         variant="ghost"
                                         size="icon"
                                         onClick={() => copyToClipboard(displayUrl)}
-                                        className="h-10 w-10 rounded-xl hover:bg-zinc-100 shrink-0"
+                                        className="h-10 w-10 rounded-none hover:bg-zinc-100 shrink-0"
                                     >
                                         {copied ? <Check className="h-4 w-4 text-emerald-500" /> : <Copy className="h-4 w-4" />}
                                     </Button>
                                     <a href={displayUrl} target="_blank" rel="noopener noreferrer">
-                                        <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl hover:bg-zinc-100 shrink-0">
+                                        <Button variant="ghost" size="icon" className="h-10 w-10 rounded-none hover:bg-zinc-100 shrink-0">
                                             <ExternalLink className="h-4 w-4" />
                                         </Button>
                                     </a>
@@ -608,7 +608,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                         </div>
 
                         {/* Last Deployment */}
-                        <div className="bg-zinc-50 rounded-2xl border border-zinc-200 p-4 sm:p-5 ">
+                        <div className="bg-zinc-50 rounded-none border border-zinc-200 p-4 sm:p-5 ">
                             <div className="flex items-center gap-2 text-zinc-500 mb-3">
                                 <Activity className="h-4 w-4" />
                                 <span className="text-xs font-medium uppercase tracking-wider">Last Deploy</span>
@@ -638,10 +638,10 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
 
                     {/* Build Progress - Only show when building */}
                     {isBuilding && (
-                        <div className="bg-zinc-50 rounded-2xl border border-zinc-200 p-6 mb-8 overflow-hidden">
+                        <div className="bg-zinc-50 rounded-none border border-zinc-200 p-6 mb-8 overflow-hidden">
                             <div className="flex items-center justify-between mb-6">
                                 <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 rounded-xl bg-blue-900 flex items-center justify-center">
+                                    <div className="w-10 h-10 rounded-none bg-blue-900 flex items-center justify-center">
                                         <Zap className="h-5 w-5 text-white" />
                                     </div>
                                     <div>
@@ -758,7 +758,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
 
                         {/* Deployments Tab */}
                         {activeTab === "deployments" && (
-                            <div className="bg-zinc-50 rounded-2xl border border-zinc-200 overflow-hidden">
+                            <div className="bg-zinc-50 rounded-none border border-zinc-200 overflow-hidden">
                                 {deployments.length === 0 ? (
                                     <div className="text-center py-16">
                                         <div className="w-12 h-12 rounded-full bg-zinc-100 flex items-center justify-center mx-auto mb-4">
@@ -845,7 +845,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
 
                         {/* Logs Tab */}
                         {activeTab === "logs" && (
-                            <div className="bg-zinc-50 rounded-2xl border border-zinc-200 overflow-hidden">
+                            <div className="bg-zinc-50 rounded-none border border-zinc-200 overflow-hidden">
                                 <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-100">
                                     <div className="flex items-center gap-3">
                                         <Terminal className="h-5 w-5 text-zinc-400" />
@@ -972,9 +972,9 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                                 )}
 
                                 {/* Info Note */}
-                                <div className="bg-blue-50 rounded-2xl border border-blue-100 p-6">
+                                <div className="bg-blue-50 rounded-none border border-blue-100 p-6">
                                     <div className="flex items-start gap-4">
-                                        <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center shrink-0">
+                                        <div className="w-10 h-10 rounded-none bg-blue-100 flex items-center justify-center shrink-0">
                                             <Cpu className="h-5 w-5 text-blue-600" />
                                         </div>
                                         <div>
@@ -1018,7 +1018,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                                 />
 
                                 {/* Danger Zone */}
-                                <div className="bg-zinc-50 rounded-2xl border border-red-200 overflow-hidden">
+                                <div className="bg-zinc-50 rounded-none border border-red-200 overflow-hidden">
                                     <div className="px-6 py-4 border-b border-red-100 bg-red-50">
                                         <h3 className="font-semibold text-red-900">Danger Zone</h3>
                                     </div>
@@ -1038,7 +1038,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                                                         Delete Project
                                                     </Button>
                                                 </AlertDialogTrigger>
-                                                <AlertDialogContent className="max-w-md rounded-2xl">
+                                                <AlertDialogContent className="max-w-md rounded-none">
                                                     <AlertDialogHeader>
                                                         <AlertDialogTitle className="text-xl">Delete Project</AlertDialogTitle>
                                                         <AlertDialogDescription>

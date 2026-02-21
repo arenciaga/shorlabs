@@ -248,7 +248,7 @@ export default function ProjectsPage() {
                     <div className="flex-1 min-w-0">
                         {/* Throttle Banner — only when usage is confirmed (not loading/revalidating) to avoid showing stale cache */}
                         {!usageLoading && !usageValidating && usage != null && usage.isThrottled && (
-                            <div className="mb-5 bg-red-50 border border-red-200 rounded-xl p-4 flex items-center justify-between">
+                            <div className="mb-5 bg-red-50 border border-red-200 rounded-none p-4 flex items-center justify-between">
                                 <div className="flex items-center gap-3">
                                     <AlertCircle className="h-5 w-5 text-red-500 shrink-0" />
                                     <div>
@@ -275,7 +275,7 @@ export default function ProjectsPage() {
                                 {[...Array(4)].map((_, i) => (
                                     <div
                                         key={i}
-                                        className="bg-zinc-50 border border-zinc-200 rounded-xl overflow-hidden"
+                                        className="bg-zinc-50 border border-zinc-200 rounded-none overflow-hidden"
                                     >
                                         <div className="p-5 pb-4">
                                             <div className="flex items-start justify-between mb-4">
@@ -320,7 +320,7 @@ export default function ProjectsPage() {
                                             href={`/projects/${project.project_id}`}
                                             className="group block"
                                         >
-                                            <div className="bg-zinc-50 border border-zinc-200 rounded-xl p-5 transition-all duration-200 hover:border-zinc-300 hover:shadow-lg hover:shadow-zinc-200/50">
+                                            <div className="bg-zinc-50 border border-zinc-200 rounded-none p-5 transition-all duration-200 hover:border-zinc-300 hover:shadow-lg hover:shadow-zinc-200/50">
                                                 {/* Top: Icon + Name + Status */}
                                                 <div className="flex items-start justify-between mb-4">
                                                     <div className="flex items-center gap-3 min-w-0">
@@ -415,7 +415,7 @@ export default function ProjectsPage() {
                             </div>
                         ) : (
                             <div className="text-center py-20">
-                                <div className="w-16 h-16 rounded-2xl bg-zinc-100 flex items-center justify-center mx-auto mb-6 rotate-3">
+                                <div className="w-16 h-16 rounded-none bg-zinc-100 flex items-center justify-center mx-auto mb-6 rotate-3">
                                     <Folder className="h-8 w-8 text-zinc-400" />
                                 </div>
                                 <h2 className="text-xl font-semibold text-zinc-900 mb-2">No projects yet</h2>

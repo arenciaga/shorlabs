@@ -39,7 +39,7 @@ export function AppNavbar() {
 
     return (
         <>
-            <header className="sticky top-0 z-50 w-full bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80">
+            <header className="sticky top-0 z-50 w-full bg-white">
                 {/* ── Main bar ── */}
                 <div className="flex h-14 items-center px-4 sm:px-6">
 
@@ -52,7 +52,7 @@ export function AppNavbar() {
                                 alt="Shorlabs"
                                 width={22}
                                 height={22}
-                                className="rounded-full"
+                                className="rounded-none"
                                 priority
                             />
                         </Link>
@@ -65,7 +65,7 @@ export function AppNavbar() {
                                     appearance={{
                                         elements: {
                                             organizationSwitcherTrigger:
-                                                "text-sm font-semibold text-zinc-900 hover:bg-zinc-100 rounded-lg px-2 py-1.5",
+                                                "text-sm font-semibold text-zinc-900 hover:bg-zinc-100 rounded-none px-2 py-1.5",
                                             organizationSwitcherTriggerIcon: "w-5 h-5",
                                             organizationPreviewAvatarBox: "w-5 h-5",
                                             organizationPreviewMainIdentifier:
@@ -75,7 +75,7 @@ export function AppNavbar() {
                                     hidePersonal={false}
                                 />
                             ) : (
-                                <div className="h-7 w-36 rounded-lg bg-zinc-100 animate-pulse" />
+                                <div className="h-7 w-36 rounded-none bg-zinc-100 animate-pulse" />
                             )}
                         </div>
 
@@ -92,7 +92,7 @@ export function AppNavbar() {
                                                     asChild
                                                     className={cn(
                                                         navigationMenuTriggerStyle(),
-                                                        "h-9 px-3 text-sm font-medium transition-colors bg-transparent hover:bg-zinc-100",
+                                                        "h-9 rounded-none px-3 text-xs font-mono tracking-[0.18em] uppercase transition-colors bg-transparent hover:bg-zinc-100",
                                                         isActive
                                                             ? "text-zinc-900 bg-zinc-100"
                                                             : "text-zinc-500 hover:text-zinc-900"
@@ -129,12 +129,12 @@ export function AppNavbar() {
                                 </UserButton.MenuItems>
                             </UserButton>
                         ) : (
-                            <div className="w-8 h-8 rounded-full bg-zinc-200 animate-pulse" />
+                            <div className="w-8 h-8 rounded-none bg-zinc-200 animate-pulse" />
                         )}
 
                         {/* Hamburger — mobile only */}
                         <button
-                            className="md:hidden p-1.5 rounded-lg text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 transition-colors"
+                            className="md:hidden p-1.5 rounded-none border border-zinc-900 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 transition-colors"
                             onClick={() => setMobileOpen((o) => !o)}
                             aria-label="Toggle menu"
                         >
@@ -153,7 +153,7 @@ export function AppNavbar() {
                                     appearance={{
                                         elements: {
                                             organizationSwitcherTrigger:
-                                                "text-sm font-semibold text-zinc-900 hover:bg-zinc-100 rounded-lg px-2 py-1.5 w-full",
+                                                "text-sm font-semibold text-zinc-900 hover:bg-zinc-100 rounded-none px-2 py-1.5 w-full",
                                             organizationSwitcherTriggerIcon: "w-5 h-5",
                                             organizationPreviewAvatarBox: "w-5 h-5",
                                             organizationPreviewMainIdentifier:
@@ -174,7 +174,7 @@ export function AppNavbar() {
                                         key={item.href}
                                         href={item.href}
                                         className={cn(
-                                            "flex items-center px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
+                                            "flex items-center px-3 py-2.5 rounded-none text-xs font-mono tracking-[0.18em] uppercase transition-colors",
                                             isActive
                                                 ? "bg-zinc-100 text-zinc-900"
                                                 : "text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900"

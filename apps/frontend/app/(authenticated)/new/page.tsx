@@ -320,8 +320,8 @@ function ImportRepositoryPageInner() {
                         pageState.message.toLowerCase().includes('invalid') ||
                         pageState.message.toLowerCase().includes('reconnect') ? (
                         // GitHub connection issue - show Connect button
-                        <div className="bg-white rounded-2xl border border-zinc-200 p-12 text-center hover:shadow-lg hover:shadow-zinc-900/5 transition-shadow">
-                            <div className="w-16 h-16 rounded-2xl bg-zinc-900 flex items-center justify-center mx-auto mb-6">
+                        <div className="bg-white rounded-none border border-zinc-200 p-12 text-center hover:shadow-lg hover:shadow-zinc-900/5 transition-shadow">
+                            <div className="w-16 h-16 rounded-none bg-zinc-900 flex items-center justify-center mx-auto mb-6">
                                 <Github className="h-8 w-8 text-white" />
                             </div>
                             <h2 className="text-xl font-semibold text-zinc-900 mb-2">
@@ -340,7 +340,7 @@ function ImportRepositoryPageInner() {
                         </div>
                     ) : (
                         // Generic error - show retry button
-                        <div className="bg-white rounded-2xl border border-zinc-200 p-12 text-center">
+                        <div className="bg-white rounded-none border border-zinc-200 p-12 text-center">
                             <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-4">
                                 <AlertCircle className="h-6 w-6 text-red-500" />
                             </div>
@@ -358,8 +358,8 @@ function ImportRepositoryPageInner() {
                     )
                 ) : pageState.status === 'not_connected' ? (
                     // Connect GitHub CTA
-                    <div className="bg-white rounded-2xl border border-zinc-200 p-12 text-center hover:shadow-lg hover:shadow-zinc-900/5 transition-shadow">
-                        <div className="w-16 h-16 rounded-2xl bg-zinc-900 flex items-center justify-center mx-auto mb-6">
+                    <div className="bg-white rounded-none border border-zinc-200 p-12 text-center hover:shadow-lg hover:shadow-zinc-900/5 transition-shadow">
+                        <div className="w-16 h-16 rounded-none bg-zinc-900 flex items-center justify-center mx-auto mb-6">
                             <Github className="h-8 w-8 text-white" />
                         </div>
                         <h2 className="text-xl font-semibold text-zinc-900 mb-2">
@@ -380,10 +380,10 @@ function ImportRepositoryPageInner() {
                     // Connected states: loading_repos OR ready
                     <div className="space-y-6">
                         {/* GitHub Account Card */}
-                        <div className="bg-white rounded-2xl border border-zinc-200 overflow-hidden hover:shadow-lg hover:shadow-zinc-900/5 transition-shadow">
+                        <div className="bg-white rounded-none border border-zinc-200 overflow-hidden hover:shadow-lg hover:shadow-zinc-900/5 transition-shadow">
                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 sm:px-6 py-4 border-b border-zinc-100">
                                 <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 rounded-xl bg-zinc-900 flex items-center justify-center">
+                                    <div className="w-10 h-10 rounded-none bg-zinc-900 flex items-center justify-center">
                                         <Github className="h-5 w-5 text-white" />
                                     </div>
                                     <div>
@@ -412,7 +412,7 @@ function ImportRepositoryPageInner() {
                                         placeholder="Search repositories..."
                                         value={searchQuery}
                                         onChange={(e) => setSearchQuery(e.target.value)}
-                                        className="pl-11 h-11 bg-white border-zinc-200 rounded-xl text-sm focus-visible:ring-zinc-200"
+                                        className="pl-11 h-11 bg-white border-zinc-200 rounded-none text-sm focus-visible:ring-zinc-200"
                                     />
                                 </div>
                             </div>
@@ -422,7 +422,7 @@ function ImportRepositoryPageInner() {
                                 <div className="divide-y divide-zinc-100">
                                     {[1, 2, 3, 4, 5].map(i => (
                                         <div key={i} className="px-4 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
-                                            <div className="w-10 h-10 rounded-xl bg-zinc-100 animate-pulse" />
+                                            <div className="w-10 h-10 rounded-none bg-zinc-100 animate-pulse" />
                                             <div className="flex-1">
                                                 <div className="h-4 w-40 bg-gradient-to-r from-zinc-200 via-zinc-100 to-zinc-200 rounded bg-[length:200%_100%] animate-[shimmer_1.5s_ease-in-out_infinite] mb-2" />
                                                 <div className="h-3 w-24 bg-zinc-100 rounded" />
@@ -449,7 +449,7 @@ function ImportRepositoryPageInner() {
                                             className="px-4 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 hover:bg-zinc-50 transition-colors group"
                                         >
                                             {/* Icon with language color */}
-                                            <div className="w-10 h-10 rounded-xl bg-zinc-100 flex items-center justify-center shrink-0 relative self-start sm:self-center">
+                                            <div className="w-10 h-10 rounded-none bg-zinc-100 flex items-center justify-center shrink-0 relative self-start sm:self-center">
                                                 <GitBranch className="h-5 w-5 text-zinc-500" />
                                                 {repo.language && LANGUAGE_COLORS[repo.language] && (
                                                     <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full ${LANGUAGE_COLORS[repo.language]} border-2 border-white`} />

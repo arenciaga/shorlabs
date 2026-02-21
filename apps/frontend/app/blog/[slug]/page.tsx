@@ -189,13 +189,13 @@ export default async function BlogPost({ params }: Props) {
       <div className="grid grid-cols-1 lg:grid-cols-[220px_1fr] gap-0 lg:gap-12 max-w-[1080px] mx-auto px-4 sm:px-6 py-6 lg:py-8 pb-10 lg:pb-16">
         {/* ── Sidebar: Table of contents ──────────────────── */}
         <aside className="hidden lg:block sticky top-[4.5rem] self-start pt-2">
-          <h4 className="text-sm font-bold mb-4 text-foreground">On this page</h4>
+          <h4 className="text-xs font-mono font-bold mb-4 text-foreground uppercase tracking-[0.2em]">On this page</h4>
           <nav className="flex flex-col">
             {headings.map((h) => (
               <a
                 key={h.id}
                 href={`#${h.id}`}
-                className={`block py-1 text-xs text-gray no-underline hover:text-foreground transition-colors leading-snug ${h.level === 3 ? "pl-3 text-[0.7rem]" : ""
+                className={`block py-1 text-[10px] font-mono uppercase tracking-widest text-gray no-underline hover:text-foreground transition-colors leading-snug ${h.level === 3 ? "pl-3 text-[9px]" : ""
                   }`}
               >
                 {h.text}
@@ -211,7 +211,7 @@ export default async function BlogPost({ params }: Props) {
             <div className="flex items-center gap-3">
               <Link
                 href="/blog"
-                className="inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-foreground no-underline hover:opacity-70 transition-opacity"
+                className="inline-flex items-center gap-1 text-[10px] font-mono font-semibold uppercase tracking-[0.2em] text-foreground no-underline hover:opacity-70 transition-opacity"
               >
                 ‹ Blog
               </Link>
@@ -259,20 +259,20 @@ export default async function BlogPost({ params }: Props) {
 
           {/* Article header */}
           <div className="pb-4 sm:pb-6">
-            <h1 className="text-xl sm:text-2xl lg:text-[2rem] font-bold leading-[1.15] tracking-tight mb-2 sm:mb-3 text-foreground">
+            <h1 className="text-xl sm:text-2xl lg:text-[2rem] font-mono font-bold leading-[1.15] tracking-tight mb-2 sm:mb-3 text-foreground uppercase">
               {post.meta.title}
             </h1>
-            <p className="text-xs sm:text-sm text-gray mb-1.5">
+            <p className="text-[10px] sm:text-xs text-gray mb-1.5 font-mono uppercase tracking-widest">
               {formatDate(post.meta.date)} · {post.meta.readingTime}{" "}
               {post.meta.readingTime === 1 ? "minute" : "minutes"} reading time
             </p>
-            <p className="text-xs sm:text-sm text-foreground">
+            <p className="text-xs sm:text-sm text-foreground font-mono">
               <strong className="font-semibold">{post.meta.author}</strong>
             </p>
           </div>
 
           {/* Summary */}
-          <p className="text-sm sm:text-base lg:text-lg leading-relaxed lg:leading-[1.7] text-foreground pb-4 sm:pb-6">
+          <p className="text-sm sm:text-base lg:text-lg leading-relaxed lg:leading-[1.7] text-foreground pb-4 sm:pb-6 font-mono">
             {post.meta.summary}
           </p>
 
@@ -288,14 +288,14 @@ export default async function BlogPost({ params }: Props) {
                 priority
               />
               <div className="absolute inset-0 bg-gradient-to-b from-black/5 to-black/55 flex items-end p-4 sm:p-6 lg:p-8">
-                <span className="text-lg sm:text-xl lg:text-2xl font-bold text-white leading-tight tracking-tight">
+                <span className="text-lg sm:text-xl lg:text-2xl font-mono font-bold text-white leading-tight tracking-tight uppercase">
                   {post.meta.title}
                 </span>
               </div>
             </div>
           )}
 
-          <div className="prose max-w-none text-sm sm:text-base lg:text-[1.05rem] leading-relaxed lg:leading-[1.8] text-foreground prose-headings:text-foreground prose-strong:text-foreground prose-p:text-foreground prose-li:text-foreground prose-blockquote:text-foreground prose-a:text-foreground prose-a:font-medium prose-a:no-underline hover:prose-a:opacity-70 prose-headings:scroll-mt-20 prose-h2:text-lg prose-h2:sm:text-xl prose-h2:lg:text-2xl prose-h2:font-bold prose-h2:tracking-tight prose-h2:mt-8 prose-h2:lg:mt-10 prose-h2:mb-3 prose-h3:text-base prose-h3:sm:text-lg prose-h3:font-semibold prose-h3:tracking-tight prose-h3:mt-6 prose-h3:lg:mt-8 prose-h3:mb-2 prose-p:mb-4">
+          <div className="prose max-w-none text-sm sm:text-base lg:text-[1.05rem] leading-relaxed lg:leading-[1.8] text-foreground prose-headings:text-foreground prose-strong:text-foreground prose-p:text-foreground prose-li:text-foreground prose-blockquote:text-foreground prose-a:text-foreground prose-a:font-medium prose-a:no-underline hover:prose-a:opacity-70 prose-headings:scroll-mt-20 prose-h2:text-lg prose-h2:sm:text-xl prose-h2:lg:text-2xl prose-h2:font-mono prose-h2:font-bold prose-h2:tracking-tight prose-h2:uppercase prose-h2:mt-8 prose-h2:lg:mt-10 prose-h2:mb-3 prose-h3:text-base prose-h3:sm:text-lg prose-h3:font-mono prose-h3:font-semibold prose-h3:tracking-tight prose-h3:uppercase prose-h3:mt-6 prose-h3:lg:mt-8 prose-h3:mb-2 prose-p:mb-4 prose-code:font-mono">
             <MDXRemote
               source={post.content}
               components={mdxComponents}

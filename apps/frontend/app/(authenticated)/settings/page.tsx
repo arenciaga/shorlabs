@@ -150,7 +150,7 @@ export default function SettingsPage() {
 
     return (
         <div className="min-h-screen bg-white">
-            <div className="px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
+            <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
 
                 {/* Tab Navigation */}
                 <div className="flex items-center gap-1 mb-6 border-b border-zinc-200">
@@ -183,11 +183,11 @@ export default function SettingsPage() {
                             <h2 className="text-sm font-semibold text-zinc-900 uppercase tracking-wider mb-4">Integrations</h2>
 
                             {/* GitHub Connection Card */}
-                            <div className="bg-white rounded-2xl border border-zinc-200 overflow-hidden">
+                            <div className="bg-white rounded-none border border-zinc-200 overflow-hidden">
                                 {/* Card Header */}
                                 <div className="px-4 py-4 sm:px-6 sm:py-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-zinc-100">
                                     <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 shrink-0 rounded-xl bg-zinc-900 flex items-center justify-center">
+                                        <div className="w-10 h-10 shrink-0 rounded-none bg-zinc-900 flex items-center justify-center">
                                             <Github className="h-5 w-5 text-white" />
                                         </div>
                                         <div>
@@ -287,7 +287,7 @@ export default function SettingsPage() {
                                                             Disconnect
                                                         </button>
                                                     </AlertDialogTrigger>
-                                                    <AlertDialogContent className="rounded-2xl">
+                                                    <AlertDialogContent className="rounded-none">
                                                         <AlertDialogHeader>
                                                             <AlertDialogTitle>Disconnect GitHub?</AlertDialogTitle>
                                                             <AlertDialogDescription>
@@ -318,7 +318,7 @@ export default function SettingsPage() {
                                     ) : (
                                         /* Not Connected State */
                                         <div className="flex flex-col items-center gap-4 py-4">
-                                            <div className="w-14 h-14 rounded-2xl bg-zinc-100 flex items-center justify-center">
+                                            <div className="w-14 h-14 rounded-none bg-zinc-100 flex items-center justify-center">
                                                 <Github className="h-7 w-7 text-zinc-400" />
                                             </div>
                                             <div className="text-center">
@@ -348,7 +348,7 @@ export default function SettingsPage() {
                         {/* Current Plan Card */}
                         <div>
                             <h2 className="text-sm font-semibold text-zinc-900 uppercase tracking-wider mb-4">Current Plan</h2>
-                            <div className="bg-white rounded-2xl border border-zinc-200 overflow-hidden">
+                            <div className="bg-white rounded-none border border-zinc-200 overflow-hidden">
                                 <div className="px-4 py-4 sm:px-6 sm:py-5">
                                     {!isPlanLoaded ? (
                                         <div className="flex items-center justify-center py-6">
@@ -400,7 +400,7 @@ export default function SettingsPage() {
 
                                             {/* Scheduled downgrade banner */}
                                             {isCanceling && (
-                                                <div className="rounded-xl bg-amber-50 border border-amber-100 px-4 py-3">
+                                                <div className="rounded-none bg-amber-50 border border-amber-100 px-4 py-3">
                                                     <p className="text-sm text-amber-800">
                                                         Your plan will change to <span className="font-medium">{scheduledPlanLabel}</span> at the end of the current billing period
                                                         {activeProduct?.current_period_end && (
@@ -418,10 +418,10 @@ export default function SettingsPage() {
                         {/* Payment & Invoices */}
                         <div>
                             <h2 className="text-sm font-semibold text-zinc-900 uppercase tracking-wider mb-4">Payment & Invoices</h2>
-                            <div className="bg-white rounded-2xl border border-zinc-200 overflow-hidden">
+                            <div className="bg-white rounded-none border border-zinc-200 overflow-hidden">
                                 <div className="px-4 py-4 sm:px-6 sm:py-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                                     <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 shrink-0 rounded-xl bg-zinc-100 flex items-center justify-center">
+                                        <div className="w-10 h-10 shrink-0 rounded-none bg-zinc-100 flex items-center justify-center">
                                             <CreditCard className="h-5 w-5 text-zinc-400" />
                                         </div>
                                         <div className="min-w-0">

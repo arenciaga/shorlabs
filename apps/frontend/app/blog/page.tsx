@@ -76,16 +76,16 @@ export default function Blog() {
       />
 
       <header className="mb-6 sm:mb-8 text-center">
-        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
+        <h1 className="text-2xl sm:text-3xl font-mono font-bold tracking-tight uppercase text-foreground">
           Blog
         </h1>
-        <p className="mt-2 text-sm sm:text-base text-gray max-w-2xl mx-auto">
+        <p className="mt-2 text-xs sm:text-sm text-gray max-w-2xl mx-auto font-mono">
           Product updates and engineering notes from Shorlabs.
         </p>
       </header>
 
       {posts.length === 0 && (
-        <p className="text-gray text-base py-8 border-t border-border">No posts yet.</p>
+        <p className="text-gray text-base py-8 border-t-2 border-foreground font-mono uppercase tracking-widest text-xs">No posts yet.</p>
       )}
 
       <div
@@ -110,21 +110,21 @@ export default function Blog() {
                   className="object-cover group-hover:scale-[1.02] transition-transform duration-300"
                 />
               ) : (
-                <div className="w-full h-full bg-gradient-to-br from-[#1a1a2e] via-[#16213e] to-[#0f3460]" />
+                <div className="w-full h-full bg-foreground" />
               )}
             </div>
             <div className="p-4 sm:p-5">
-              <h2 className="text-lg sm:text-xl font-semibold tracking-tight text-foreground group-hover:opacity-75 transition-opacity">
+              <h2 className="text-lg sm:text-xl font-mono font-semibold tracking-tight uppercase text-foreground group-hover:opacity-75 transition-opacity">
                 {post.title}
               </h2>
-              <p className="mt-1 text-xs sm:text-sm text-gray">
+              <p className="mt-1 text-[10px] sm:text-xs text-gray font-mono tracking-widest uppercase">
                 {formatDate(post.date)} · {post.readingTime}{" "}
                 {post.readingTime === 1 ? "minute" : "minutes"} read
               </p>
-              <p className="mt-3 text-sm sm:text-base text-foreground leading-relaxed">
+              <p className="mt-3 text-xs sm:text-sm text-foreground leading-relaxed font-mono">
                 {post.summary}
               </p>
-              <span className="mt-3 inline-flex items-center text-xs sm:text-sm font-semibold uppercase tracking-wide text-foreground group-hover:opacity-75 transition-opacity">
+              <span className="mt-3 inline-flex items-center text-[10px] sm:text-xs font-mono font-semibold uppercase tracking-[0.2em] text-foreground group-hover:opacity-75 transition-opacity">
                 Read article
               </span>
             </div>

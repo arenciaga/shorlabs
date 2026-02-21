@@ -357,7 +357,7 @@ function ConfigureProjectContent() {
         return (
             <div>
                 <div
-                    className={`flex items-center gap-2 py-2.5 px-3 cursor-pointer transition-colors rounded-lg mx-2 ${isSelected ? "bg-zinc-100" : "hover:bg-zinc-50"
+                    className={`flex items-center gap-2 py-2.5 px-3 cursor-pointer transition-colors rounded-none mx-2 ${isSelected ? "bg-zinc-100" : "hover:bg-zinc-50"
                         }`}
                     style={{ paddingLeft: `${12 + depth * 20}px` }}
                 >
@@ -485,9 +485,9 @@ function ConfigureProjectContent() {
                 </div>
 
                 {/* Source Card - Compact inline layout */}
-                <div className="bg-white rounded-2xl border border-zinc-200 px-4 py-3 mb-6">
+                <div className="bg-white rounded-none border border-zinc-200 px-4 py-3 mb-6">
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-zinc-900 flex items-center justify-center shrink-0">
+                        <div className="w-10 h-10 rounded-none bg-zinc-900 flex items-center justify-center shrink-0">
                             <Github className="h-5 w-5 text-white" />
                         </div>
                         <div className="flex-1 min-w-0">
@@ -514,7 +514,7 @@ function ConfigureProjectContent() {
 
                 {/* Error State */}
                 {error && (
-                    <div className="flex items-start gap-3 text-sm text-red-600 bg-red-50 p-4 rounded-2xl border border-red-100 mb-6">
+                    <div className="flex items-start gap-3 text-sm text-red-600 bg-red-50 p-4 rounded-none border border-red-100 mb-6">
                         <AlertCircle className="h-5 w-5 shrink-0 mt-0.5" />
                         <div>
                             <p className="font-medium">Deployment failed</p>
@@ -549,7 +549,7 @@ function ConfigureProjectContent() {
                         {/* Project Name + Root Directory - Side by side */}
                         <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
                             {/* Project Name - Takes 3 columns */}
-                            <div className="lg:col-span-3 bg-white rounded-2xl border border-zinc-200 overflow-hidden">
+                            <div className="lg:col-span-3 bg-white rounded-none border border-zinc-200 overflow-hidden">
                                 <div className="flex items-center gap-3 px-4 sm:px-6 py-4 border-b border-zinc-100">
                                     <FileText className="h-5 w-5 text-zinc-400" />
                                     <h3 className="font-semibold text-zinc-900">Project Name</h3>
@@ -559,7 +559,7 @@ function ConfigureProjectContent() {
                                         value={projectName}
                                         onChange={(e) => setProjectName(e.target.value)}
                                         placeholder="my-awesome-project"
-                                        className="h-12 text-sm border-zinc-200 rounded-xl font-medium"
+                                        className="h-12 text-sm border-zinc-200 rounded-none font-medium"
                                     />
                                     <p className="text-xs text-zinc-500 mt-2">
                                         Used in your deployment URL
@@ -568,21 +568,21 @@ function ConfigureProjectContent() {
                             </div>
 
                             {/* Root Directory - Takes 2 columns */}
-                            <div className="lg:col-span-2 bg-white rounded-2xl border border-zinc-200 overflow-hidden">
+                            <div className="lg:col-span-2 bg-white rounded-none border border-zinc-200 overflow-hidden">
                                 <div className="flex items-center gap-3 px-4 sm:px-6 py-4 border-b border-zinc-100">
                                     <Folder className="h-5 w-5 text-zinc-400" />
                                     <h3 className="font-semibold text-zinc-900">Root Directory</h3>
                                 </div>
                                 <div className="p-4 sm:p-6">
                                     <div className="flex items-center gap-3">
-                                        <div className="flex-1 flex items-center gap-3 bg-zinc-50 rounded-xl px-4 py-3.5 border border-zinc-100 min-w-0">
+                                        <div className="flex-1 flex items-center gap-3 bg-zinc-50 rounded-none px-4 py-3.5 border border-zinc-100 min-w-0">
                                             <Folder className="h-4 w-4 text-zinc-400 shrink-0" />
                                             <span className="font-mono text-sm text-zinc-700 truncate">{rootDirectory}</span>
                                         </div>
                                         <Button
                                             variant="outline"
                                             onClick={openDirectoryPicker}
-                                            className="h-12 rounded-xl shrink-0 px-4"
+                                            className="h-12 rounded-none shrink-0 px-4"
                                         >
                                             Edit
                                         </Button>
@@ -641,7 +641,7 @@ function ConfigureProjectContent() {
 
             {/* Root Directory Picker Dialog */}
             <Dialog open={showDirPicker} onOpenChange={setShowDirPicker}>
-                <DialogContent className="sm:max-w-[500px] p-0 gap-0 overflow-hidden rounded-2xl">
+                <DialogContent className="sm:max-w-[500px] p-0 gap-0 overflow-hidden rounded-none">
                     <DialogHeader className="px-6 pt-6 pb-4 text-center">
                         <DialogTitle className="text-xl font-semibold text-zinc-900">
                             Root Directory
@@ -659,7 +659,7 @@ function ConfigureProjectContent() {
                     <div className="border-t border-zinc-100 max-h-[320px] overflow-y-auto py-2">
                         {/* Root option */}
                         <div
-                            className={`flex items-center gap-2 py-2.5 px-3 cursor-pointer transition-colors rounded-lg mx-2 ${selectedDir === "./" ? "bg-zinc-100" : "hover:bg-zinc-50"
+                            className={`flex items-center gap-2 py-2.5 px-3 cursor-pointer transition-colors rounded-none mx-2 ${selectedDir === "./" ? "bg-zinc-100" : "hover:bg-zinc-50"
                                 }`}
                             onClick={() => setSelectedDir("./")}
                         >

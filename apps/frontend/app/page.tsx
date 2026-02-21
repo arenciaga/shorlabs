@@ -5,6 +5,7 @@ import { FeatureGrid } from "@/components/feature-grid";
 import { AboutSection } from "@/components/about-section";
 import { PricingSection } from "@/components/pricing-section-brutalist";
 import { GlitchMarquee } from "@/components/glitch-marquee";
+import { CtaSection } from "@/components/cta-section-brutalist";
 import { Footer } from "@/components/footer-brutalist";
 
 const homepageTitle = "Shorlabs | Open Source Full-Stack Deployment Platform";
@@ -41,10 +42,11 @@ export default function Home() {
       <Navbar />
       <main>
         <HeroSection />
+        <GlitchMarquee />
         <FeatureGrid />
         <AboutSection />
         <PricingSection />
-        <GlitchMarquee />
+        <CtaSection />
       </main>
       <Footer />
     </div>

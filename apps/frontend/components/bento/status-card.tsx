@@ -3,11 +3,11 @@
 import { useEffect, useState } from "react"
 import { Card } from "@/components/ui/card"
 
-const REGIONS = [
-  { name: "US-EAST-1", status: "ONLINE", latency: "12ms" },
-  { name: "EU-WEST-1", status: "ONLINE", latency: "15ms" },
-  { name: "AP-SOUTH-1", status: "ONLINE", latency: "18ms" },
-  { name: "US-WEST-2", status: "ONLINE", latency: "14ms" },
+const CAPABILITIES = [
+  { name: "GITHUB IMPORT", status: "READY", value: "OAuth" },
+  { name: "DEPLOY LOGS", status: "LIVE", value: "Streaming" },
+  { name: "CUSTOM DOMAINS", status: "READY", value: "SSL Auto" },
+  { name: "RUNTIME CONFIG", status: "READY", value: "Per Project" },
 ]
 
 export function StatusCard() {
@@ -32,32 +32,32 @@ export function StatusCard() {
       </div>
       <div className="flex-1 flex flex-col p-3 sm:p-4 gap-0">
         <div className="grid grid-cols-3 gap-2 border-b border-border pb-2 mb-2">
-          <span className="text-[9px] tracking-[0.15em] uppercase text-muted-foreground">Region</span>
+          <span className="text-[9px] tracking-[0.15em] uppercase text-muted-foreground">Capability</span>
           <span className="text-[9px] tracking-[0.15em] uppercase text-muted-foreground">Status</span>
-          <span className="text-[9px] tracking-[0.15em] uppercase text-muted-foreground text-right">Latency</span>
+          <span className="text-[9px] tracking-[0.15em] uppercase text-muted-foreground text-right">Mode</span>
         </div>
-        {REGIONS.map((region) => (
+        {CAPABILITIES.map((capability) => (
           <div
-            key={region.name}
+            key={capability.name}
             className="grid grid-cols-3 gap-2 py-2 border-b border-border last:border-none"
           >
-            <span className="text-[11px] sm:text-xs font-mono text-foreground truncate">{region.name}</span>
+            <span className="text-[11px] sm:text-xs font-mono text-foreground truncate">{capability.name}</span>
             <div className="flex items-center gap-2">
               <span
                 className="h-1.5 w-1.5"
                 style={{
-                  backgroundColor: region.status === "ONLINE" ? "currentColor" : "hsl(var(--muted-foreground))",
+                  backgroundColor: capability.status === "LIVE" || capability.status === "READY" ? "currentColor" : "hsl(var(--muted-foreground))",
                 }}
               />
-              <span className="text-[11px] sm:text-xs font-mono text-muted-foreground">{region.status}</span>
+              <span className="text-[11px] sm:text-xs font-mono text-muted-foreground">{capability.status}</span>
             </div>
-            <span className="text-[11px] sm:text-xs font-mono text-foreground text-right">{region.latency}</span>
+            <span className="text-[11px] sm:text-xs font-mono text-foreground text-right">{capability.value}</span>
           </div>
         ))}
         <div className="mt-auto pt-4">
           <div className="flex items-center justify-between mb-1">
             <span className="text-[9px] tracking-[0.15em] uppercase text-muted-foreground">
-              Global Throughput
+              Service Health
             </span>
             <span className="text-[9px] font-mono text-foreground">100%</span>
           </div>

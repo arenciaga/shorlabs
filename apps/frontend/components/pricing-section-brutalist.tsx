@@ -1,26 +1,16 @@
 "use client"
 
-import { useEffect, useState } from "react"
 import { PLANS } from "@/lib/plans"
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
 import { PricingCard } from "@/components/pricing-card"
 
-/* ── data-stream status line ── */
+/* ── status line ── */
 function StatusLine() {
-  const [throughput, setThroughput] = useState("0.0")
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setThroughput((Math.random() * 50 + 10).toFixed(1))
-    }, 2000)
-    return () => clearInterval(interval)
-  }, [])
-
   return (
     <div className="flex items-center gap-2 text-[10px] tracking-widest text-muted-foreground uppercase font-mono whitespace-nowrap">
       <span className="h-1.5 w-1.5 bg-muted-foreground" />
-      <span>live deployments: {throughput}k / day</span>
+      <span>invocations served: 592,843</span>
     </div>
   )
 }
@@ -52,7 +42,7 @@ export function PricingSection() {
               Select your plan
             </h2>
             <p className="text-xs sm:text-sm font-mono text-muted-foreground leading-relaxed max-w-md">
-              Simple, transparent pricing. Start free, scale as you grow.
+              Usage-based pricing with a free Hobby tier. Upgrade only when you need more limits.
             </p>
           </div>
           <Badge variant="outline" className="rounded-none font-mono text-[10px] tracking-widest uppercase w-full sm:w-auto justify-start sm:justify-center overflow-x-auto">
@@ -68,7 +58,7 @@ export function PricingSection() {
 
         <div className="flex items-center gap-3 mt-6">
           <Badge variant="outline" className="rounded-none font-mono text-[10px] tracking-[0.2em] uppercase text-muted-foreground leading-relaxed">
-            {"* Pay per request pricing available. Cancel anytime."}
+            {"* Includes free usage. Cancel anytime."}
           </Badge>
           <Separator className="flex-1" />
         </div>

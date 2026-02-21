@@ -1,6 +1,5 @@
 "use client"
 
-import { useState, useEffect } from "react"
 import { AlertCircle } from "lucide-react"
 import { useUsage } from "@/hooks/use-usage"
 import { useIsPro } from "@/hooks/use-is-pro"
@@ -22,9 +21,7 @@ const formatDollars = (amount: number) => {
 export function UsagePanel({ onUpgrade }: UsagePanelProps) {
     const { usage, loading: usageLoading, error: usageError, isValidating } = useUsage()
     const { isPro, planLabel } = useIsPro()
-    const [mounted, setMounted] = useState(false)
-
-    useEffect(() => { setMounted(true) }, [])
+    const mounted = true
 
     // Don't render anything meaningful until mounted (prevents hydration mismatch)
     // and until we have data (prevents showing wrong layout)
@@ -36,7 +33,7 @@ export function UsagePanel({ onUpgrade }: UsagePanelProps) {
 
     return (
         <div className="w-full lg:w-80 lg:shrink-0">
-            <div className="sticky top-8 border border-zinc-200 rounded-xl bg-white overflow-hidden">
+            <div className="sticky top-8 border border-zinc-200 rounded-none bg-white overflow-hidden">
                 {/* Header row */}
                 <div className="flex items-center justify-between px-5 pt-5 pb-1">
                     <div>
@@ -64,7 +61,7 @@ export function UsagePanel({ onUpgrade }: UsagePanelProps) {
 
                 {/* Quota Exceeded Banner — only when confirmed (not revalidating) to avoid flash from stale cache */}
                 {dataConfirmed && usage.isThrottled && (
-                    <div className="mx-4 mt-3 rounded-lg bg-red-50 border border-red-200 p-3">
+                    <div className="mx-4 mt-3 rounded-none bg-red-50 border border-red-200 p-3">
                         <div className="flex items-start gap-2.5">
                             <AlertCircle className="h-4 w-4 text-red-500 shrink-0 mt-0.5" />
                             <div>

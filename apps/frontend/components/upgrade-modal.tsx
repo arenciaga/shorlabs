@@ -115,7 +115,7 @@ export function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
         <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
             <SheetContent
                 side="right"
-                className="w-full gap-0 border-l border-zinc-200 bg-zinc-50 p-0 md:!w-full md:!max-w-none"
+                className="w-full gap-0 border-l border-zinc-200 bg-white p-0 md:!w-full md:!max-w-none"
             >
                 <div className="h-full overflow-y-auto px-5 py-8 sm:px-6 sm:py-8">
                     <SheetHeader className="space-y-3 p-0 text-center">
@@ -126,11 +126,11 @@ export function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
                             Start free, scale as you grow. No surprises.
                         </SheetDescription>
 
-                        <div className="mx-auto inline-flex items-center rounded-full border border-zinc-200 bg-zinc-100 p-0.5">
+                        <div className="mx-auto inline-flex items-center rounded-none border border-zinc-200 bg-zinc-100 p-0.5">
                             <Button
                                 type="button"
                                 size="sm"
-                                className="h-8 rounded-full bg-white px-3 text-sm text-zinc-900 shadow-xs hover:bg-white"
+                                className="h-8 rounded-none bg-white px-3 text-sm text-zinc-900 shadow-xs hover:bg-white"
                             >
                                 Business
                             </Button>
@@ -173,28 +173,28 @@ export function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
                                     renderBadge={() => {
                                         if (isCurrent && isPaidPlan && isDowngradeScheduled) {
                                             return (
-                                                <Badge className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
+                                                <Badge className="rounded-none bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
                                                     Cancels at period end
                                                 </Badge>
                                             )
                                         }
                                         if (isScheduledTarget) {
                                             return (
-                                                <Badge className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
+                                                <Badge className="rounded-none bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
                                                     Starts at period end
                                                 </Badge>
                                             )
                                         }
                                         if (isCurrent) {
                                             return (
-                                                <Badge className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-600">
+                                                <Badge className="rounded-none bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-600">
                                                     Current
                                                 </Badge>
                                             )
                                         }
                                         if (isPaidPlan) {
                                             return (
-                                                <Badge className="rounded-full bg-gradient-to-r from-violet-500 to-blue-500 px-2 py-0.5 text-xs font-medium text-white">
+                                                <Badge className="rounded-none bg-gradient-to-r from-violet-500 to-blue-500 px-2 py-0.5 text-xs font-medium text-white">
                                                     14 day free trial
                                                 </Badge>
                                             )
@@ -208,7 +208,7 @@ export function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
                                             disabled={isCurrent || isScheduledTarget || isLoading || !isLoaded || (isFree && isDowngradeScheduled && scheduledPlanId === "hobby")}
                                             variant={isPro && !isCurrent && !isScheduledTarget ? "default" : "outline"}
                                             className={cn(
-                                                "h-10 w-full rounded-full text-sm font-medium",
+                                                "h-10 w-full rounded-none text-sm font-medium",
                                                 isPro && !isCurrent && !isScheduledTarget && "bg-zinc-900 text-white hover:bg-zinc-800",
                                                 (isCurrent || isScheduledTarget || (isFree && isDowngradeScheduled && scheduledPlanId === "hobby")) && "border-zinc-200 bg-zinc-100 text-zinc-500 hover:bg-zinc-100",
                                                 !isPaidPlan && !isCurrent && !isScheduledTarget && !(isFree && isDowngradeScheduled && scheduledPlanId === "hobby") && "border-zinc-200 text-zinc-700 hover:bg-zinc-50",
@@ -237,7 +237,7 @@ export function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
 
         {/* Confirm plan change */}
         <AlertDialog open={!!confirmPlanId} onOpenChange={(open) => !open && handleConfirmCancel()}>
-            <AlertDialogContent className="rounded-2xl max-w-md">
+            <AlertDialogContent className="rounded-none max-w-md">
                 <AlertDialogHeader>
                     <AlertDialogTitle>Change plan?</AlertDialogTitle>
                     <AlertDialogDescription>
@@ -247,11 +247,11 @@ export function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                    <AlertDialogCancel className="rounded-full" onClick={handleConfirmCancel}>
+                    <AlertDialogCancel className="rounded-none" onClick={handleConfirmCancel}>
                         Cancel
                     </AlertDialogCancel>
                     <AlertDialogAction
-                        className="rounded-full bg-gradient-to-r from-violet-500 to-blue-500 text-white hover:opacity-90 focus:ring-violet-500"
+                        className="rounded-none bg-gradient-to-r from-violet-500 to-blue-500 text-white hover:opacity-90 focus:ring-violet-500"
                         onClick={(e) => {
                             e.preventDefault()
                             handleConfirmPlan()

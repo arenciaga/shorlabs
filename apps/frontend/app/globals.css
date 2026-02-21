@@ -91,6 +91,53 @@
   }
 }
 
+@layer components {
+  .brutalist-app {
+    background:
+      linear-gradient(to right, rgba(24, 24, 27, 0.06) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(24, 24, 27, 0.06) 1px, transparent 1px);
+    background-size: 24px 24px;
+    background-color: var(--background);
+  }
+
+  .brutalist-app .rounded-2xl,
+  .brutalist-app .rounded-xl,
+  .brutalist-app .rounded-lg,
+  .brutalist-app .rounded-md,
+  .brutalist-app .rounded-full {
+    border-radius: 0 !important;
+  }
+
+  .brutalist-app [data-slot="button"] {
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+
+  .brutalist-app [data-slot="badge"] {
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+
+  .brutalist-app [data-slot="input"] {
+    border-radius: 0 !important;
+    border-width: 2px !important;
+    box-shadow: none !important;
+    background: var(--background) !important;
+  }
+
+  .brutalist-app [class*="shadow-"] {
+    box-shadow: none !important;
+  }
+
+  .brutalist-app [data-slot="dialog-content"],
+  .brutalist-app [data-slot="alert-dialog-content"],
+  .brutalist-app [data-slot="sheet-content"] {
+    border-radius: 0 !important;
+    border-width: 2px !important;
+    box-shadow: none !important;
+  }
+}
+
 /* Dot Grid Background */
 .dot-grid-bg {
   background-image: radial-gradient(circle, rgba(0, 0, 0, 0.15) 1px, transparent 1px);

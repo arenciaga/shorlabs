@@ -68,10 +68,10 @@ export function MetricsCard() {
         <span className="inline-block h-2 w-2 bg-muted-foreground" />
       </div>
       <div className="flex-1 flex flex-col justify-center gap-5 sm:gap-6 p-4 sm:p-6">
-        <ScrambleNumber target="<1s" label="Deploy Time" delay={500} />
-        <ScrambleNumber target="99.9%" label="Uptime" delay={800} />
-        <ScrambleNumber target="0ms" label="Cold Start" delay={1100} />
-        <ScrambleNumber target="∞" label="Scale Limit" delay={1400} />
+        <ScrambleNumber target="592,843" label="Invocations" delay={500} />
+        <ScrambleNumber target="3K/mo" label="Free Requests" delay={800} />
+        <ScrambleNumber target="$0.60" label="Per 1M Requests" delay={1100} />
+        <ScrambleNumber target="$0.035" label="Per 1K GB-S" delay={1400} />
       </div>
     </Card>
   )

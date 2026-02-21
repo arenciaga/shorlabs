@@ -96,7 +96,7 @@ export function ComputeSettings({
     return (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             {/* Memory Column */}
-            <div className="bg-white rounded-xl border border-zinc-200 overflow-hidden">
+            <div className="bg-white rounded-none border border-zinc-200 overflow-hidden">
                 <div className="flex items-center gap-3 px-4 py-3 border-b border-zinc-100">
    
                     <h3 className="font-semibold text-zinc-900 text-sm">Memory</h3>
@@ -109,7 +109,7 @@ export function ComputeSettings({
                                 <button
                                     key={option.value}
                                     onClick={() => handleMemorySelect(option.value, option.minPlan)}
-                                    className={`relative w-full p-3 rounded-lg border-2 transition-all text-left ${memory === option.value
+                                    className={`relative w-full p-3 rounded-none border-2 transition-all text-left ${memory === option.value
                                             ? "border-zinc-900 bg-zinc-50"
                                             : isLocked
                                                 ? "border-zinc-200 bg-zinc-50/50 opacity-75"
@@ -140,7 +140,7 @@ export function ComputeSettings({
             </div>
 
             {/* Timeout Column */}
-            <div className="bg-white rounded-xl border border-zinc-200 overflow-hidden">
+            <div className="bg-white rounded-none border border-zinc-200 overflow-hidden">
                 <div className="flex items-center gap-3 px-4 py-3 border-b border-zinc-100">
             
                     <h3 className="font-semibold text-zinc-900 text-sm">Timeout</h3>
@@ -150,7 +150,7 @@ export function ComputeSettings({
                         <div>
                             <div className="flex items-center justify-between mb-2">
                                 <span className="text-xs text-zinc-500">Duration</span>
-                                <div className="bg-zinc-100 rounded-lg px-3 py-1.5">
+                                <div className="bg-zinc-100 rounded-none px-3 py-1.5">
                                     <span className="text-lg font-bold text-zinc-900">{timeout}</span>
                                     <span className="text-xs text-zinc-500 ml-1">sec</span>
                                 </div>
@@ -170,7 +170,7 @@ export function ComputeSettings({
                             </div>
                         </div>
                         {plan !== "pro" && (
-                            <div className="p-3 bg-zinc-50 border border-zinc-200 rounded-lg">
+                            <div className="p-3 bg-zinc-50 border border-zinc-200 rounded-none">
                                 <p className="text-xs text-zinc-600">
                                     {plan === "hobby"
                                         ? "Hobby plan limited to 30 seconds."
@@ -192,7 +192,7 @@ export function ComputeSettings({
             </div>
 
             {/* Ephemeral Storage Column */}
-            <div className="bg-white rounded-xl border border-zinc-200 overflow-hidden">
+            <div className="bg-white rounded-none border border-zinc-200 overflow-hidden">
                 <div className="flex items-center gap-3 px-4 py-3 border-b border-zinc-100">
                 
                     <h3 className="font-semibold text-zinc-900 text-sm">Temporary Storage</h3>
@@ -205,7 +205,7 @@ export function ComputeSettings({
                                 <button
                                     key={option.value}
                                     onClick={() => handleEphemeralStorageSelect(option.value, option.minPlan)}
-                                    className={`relative w-full p-3 rounded-lg border-2 transition-all text-left ${ephemeralStorage === option.value
+                                    className={`relative w-full p-3 rounded-none border-2 transition-all text-left ${ephemeralStorage === option.value
                                             ? "border-zinc-900 bg-zinc-50"
                                             : isLocked
                                                 ? "border-zinc-200 bg-zinc-50/50 opacity-75"

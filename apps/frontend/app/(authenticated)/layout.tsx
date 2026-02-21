@@ -8,7 +8,7 @@ export default function AuthenticatedLayout({
     return (
         <>
             <NavbarWrapper />
-            <main className="w-full">
+            <main className="w-full brutalist-app">
                 {children}
             </main>
         </>

@@ -9,7 +9,7 @@ import { Separator } from "@/components/ui/separator"
 
 export function FeatureGrid() {
   return (
-    <section id="features" className="w-full px-4 py-14 sm:px-6 sm:py-16 lg:px-12 lg:py-20">
+    <section id="features" className="w-full px-4 pt-6 pb-14 sm:px-6 sm:pt-8 sm:pb-16 lg:px-12 lg:pt-10 lg:pb-20">
       <div className="mx-auto w-full max-w-7xl">
         <div className="flex items-center gap-3 sm:gap-4 mb-6 sm:mb-8">
           <span className="text-[10px] tracking-[0.2em] uppercase text-muted-foreground whitespace-nowrap">

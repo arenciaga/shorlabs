@@ -28,28 +28,20 @@ export function HeroSection() {
             {!isLoaded ? (
               <div className="h-10 w-40 bg-muted" />
             ) : isSignedIn ? (
-              <Button asChild className="group w-full sm:w-auto rounded-none bg-foreground text-background text-xs sm:text-sm font-mono tracking-wider uppercase h-10 px-0">
-                <Link href="/projects" className="flex items-center gap-0">
-                  <span className="flex items-center justify-center w-10 h-10 bg-muted-foreground shrink-0">
-                    <ArrowRight size={16} strokeWidth={2} className="text-background" />
-                  </span>
-                  <span className="px-4 sm:px-5 py-2.5 w-full sm:w-auto text-center">
-                    Go to Projects
-                  </span>
-                </Link>
-              </Button>
+              <Link href="/projects" className="w-full sm:w-auto">
+                <Button className="group w-full sm:w-auto rounded-none bg-foreground text-background hover:bg-foreground text-xs sm:text-sm font-mono tracking-wider uppercase h-10 px-6">
+                  <span>Go to Projects</span>
+                  <ArrowRight className="w-4 h-4 ml-2" strokeWidth={1.5} />
+                </Button>
+              </Link>
             ) : (
               <>
-                <Button asChild className="group w-full sm:w-auto rounded-none bg-foreground text-background text-xs sm:text-sm font-mono tracking-wider uppercase h-10 px-0">
-                  <Link href="/sign-in" className="flex items-center gap-0">
-                    <span className="flex items-center justify-center w-10 h-10 bg-muted-foreground shrink-0">
-                      <ArrowRight size={16} strokeWidth={2} className="text-background" />
-                    </span>
-                    <span className="px-4 sm:px-5 py-2.5 w-full sm:w-auto text-center">
-                      Get Started
-                    </span>
-                  </Link>
-                </Button>
+                <Link href="/sign-in" className="w-full sm:w-auto">
+                  <Button className="group w-full sm:w-auto rounded-none bg-foreground text-background hover:bg-foreground text-xs sm:text-sm font-mono tracking-wider uppercase h-10 px-6">
+                    <span>Get Started</span>
+                    <ArrowRight className="w-4 h-4 ml-2" strokeWidth={1.5} />
+                  </Button>
+                </Link>
                 <GoogleSignInButton
                   source="hero"
                   text="Continue With Google"

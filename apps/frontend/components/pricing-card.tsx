@@ -109,20 +109,19 @@ export function PricingCard({
             <div className="px-5 pt-3 pb-5">
                 {customAction}
                 {showDefaultAction && (
-                    <Button
-                        asChild
-                        className={cn(
-                            "group h-9 w-full rounded-none px-0 text-xs font-mono tracking-wider uppercase",
-                            isHighlighted ? "bg-background text-foreground" : "bg-foreground text-background"
-                        )}
-                    >
-                        <Link href={isSignedIn ? "/projects" : "/sign-in"} className="flex items-center justify-center gap-0">
-                            <span className="flex h-9 w-9 items-center justify-center bg-muted-foreground">
-                                <ArrowRight size={14} strokeWidth={2} className="text-background" />
-                            </span>
-                            <span className="flex-1 py-2.5">{isSignedIn ? "Deploy Now" : "Get Started"}</span>
-                        </Link>
-                    </Button>
+                    <Link href={isSignedIn ? "/projects" : "/sign-in"} className="w-full">
+                        <Button
+                            className={cn(
+                                "group h-9 w-full rounded-none px-6 text-xs font-mono tracking-wider uppercase",
+                                isHighlighted
+                                    ? "bg-background text-foreground hover:bg-background"
+                                    : "bg-foreground text-background hover:bg-foreground"
+                            )}
+                        >
+                            <span>{isSignedIn ? "Deploy Now" : "Get Started"}</span>
+                            <ArrowRight className="w-4 h-4 ml-2" strokeWidth={1.5} />
+                        </Button>
+                    </Link>
                 )}
             </div>
         </Card>

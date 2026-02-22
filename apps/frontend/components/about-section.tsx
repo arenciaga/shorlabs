@@ -102,19 +102,17 @@ export function AboutSection() {
             <div className="flex-1 flex flex-col justify-between px-4 sm:px-5 py-6 lg:py-8">
               <div className="flex flex-col gap-6">
                 <h2 className="text-xl sm:text-2xl lg:text-3xl font-mono font-bold tracking-tight uppercase text-balance">
-                  Deployment workflow built for
+                  You write the code.
                   <br />
-                  <span className="text-muted-foreground">fast iteration</span>
+                  <span className="text-muted-foreground">We handle the rest.</span>
                 </h2>
 
                 <div className="flex flex-col gap-4">
                   <p className="text-xs sm:text-sm font-mono text-muted-foreground leading-relaxed">
-                    Import a GitHub repository, review defaults, and deploy to a production URL from one place.
-                    Built-in logs and project settings make redeploys straightforward.
+                    Connect your GitHub repo. Pick your settings. Hit deploy. Your app is live on a production URL in under two minutes.
                   </p>
                   <p className="text-xs sm:text-sm font-mono text-muted-foreground leading-relaxed">
-                    Configure environment variables, start commands, compute limits, and domains per project.
-                    Pay only for usage as your traffic grows.
+                    Redeploy with a git push. Monitor with built-in logs. Set environment variables, custom domains, and compute limits per project. Pay only for what you use.
                   </p>
                 </div>
 

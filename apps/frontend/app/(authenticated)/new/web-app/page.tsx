@@ -294,11 +294,11 @@ function ImportRepositoryPageInner() {
             <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
                 {/* Navigation */}
                 <Link
-                    href="/projects"
+                    href="/new"
                     className="inline-flex items-center gap-1.5 text-sm text-zinc-500 hover:text-zinc-900 transition-colors mb-8 group"
                 >
                     <ArrowLeft className="h-4 w-4 transition-transform group-hover:-translate-x-1" />
-                    <span>Back to Projects</span>
+                    <span>Back to Project Type</span>
                 </Link>
 
                 {/* Header */}

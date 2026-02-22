@@ -1,40 +1,15 @@
 "use client"
 
 import Link from "next/link"
-import { ArrowLeft, ArrowRight, Globe, Bot, Database, LucideIcon } from "lucide-react"
+import { ArrowLeft, ArrowRight, Globe } from "lucide-react"
 
-interface ProjectType {
-    id: string
-    name: string
-    description: string
-    icon: LucideIcon
-    href: string
-    comingSoon?: boolean
-}
-
-const PROJECT_TYPES: ProjectType[] = [
+const PROJECT_TYPES = [
     {
         id: "web-app",
         name: "Web App",
         description: "Deploy a web application from a Git repository",
         icon: Globe,
         href: "/new/web-app",
-    },
-    {
-        id: "ai-agent",
-        name: "AI Agent",
-        description: "Deploy an autonomous AI agent",
-        icon: Bot,
-        href: "#",
-        comingSoon: true,
-    },
-    {
-        id: "vector-database",
-        name: "Vector Database",
-        description: "Spin up a managed vector database for embeddings",
-        icon: Database,
-        href: "#",
-        comingSoon: true,
     },
 ]
 
@@ -59,42 +34,22 @@ export default function NewProjectPage() {
 
                 {/* Project Type List */}
                 <div className="border border-zinc-200 divide-y divide-zinc-200">
-                    {PROJECT_TYPES.map((type) =>
-                        type.comingSoon ? (
-                            <div
-                                key={type.id}
-                                className="flex items-center gap-4 px-4 sm:px-6 py-4 cursor-not-allowed opacity-50"
-                            >
-                                <div className="w-10 h-10 rounded-none bg-zinc-300 flex items-center justify-center shrink-0">
-                                    <type.icon className="h-5 w-5 text-white" />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-2">
-                                        <p className="font-medium text-zinc-900">{type.name}</p>
-                                        <span className="text-xs font-medium text-zinc-400 bg-zinc-100 px-2 py-0.5 rounded-full">
-                                            Coming Soon
-                                        </span>
-                                    </div>
-                                    <p className="text-sm text-zinc-500">{type.description}</p>
-                                </div>
+                    {PROJECT_TYPES.map((type) => (
+                        <Link
+                            key={type.id}
+                            href={type.href}
+                            className="flex items-center gap-4 px-4 sm:px-6 py-4 hover:bg-zinc-50 transition-colors group"
+                        >
+                            <div className="w-10 h-10 rounded-none bg-zinc-900 flex items-center justify-center shrink-0">
+                                <type.icon className="h-5 w-5 text-white" />
                             </div>
-                        ) : (
-                            <Link
-                                key={type.id}
-                                href={type.href}
-                                className="flex items-center gap-4 px-4 sm:px-6 py-4 hover:bg-zinc-50 transition-colors group"
-                            >
-                                <div className="w-10 h-10 rounded-none bg-zinc-900 flex items-center justify-center shrink-0">
-                                    <type.icon className="h-5 w-5 text-white" />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <p className="font-medium text-zinc-900">{type.name}</p>
-                                    <p className="text-sm text-zinc-500">{type.description}</p>
-                                </div>
-                                <ArrowRight className="h-4 w-4 text-zinc-400 group-hover:text-zinc-900 transition-colors shrink-0" />
-                            </Link>
-                        )
-                    )}
+                            <div className="flex-1 min-w-0">
+                                <p className="font-medium text-zinc-900">{type.name}</p>
+                                <p className="text-sm text-zinc-500">{type.description}</p>
+                            </div>
+                            <ArrowRight className="h-4 w-4 text-zinc-400 group-hover:text-zinc-900 transition-colors shrink-0" />
+                        </Link>
+                    ))}
                 </div>
             </div>
         </div>

@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { AlertCircle } from "lucide-react"
 import { useUsage } from "@/hooks/use-usage"
 import { useIsPro } from "@/hooks/use-is-pro"
@@ -21,7 +22,8 @@ const formatDollars = (amount: number) => {
 export function UsagePanel({ onUpgrade }: UsagePanelProps) {
     const { usage, loading: usageLoading, error: usageError, isValidating } = useUsage()
     const { isPro, planLabel } = useIsPro()
-    const mounted = true
+    const [mounted, setMounted] = useState(false)
+    useEffect(() => { setMounted(true) }, [])
 
     // Don't render anything meaningful until mounted (prevents hydration mismatch)
     // and until we have data (prevents showing wrong layout)

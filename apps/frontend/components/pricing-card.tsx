@@ -5,6 +5,7 @@ import Link from "next/link"
 import { useAuth } from "@clerk/nextjs"
 import { ArrowRight, Check } from "lucide-react"
 
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import type { Plan } from "@/lib/plans"
@@ -56,6 +57,11 @@ export function PricingCard({
                 </span>
                 <div className="flex items-center gap-2">
                     {renderBadge?.(plan)}
+                    {!renderBadge && plan.trialLabel && (
+                        <Badge className="rounded-none bg-gradient-to-r from-violet-500 to-blue-500 px-2 py-0.5 text-[9px] font-mono tracking-widest uppercase text-white border-0">
+                            {plan.trialLabel}
+                        </Badge>
+                    )}
                     {typeof index === "number" && (
                         <span className="text-[10px] font-mono tracking-[0.2em] opacity-50">
                             {String(index + 1).padStart(2, "0")}

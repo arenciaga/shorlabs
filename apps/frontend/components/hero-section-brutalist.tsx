@@ -19,10 +19,10 @@ export function HeroSection() {
             className="font-mono sm:text-xl lg:text-base xl:text-4xl tracking-tight text-foreground mb-5 select-none font-bold uppercase leading-[0.95]"
             style={{ letterSpacing: "-0.01em" }}
           >
-            FULL-STACK DEPLOYMENT PLATFORM
+            DEPLOY YOUR APP IN MINUTES, NOT HOURS.
           </h1>
           <p className="text-xs sm:text-sm text-muted-foreground max-w-2xl mb-8 sm:mb-9 leading-relaxed font-mono px-1 sm:px-0">
-            Deploy full-stack apps from GitHub in minutes. Configure memory, timeout, environment variables, logs, and custom domains from one dashboard.
+            Push your code to GitHub. Your app gets built, containerized, and deployed automatically. Logs, custom domains, and environment variables — all from one dashboard.
           </p>
           <div className="flex w-full max-w-md sm:max-w-none flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3">
             {!isLoaded ? (

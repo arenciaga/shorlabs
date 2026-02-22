@@ -12,6 +12,7 @@ export interface Plan {
     price: string
     period: string
     highlighted?: boolean
+    trialLabel?: string
     features: PlanFeature[]
 }
 
@@ -41,6 +42,7 @@ export const PLANS: Plan[] = [
         description: "Great for growing projects that need more scale.",
         price: "$5",
         period: "/ month",
+        trialLabel: "30 day free trial",
         features: [
             { label: "$5 Included Usage/Month", icon: DollarSign },
             { label: USAGE_PRICING.requests, icon: Globe },
@@ -57,6 +59,7 @@ export const PLANS: Plan[] = [
         price: "$20",
         period: "/ month",
         highlighted: true,
+        trialLabel: "30 day free trial",
         features: [
             { label: "$20 Included Usage/Month", icon: DollarSign },
             { label: USAGE_PRICING.requests, icon: Globe },

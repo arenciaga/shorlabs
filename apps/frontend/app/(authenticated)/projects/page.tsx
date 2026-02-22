@@ -227,7 +227,7 @@ export default function ProjectsPage() {
                             <Sparkles className="h-4 w-4 mr-2" />
                             Upgrade
                         </Button>
-                        <Link href="/new" className="flex-1 sm:flex-none">
+                        <Link href="/new/web-app" className="flex-1 sm:flex-none">
                             <Button className="rounded-full h-10 px-4 sm:px-5 bg-zinc-900 text-white hover:bg-zinc-800 text-sm font-medium cursor-pointer transition-all hover:shadow-lg hover:shadow-zinc-900/10 w-full">
                                 <Plus className="h-4 w-4 mr-2" />
                                 New Project

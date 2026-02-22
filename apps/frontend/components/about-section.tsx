@@ -4,10 +4,6 @@ import { Card } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
 
-function ScrambleText({ text, className }: { text: string; className?: string }) {
-  return <span className={className}>{text}</span>
-}
-
 function BlinkDot() {
   return <span className="inline-block h-2 w-2 bg-muted-foreground" />
 }
@@ -17,27 +13,6 @@ function UptimeCounter() {
     <span className="font-mono text-muted-foreground" style={{ fontVariantNumeric: "tabular-nums" }}>
       365d 00h 00m 00s
     </span>
-  )
-}
-
-/* ── stat block ── */
-const STATS = [
-  { label: "TOTAL_INVOCATIONS", value: "592,843" },
-  { label: "HOBBY_INCLUDED", value: "3K REQ / 1.2K GB-S" },
-  { label: "REQUEST_PRICING", value: "$0.60 / 1M" },
-  { label: "FIRST_DEPLOY", value: "~60-90s" },
-]
-
-function StatBlock({ label, value }: { label: string; value: string }) {
-  return (
-    <Card className="flex flex-col gap-1 border-2 border-foreground rounded-none bg-transparent py-3 px-3 sm:px-4 shadow-none">
-      <span className="text-[10px] tracking-[0.2em] uppercase text-muted-foreground font-mono">
-        {label}
-      </span>
-      <span className="text-xl lg:text-2xl font-mono font-bold tracking-tight">
-        <ScrambleText text={value} />
-      </span>
-    </Card>
   )
 }
 
@@ -125,11 +100,6 @@ export function AboutSection() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-0 mt-6">
-                {STATS.map((stat) => (
-                  <StatBlock key={stat.label} {...stat} />
-                ))}
-              </div>
             </div>
           </div>
         </Card>

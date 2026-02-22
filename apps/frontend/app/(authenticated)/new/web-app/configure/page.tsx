@@ -133,7 +133,7 @@ function ConfigureProjectContent() {
     // Redirect if no repo selected
     useEffect(() => {
         if (!repoFullName) {
-            router.push("/new")
+            router.push("/new/web-app")
         }
     }, [repoFullName, router])
 
@@ -437,7 +437,7 @@ function ConfigureProjectContent() {
             <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
                 {/* Navigation */}
                 <Link
-                    href="/new"
+                    href="/new/web-app"
                     className="inline-flex items-center gap-1.5 text-sm text-zinc-500 hover:text-zinc-900 transition-colors mb-8 group"
                 >
                     <ArrowLeft className="h-4 w-4 transition-transform group-hover:-translate-x-1" />

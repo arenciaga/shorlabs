@@ -6,6 +6,7 @@ import { GoogleSignInButton } from "@/components/GoogleSignInButton"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
+
 export function HeroSection() {
   const { isLoaded, isSignedIn } = useAuth()
   return (

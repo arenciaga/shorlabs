@@ -81,18 +81,30 @@ def _run_deployment_sync(
     memory: int = 1024,
     timeout: int = 30,
     ephemeral_storage: int = 512,
+    commit_sha: Optional[str] = None,
+    commit_message: Optional[str] = None,
+    commit_author_name: Optional[str] = None,
+    commit_author_username: Optional[str] = None,
+    branch: Optional[str] = None,
 ):
     """Synchronous deployment function - runs in thread pool using new deployer."""
     from datetime import datetime
-    
+
     deployment = None
     build_id_holder = [None]  # Use list to allow mutation in nested function
-    
+
     def on_build_start(build_id: str):
         """Callback called when build starts - creates deployment record immediately."""
         nonlocal deployment
         build_id_holder[0] = build_id
-        deployment = create_deployment(project_id, build_id)
+        deployment = create_deployment(
+            project_id, build_id,
+            commit_sha=commit_sha,
+            commit_message=commit_message,
+            commit_author_name=commit_author_name,
+            commit_author_username=commit_author_username,
+            branch=branch,
+        )
         print(f"📝 Deployment record created: {deployment['deploy_id']} (build: {build_id})")
     
     try:
@@ -191,10 +203,15 @@ def send_deployment_to_sqs(
     memory: int = 1024,
     timeout: int = 30,
     ephemeral_storage: int = 512,
+    commit_sha: Optional[str] = None,
+    commit_message: Optional[str] = None,
+    commit_author_name: Optional[str] = None,
+    commit_author_username: Optional[str] = None,
+    branch: Optional[str] = None,
 ):
     """
     Send deployment task to SQS queue for background processing.
-    
+
     This is the industry-standard approach for Lambda background tasks:
     - SQS provides automatic retries on failure
     - Dead-letter queue captures failed deployments
@@ -202,30 +219,42 @@ def send_deployment_to_sqs(
     - No risk of recursive invocation loops
     """
     import time
-    
+
     # Check if running on Lambda
     if not os.environ.get("AWS_LAMBDA_FUNCTION_NAME"):
         # Running locally - use thread pool fallback
         def run_in_thread():
-            _run_deployment_sync(project_id, github_url, github_token, root_directory, start_command, env_vars, memory, timeout, ephemeral_storage)
+            _run_deployment_sync(
+                project_id, github_url, github_token, root_directory, start_command,
+                env_vars, memory, timeout, ephemeral_storage,
+                commit_sha=commit_sha, commit_message=commit_message,
+                commit_author_name=commit_author_name,
+                commit_author_username=commit_author_username, branch=branch,
+            )
         thread = threading.Thread(target=run_in_thread)
         thread.start()
         print(f"📤 Local: Deployment started in background thread for project {project_id}")
         return
-    
+
     # Running on Lambda - send message to SQS queue
     sqs_client = boto3.client("sqs")
-    
+
     # Get queue URL from environment
     queue_url = os.environ.get("DEPLOY_QUEUE_URL")
     if not queue_url:
         print("⚠️ DEPLOY_QUEUE_URL not set, falling back to thread-based execution")
         def run_in_thread():
-            _run_deployment_sync(project_id, github_url, github_token, root_directory, start_command, env_vars, memory, timeout, ephemeral_storage)
+            _run_deployment_sync(
+                project_id, github_url, github_token, root_directory, start_command,
+                env_vars, memory, timeout, ephemeral_storage,
+                commit_sha=commit_sha, commit_message=commit_message,
+                commit_author_name=commit_author_name,
+                commit_author_username=commit_author_username, branch=branch,
+            )
         thread = threading.Thread(target=run_in_thread)
         thread.start()
         return
-    
+
     message_body = {
         "project_id": project_id,
         "github_url": github_url,
@@ -236,6 +265,11 @@ def send_deployment_to_sqs(
         "memory": memory,
         "timeout": timeout,
         "ephemeral_storage": ephemeral_storage,
+        "commit_sha": commit_sha,
+        "commit_message": commit_message,
+        "commit_author_name": commit_author_name,
+        "commit_author_username": commit_author_username,
+        "branch": branch,
     }
     
     response = sqs_client.send_message(
@@ -422,6 +456,11 @@ async def get_project_details(
                 "status": d["status"],
                 "started_at": d["started_at"],
                 "finished_at": d.get("finished_at"),
+                "commit_sha": d.get("commit_sha"),
+                "commit_message": d.get("commit_message"),
+                "commit_author_name": d.get("commit_author_name"),
+                "commit_author_username": d.get("commit_author_username"),
+                "branch": d.get("branch"),
             }
             for d in deployments
         ],

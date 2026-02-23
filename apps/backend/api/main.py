@@ -116,6 +116,11 @@ def _handle_sqs_event(event: dict) -> dict:
                 memory=body.get("memory", 1024),
                 timeout=body.get("timeout", 30),
                 ephemeral_storage=body.get("ephemeral_storage", 512),
+                commit_sha=body.get("commit_sha"),
+                commit_message=body.get("commit_message"),
+                commit_author_name=body.get("commit_author_name"),
+                commit_author_username=body.get("commit_author_username"),
+                branch=body.get("branch"),
             )
             print(f"✅ Message {message_id} processed successfully")
             

@@ -79,6 +79,11 @@ export interface Deployment {
     status: "IN_PROGRESS" | "SUCCEEDED" | "FAILED";
     started_at: string;
     finished_at: string | null;
+    commit_sha: string | null;
+    commit_message: string | null;
+    commit_author_name: string | null;
+    commit_author_username: string | null;
+    branch: string | null;
 }
 
 export interface ProjectDetails {

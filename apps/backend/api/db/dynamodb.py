@@ -512,6 +512,11 @@ def get_project_by_custom_domain(domain: str) -> Optional[dict]:
 def create_deployment(
     project_id: str,
     build_id: str,
+    commit_sha: Optional[str] = None,
+    commit_message: Optional[str] = None,
+    commit_author_name: Optional[str] = None,
+    commit_author_username: Optional[str] = None,
+    branch: Optional[str] = None,
 ) -> dict:
     """Create a new deployment record in the deployments table."""
     table = get_or_create_deployments_table()
@@ -529,6 +534,19 @@ def create_deployment(
         "started_at": now,
         "finished_at": None,
     }
+
+    # Add Git metadata if present (webhook-triggered deploys)
+    if commit_sha:
+        item["commit_sha"] = commit_sha
+    if commit_message:
+        item["commit_message"] = commit_message
+    if commit_author_name:
+        item["commit_author_name"] = commit_author_name
+    if commit_author_username:
+        item["commit_author_username"] = commit_author_username
+    if branch:
+        item["branch"] = branch
+
     table.put_item(Item=item)
     return item
 

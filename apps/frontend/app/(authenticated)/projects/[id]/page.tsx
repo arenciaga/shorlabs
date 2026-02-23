@@ -86,6 +86,11 @@ interface Deployment {
     status: "IN_PROGRESS" | "SUCCEEDED" | "FAILED"
     started_at: string
     finished_at: string | null
+    commit_sha: string | null
+    commit_message: string | null
+    commit_author_name: string | null
+    commit_author_username: string | null
+    branch: string | null
 }
 
 interface CustomDomain {
@@ -779,16 +784,42 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                                                     >
                                                         <div className="flex-1 min-w-0">
                                                             <div className="flex items-center gap-2">
-                                                                <p className="font-mono text-sm font-medium text-zinc-900">
-                                                                    {deployment.deploy_id}
-                                                                </p>
+                                                                {deployment.commit_sha ? (
+                                                                    <>
+                                                                        <GitBranch className="h-3.5 w-3.5 text-zinc-400 flex-shrink-0" />
+                                                                        {deployment.branch && (
+                                                                            <span className="text-xs font-medium text-zinc-600 bg-zinc-100 px-1.5 py-0.5 rounded">
+                                                                                {deployment.branch}
+                                                                            </span>
+                                                                        )}
+                                                                        <a
+                                                                            href={`https://github.com/${project.github_repo}/commit/${deployment.commit_sha}`}
+                                                                            target="_blank"
+                                                                            rel="noopener noreferrer"
+                                                                            onClick={(e) => e.stopPropagation()}
+                                                                            className="font-mono text-sm font-medium text-blue-600 hover:underline"
+                                                                        >
+                                                                            {deployment.commit_sha.slice(0, 7)}
+                                                                        </a>
+                                                                    </>
+                                                                ) : (
+                                                                    <p className="font-mono text-sm font-medium text-zinc-900">
+                                                                        {deployment.deploy_id}
+                                                                    </p>
+                                                                )}
                                                                 {isLatest && (
                                                                     <span className="text-xs font-medium text-zinc-500 bg-zinc-100 px-2 py-0.5 rounded-full">
                                                                         Current
                                                                     </span>
                                                                 )}
                                                             </div>
-                                                            <p className="text-sm text-zinc-500 mt-0.5">
+                                                            {deployment.commit_message && (
+                                                                <p className="text-sm text-zinc-700 mt-0.5 truncate">
+                                                                    {deployment.commit_message.split("\n")[0].slice(0, 60)}
+                                                                    {deployment.commit_message.split("\n")[0].length > 60 ? "..." : ""}
+                                                                </p>
+                                                            )}
+                                                            <p className="text-xs text-zinc-400 mt-0.5">
                                                                 {new Date(deployment.started_at).toLocaleDateString("en-US", {
                                                                     month: "short",
                                                                     day: "numeric",
@@ -796,6 +827,9 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                                                                     hour: "2-digit",
                                                                     minute: "2-digit",
                                                                 })}
+                                                                {deployment.commit_author_name && (
+                                                                    <span> by {deployment.commit_author_name}</span>
+                                                                )}
                                                             </p>
                                                         </div>
 

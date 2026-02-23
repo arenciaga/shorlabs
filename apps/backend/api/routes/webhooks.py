@@ -84,6 +84,14 @@ async def github_webhook(request: Request):
     full_name = repository.get("full_name")  # e.g. "owner/repo"
     ref = body.get("ref", "")  # e.g. "refs/heads/main"
 
+    # Extract commit metadata from push payload
+    head_commit = body.get("head_commit") or {}
+    commit_sha = head_commit.get("id")
+    commit_message = head_commit.get("message")
+    commit_author = head_commit.get("author") or {}
+    commit_author_name = commit_author.get("name")
+    commit_author_username = commit_author.get("username")
+
     # GitHub App payloads include installation
     installation = body.get("installation") or {}
     installation_id = installation.get("id")
@@ -148,6 +156,11 @@ async def github_webhook(request: Request):
             memory=memory,
             timeout=timeout,
             ephemeral_storage=ephemeral_storage,
+            commit_sha=commit_sha,
+            commit_message=commit_message,
+            commit_author_name=commit_author_name,
+            commit_author_username=commit_author_username,
+            branch=pushed_branch,
         )
         print(f"[webhook] push {full_name}@{pushed_branch}: triggered deploy for project_id={project_id}")
         triggered += 1

@@ -306,25 +306,30 @@ async def create_new_project(
     user_id: str = Depends(get_current_user_id),
 ):
     """Create a new project and start deployment."""
-    from api.routes.github import get_or_refresh_token
+    from api.routes.github import get_or_refresh_token, fetch_latest_commit
 
     github_url = f"https://github.com/{request.github_repo}"
 
     # Get GitHub token for private repos
     github_token = await get_or_refresh_token(request.organization_id, user_id)
-    
+
+    # Fetch latest commit info from GitHub API
+    commit_info = {}
+    if github_token:
+        commit_info = await fetch_latest_commit(github_token, request.github_repo)
+
     # Normalize root_directory
     root_directory = request.root_directory or "./"
-    
+
     # Validate organization_id is not empty (organization-only mode)
     if not request.organization_id or not request.organization_id.strip():
         raise HTTPException(status_code=400, detail="organization_id is required")
-    
+
     # Get compute settings with defaults
     memory = request.memory or 1024
     timeout = request.timeout or 30
     ephemeral_storage = request.ephemeral_storage or 512
-    
+
     # Create project in DynamoDB
     project = create_project(
         user_id=user_id,
@@ -339,7 +344,7 @@ async def create_new_project(
         timeout=timeout,
         ephemeral_storage=ephemeral_storage,
     )
-    
+
     # Start deployment via SQS queue (industry-standard background task pattern)
     send_deployment_to_sqs(
         project["project_id"],
@@ -351,6 +356,7 @@ async def create_new_project(
         memory,
         timeout,
         ephemeral_storage,
+        **commit_info,
     )
     
     return {
@@ -616,7 +622,7 @@ async def redeploy_project(
     org_id: str = Query(...),
 ):
     """Trigger a redeployment of the project."""
-    from api.routes.github import get_or_refresh_token
+    from api.routes.github import get_or_refresh_token, fetch_latest_commit
 
     # Use get_project_by_key for strong consistency to ensure we get the latest
     # compute settings (memory, timeout) if they were just updated.
@@ -631,7 +637,12 @@ async def redeploy_project(
 
     # Get GitHub token for private repos
     github_token = await get_or_refresh_token(org_id, user_id)
-    
+
+    # Fetch latest commit info from GitHub API
+    commit_info = {}
+    if github_token:
+        commit_info = await fetch_latest_commit(github_token, project.get("github_repo", ""))
+
     # Get root_directory and start_command from stored project
     root_directory = project.get("root_directory", "./")
     start_command = project.get("start_command", "uvicorn main:app --host 0.0.0.0 --port 8080")
@@ -640,7 +651,7 @@ async def redeploy_project(
     memory = int(project.get("memory", 1024))
     timeout = int(project.get("timeout", 30))
     ephemeral_storage = int(project.get("ephemeral_storage", 512))
-    
+
     # Start redeployment via SQS queue
     send_deployment_to_sqs(
         project_id,
@@ -652,6 +663,7 @@ async def redeploy_project(
         memory,
         timeout,
         ephemeral_storage,
+        **commit_info,
     )
     
     return {

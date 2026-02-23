@@ -620,8 +620,34 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                             </div>
                             {latestDeployment ? (
                                 <div className="flex items-center justify-between">
-                                    <div>
-                                        <p className="font-mono text-sm text-zinc-700">{latestDeployment.deploy_id}</p>
+                                    <div className="min-w-0 flex-1">
+                                        {latestDeployment.commit_sha ? (
+                                            <>
+                                                <div className="flex items-center gap-1.5">
+                                                    {latestDeployment.branch && (
+                                                        <span className="text-xs font-medium text-zinc-600 bg-zinc-100 px-1.5 py-0.5 rounded">
+                                                            {latestDeployment.branch}
+                                                        </span>
+                                                    )}
+                                                    <a
+                                                        href={`https://github.com/${project.github_repo}/commit/${latestDeployment.commit_sha}`}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="font-mono text-sm text-blue-600 hover:underline"
+                                                    >
+                                                        {latestDeployment.commit_sha.slice(0, 7)}
+                                                    </a>
+                                                </div>
+                                                {latestDeployment.commit_message && (
+                                                    <p className="text-xs text-zinc-500 mt-1 truncate">
+                                                        {latestDeployment.commit_message.split("\n")[0].slice(0, 50)}
+                                                        {latestDeployment.commit_message.split("\n")[0].length > 50 ? "..." : ""}
+                                                    </p>
+                                                )}
+                                            </>
+                                        ) : (
+                                            <p className="font-mono text-sm text-zinc-700">{latestDeployment.deploy_id}</p>
+                                        )}
                                         <p className="text-xs text-zinc-400 mt-1">
                                             {new Date(latestDeployment.started_at).toLocaleDateString("en-US", {
                                                 month: "short",
@@ -631,9 +657,9 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                                             })}
                                         </p>
                                     </div>
-                                    {latestDeployment.status === "SUCCEEDED" && <CheckCircle2 className="h-5 w-5 text-emerald-500" />}
-                                    {latestDeployment.status === "FAILED" && <XCircle className="h-5 w-5 text-red-500" />}
-                                    {latestDeployment.status === "IN_PROGRESS" && <Loader2 className="h-5 w-5 text-blue-900 animate-spin" />}
+                                    {latestDeployment.status === "SUCCEEDED" && <CheckCircle2 className="h-5 w-5 text-emerald-500 flex-shrink-0" />}
+                                    {latestDeployment.status === "FAILED" && <XCircle className="h-5 w-5 text-red-500 flex-shrink-0" />}
+                                    {latestDeployment.status === "IN_PROGRESS" && <Loader2 className="h-5 w-5 text-blue-900 animate-spin flex-shrink-0" />}
                                 </div>
                             ) : (
                                 <div className="text-zinc-400 text-sm">No deployments</div>

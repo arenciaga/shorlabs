@@ -191,6 +191,52 @@ async def get_or_refresh_token_for_org(org_id: str) -> Optional[str]:
     return installation.get("token")
 
 
+async def fetch_latest_commit(github_token: str, github_repo: str) -> dict:
+    """
+    Fetch the latest commit on the default branch from GitHub API.
+    Used by create_new_project and redeploy to attach commit metadata
+    to deployments that aren't triggered by webhooks.
+
+    Returns dict with commit_sha, commit_message, commit_author_name,
+    commit_author_username, branch — or empty dict on failure.
+    """
+    headers = {
+        "Authorization": f"Bearer {github_token}",
+        "Accept": "application/vnd.github.v3+json",
+    }
+    try:
+        async with httpx.AsyncClient() as client:
+            # Get default branch
+            repo_resp = await client.get(
+                f"https://api.github.com/repos/{github_repo}",
+                headers=headers,
+            )
+            if repo_resp.status_code != 200:
+                print(f"[github] Failed to fetch repo info for {github_repo}: {repo_resp.status_code}")
+                return {}
+            default_branch = repo_resp.json().get("default_branch", "main")
+
+            # Get latest commit on that branch
+            commit_resp = await client.get(
+                f"https://api.github.com/repos/{github_repo}/commits/{default_branch}",
+                headers=headers,
+            )
+            if commit_resp.status_code != 200:
+                print(f"[github] Failed to fetch latest commit for {github_repo}/{default_branch}: {commit_resp.status_code}")
+                return {}
+            data = commit_resp.json()
+            return {
+                "commit_sha": data.get("sha"),
+                "commit_message": (data.get("commit") or {}).get("message"),
+                "commit_author_name": ((data.get("commit") or {}).get("author") or {}).get("name"),
+                "commit_author_username": (data.get("author") or {}).get("login"),
+                "branch": default_branch,
+            }
+    except Exception as e:
+        print(f"[github] Error fetching latest commit for {github_repo}: {e}")
+        return {}
+
+
 @router.get("/auth-url")
 async def get_auth_url():
     """Get the GitHub OAuth authorization URL."""

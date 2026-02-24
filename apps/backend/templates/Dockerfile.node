@@ -28,12 +28,21 @@ COPY . .
 # ============================================================
 # Phase 1: Detect package manager and install all dependencies
 # ============================================================
-# Industry standard: Always install from repo root so workspace
-# symlinks/hoisting resolves correctly (Vercel, Railway, Render
-# all do this). This works for both monorepos and standalone.
+# If a root package.json exists (proper workspace monorepo),
+# install from root so symlinks/hoisting resolves correctly.
+# If not, cd into APP_DIR where the actual project lives.
+# Also check APP_DIR for lockfiles in case the subdirectory
+# has its own package manager (non-workspace monorepo).
 # ============================================================
 RUN set -e && \
     echo "=== Detecting package manager ===" && \
+    INSTALL_DIR="/app" && \
+    if [ ! -f "package.json" ] && [ "$APP_DIR" != "." ] && [ -f "$APP_DIR/package.json" ]; then \
+        echo "No root package.json found, using $APP_DIR" && \
+        INSTALL_DIR="/app/$APP_DIR"; \
+    fi && \
+    cd "$INSTALL_DIR" && \
+    echo "Installing from: $INSTALL_DIR" && \
     PM="npm" && \
     if [ -f "bun.lockb" ] || [ -f "bun.lock" ]; then \
         PM="bun" && \

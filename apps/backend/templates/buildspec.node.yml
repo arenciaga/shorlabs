@@ -3,8 +3,9 @@ phases:
   pre_build:
     commands:
       - echo "Cloning repository from GitHub..."
-      - git clone --depth 1 https://x-access-token:$GITHUB_TOKEN@github.com/{{REPO_PATH}}.git repo
+      - set -e && git clone --depth 1 https://x-access-token:$GITHUB_TOKEN@github.com/{{REPO_PATH}}.git repo
       - |
+        set -e
         cd repo
         echo "Creating Dockerfile for Node.js..."
         cat > Dockerfile << 'DOCKERFILE_EOF'
@@ -15,13 +16,17 @@ phases:
   build:
     commands:
       - |
-        cd repo
+        set -e
         echo "Building Docker image..."
         docker build --build-arg APP_DIR={{ROOT_DIRECTORY}} {{BUILD_ARGS}} -t {{ECR_REPO_URI}}:latest .
   post_build:
     commands:
       - |
-        cd repo
-        echo "Pushing Docker image to ECR..."
-        docker push {{ECR_REPO_URI}}:latest
-        echo "Build completed successfully"
+        if [ "$CODEBUILD_BUILD_SUCCEEDING" = "1" ]; then
+          echo "Pushing Docker image to ECR..."
+          docker push {{ECR_REPO_URI}}:latest
+          echo "Build completed successfully"
+        else
+          echo "BUILD FAILED — skipping push"
+          exit 1
+        fi

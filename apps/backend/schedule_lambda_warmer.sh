@@ -1,7 +1,7 @@
 #!/bin/bash
 #
-# Setup EventBridge Scheduler for usage metrics aggregation
-# Runs hourly to fetch CloudWatch metrics and store in DynamoDB
+# Setup EventBridge Scheduler for Lambda warming
+# Runs every 5 minutes to keep all LIVE user Lambdas warm
 #
 # Uses the modern EventBridge Scheduler API (not legacy CloudWatch Events rules)
 #
@@ -22,10 +22,10 @@ fi
 REGION="${AWS_DEFAULT_REGION:-us-east-1}"
 AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 FUNCTION_NAME="shorlabs-api"
-SCHEDULE_NAME="shorlabs-usage-aggregation"
+SCHEDULE_NAME="shorlabs-lambda-warming"
 SCHEDULER_ROLE_NAME="shorlabs-scheduler-role"
 
-echo "🔧 Setting up EventBridge Scheduler for usage aggregation..."
+echo "🔧 Setting up EventBridge Scheduler for Lambda warming..."
 echo "   Region: $REGION"
 echo "   Function: $FUNCTION_NAME"
 
@@ -93,12 +93,12 @@ echo "✅ Scheduler role ready: $SCHEDULER_ROLE_ARN"
 echo "📅 Creating EventBridge Schedule..."
 aws scheduler create-schedule \
   --name "$SCHEDULE_NAME" \
-  --schedule-expression "cron(0 * * * ? *)" \
+  --schedule-expression "rate(5 minutes)" \
   --flexible-time-window '{"Mode":"OFF"}' \
   --target '{
     "Arn": "'"$FUNCTION_ARN"'",
     "RoleArn": "'"$SCHEDULER_ROLE_ARN"'",
-    "Input": "{\"source\":\"aws.events\",\"detail\":{\"action\":\"aggregate_usage\"}}"
+    "Input": "{\"source\":\"aws.events\",\"detail\":{\"action\":\"warm_lambdas\"}}"
   }' \
   --state ENABLED \
   --region "$REGION" \
@@ -106,12 +106,12 @@ aws scheduler create-schedule \
     echo "   Schedule already exists, updating..."
     aws scheduler update-schedule \
       --name "$SCHEDULE_NAME" \
-      --schedule-expression "cron(0 * * * ? *)" \
+      --schedule-expression "rate(5 minutes)" \
       --flexible-time-window '{"Mode":"OFF"}' \
       --target '{
         "Arn": "'"$FUNCTION_ARN"'",
         "RoleArn": "'"$SCHEDULER_ROLE_ARN"'",
-        "Input": "{\"source\":\"aws.events\",\"detail\":{\"action\":\"aggregate_usage\"}}"
+        "Input": "{\"source\":\"aws.events\",\"detail\":{\"action\":\"warm_lambdas\"}}"
       }' \
       --state ENABLED \
       --region "$REGION"
@@ -121,12 +121,12 @@ aws scheduler create-schedule \
 echo ""
 echo "✅ EventBridge Scheduler configured successfully!"
 echo ""
-echo "   Schedule: Every hour at :00 minutes"
-echo "   Action:   aggregate_usage"
+echo "   Schedule: Every 5 minutes"
+echo "   Action:   warm_lambdas"
 echo "   Target:   $FUNCTION_NAME"
 echo ""
-echo "To manually trigger aggregation:"
+echo "To manually trigger warming:"
 echo "  aws lambda invoke --function-name $FUNCTION_NAME \\"
-echo "    --payload '{\"source\":\"aws.events\",\"detail\":{\"action\":\"aggregate_usage\"}}' \\"
+echo "    --payload '{\"source\":\"aws.events\",\"detail\":{\"action\":\"warm_lambdas\"}}' \\"
 echo "    --cli-binary-format raw-in-base64-out \\"
 echo "    response.json"

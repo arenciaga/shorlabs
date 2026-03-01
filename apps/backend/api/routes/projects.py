@@ -143,6 +143,13 @@ def _run_deployment_sync(
             "function_name": function_name,  # Store for usage aggregation
         })
 
+        # Post-deploy warming: pre-warm the new Lambda to avoid cold starts
+        try:
+            from api.lambda_warmer import warm_single_function
+            warm_single_function(function_url, count=3)
+        except Exception as warm_err:
+            print(f"⚠️ Post-deploy warming failed (non-fatal): {warm_err}")
+
         # Propagate new function_url to all custom domain items
         # Lambda@Edge reads function_url from DOMAIN items, so they must stay in sync
         try:

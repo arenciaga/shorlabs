@@ -182,6 +182,17 @@ def _handle_eventbridge_event(event: dict) -> dict:
             traceback.print_exc()
             return {"statusCode": 500, "body": f"Aggregation failed: {str(e)}"}
     
+    if action == "warm_lambdas":
+        from api.lambda_warmer import warm_all_lambdas
+        try:
+            result = warm_all_lambdas()
+            return {"statusCode": 200, "body": f"Warming complete: {result}"}
+        except Exception as e:
+            print(f"❌ Lambda warming failed: {e}")
+            import traceback
+            traceback.print_exc()
+            return {"statusCode": 500, "body": f"Warming failed: {str(e)}"}
+
     print(f"⚠️ Unknown EventBridge action: {action}")
     return {"statusCode": 400, "body": f"Unknown action: {action}"}
 

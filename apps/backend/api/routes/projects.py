@@ -143,13 +143,6 @@ def _run_deployment_sync(
             "function_name": function_name,  # Store for usage aggregation
         })
 
-        # Post-deploy warming: pre-warm the new Lambda to avoid cold starts
-        try:
-            from api.lambda_warmer import warm_single_function
-            warm_single_function(function_url, count=3)
-        except Exception as warm_err:
-            print(f"⚠️ Post-deploy warming failed (non-fatal): {warm_err}")
-
         # Propagate new function_url to all custom domain items
         # Lambda@Edge reads function_url from DOMAIN items, so they must stay in sync
         try:
@@ -168,6 +161,15 @@ def _run_deployment_sync(
         project_data = get_project(project_id)
         if project_data:
             org_id = project_data.get("organization_id")
+
+            # Post-deploy warming: pre-warm the new Lambda (paid plans only)
+            if org_id:
+                try:
+                    from api.lambda_warmer import warm_single_function
+                    warm_single_function(function_url, org_id=org_id, count=3)
+                except Exception as warm_err:
+                    print(f"⚠️ Post-deploy warming failed (non-fatal): {warm_err}")
+
             if org_id:
                 from api.db.dynamodb import get_throttle_state
                 throttle_state = get_throttle_state(org_id)

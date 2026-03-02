@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { ArrowLeft, ArrowRight, Globe } from "lucide-react"
+import { ArrowLeft, ArrowRight, Globe, Database } from "lucide-react"
 
 const PROJECT_TYPES = [
     {
@@ -10,6 +10,13 @@ const PROJECT_TYPES = [
         description: "Deploy a web application from a Git repository",
         icon: Globe,
         href: "/new/web-app",
+    },
+    {
+        id: "database",
+        name: "Database",
+        description: "Provision a PostgreSQL database with scale-to-zero",
+        icon: Database,
+        href: "/new/database",
     },
 ]
 

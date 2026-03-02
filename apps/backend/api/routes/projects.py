@@ -27,9 +27,11 @@ from api.db.dynamodb import (
 
 # Import from deployer package
 from deployer import deploy_project, delete_project_resources, extract_project_name
+from deployer import provision_database, delete_database_resources
 from deployer.aws import (
     get_lambda_logs,
 )
+from deployer.aws.rds import get_cluster_secret
 from deployer.aws.ecr import get_ecr_repo_name
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
@@ -49,6 +51,14 @@ class CreateProjectRequest(BaseModel):
     memory: Optional[int] = 1024  # Memory in MB (1024, 2048, 4096)
     timeout: Optional[int] = 30  # Timeout in seconds
     ephemeral_storage: Optional[int] = 512  # Ephemeral storage in MB (512, 1024, 2048)
+
+
+class CreateDatabaseProjectRequest(BaseModel):
+    name: str
+    organization_id: str
+    db_name: Optional[str] = "shorlabs"
+    min_acu: Optional[float] = 0
+    max_acu: Optional[float] = 2
 
 
 class ProjectResponse(BaseModel):
@@ -294,6 +304,95 @@ def send_deployment_to_sqs(
     print(f"📤 Deployment queued for project {project_id}, MessageId: {response['MessageId']}")
 
 
+# ─────────────────────────────────────────────────────────────
+# DATABASE PROVISIONING (BACKGROUND TASK)
+# ─────────────────────────────────────────────────────────────
+
+
+def _run_database_provision_sync(
+    project_id: str,
+    db_name: str = "shorlabs",
+    min_acu: float = 0,
+    max_acu: float = 2,
+):
+    """Synchronous database provisioning - runs in thread pool or via SQS."""
+    try:
+        update_project(project_id, {"status": "PROVISIONING"})
+
+        result = provision_database(
+            project_id=project_id,
+            db_name=db_name,
+            min_acu=min_acu,
+            max_acu=max_acu,
+        )
+
+        update_project(project_id, {
+            "status": "LIVE",
+            "db_cluster_identifier": result["cluster_identifier"],
+            "db_endpoint": result["endpoint"],
+            "db_port": result["port"],
+            "db_name": result["db_name"],
+            "db_master_username": result["master_username"],
+            "db_secret_arn": result["secret_arn"],
+        })
+
+        print(f"✅ Database provisioned: {result['endpoint']}:{result['port']}")
+
+    except Exception as e:
+        update_project(project_id, {"status": "FAILED"})
+        print(f"❌ Database provisioning failed: {e}")
+        import traceback
+        traceback.print_exc()
+
+
+def send_database_provision_to_sqs(
+    project_id: str,
+    db_name: str = "shorlabs",
+    min_acu: float = 0,
+    max_acu: float = 2,
+):
+    """Send database provisioning task to SQS queue for background processing."""
+    import time
+
+    # Check if running on Lambda
+    if not os.environ.get("AWS_LAMBDA_FUNCTION_NAME"):
+        # Running locally - use thread pool fallback
+        def run_in_thread():
+            _run_database_provision_sync(project_id, db_name, min_acu, max_acu)
+        thread = threading.Thread(target=run_in_thread)
+        thread.start()
+        print(f"📤 Local: Database provisioning started in background thread for project {project_id}")
+        return
+
+    # Running on Lambda - send message to SQS queue
+    sqs_client = boto3.client("sqs")
+
+    queue_url = os.environ.get("DEPLOY_QUEUE_URL")
+    if not queue_url:
+        print("⚠️ DEPLOY_QUEUE_URL not set, falling back to thread-based execution")
+        def run_in_thread():
+            _run_database_provision_sync(project_id, db_name, min_acu, max_acu)
+        thread = threading.Thread(target=run_in_thread)
+        thread.start()
+        return
+
+    message_body = {
+        "message_type": "database_provision",
+        "project_id": project_id,
+        "db_name": db_name,
+        "min_acu": min_acu,
+        "max_acu": max_acu,
+    }
+
+    response = sqs_client.send_message(
+        QueueUrl=queue_url,
+        MessageBody=json.dumps(message_body),
+        MessageGroupId=project_id,
+        MessageDeduplicationId=f"{project_id}-db-{int(time.time())}",
+    )
+
+    print(f"📤 Database provisioning queued for project {project_id}, MessageId: {response['MessageId']}")
+
 
 # ─────────────────────────────────────────────────────────────
 # API ENDPOINTS
@@ -379,6 +478,41 @@ async def create_new_project(
     }
 
 
+@router.post("/database")
+async def create_database_project(
+    request: CreateDatabaseProjectRequest,
+    user_id: str = Depends(get_current_user_id),
+):
+    """Create a new database project and start provisioning."""
+    if not request.organization_id or not request.organization_id.strip():
+        raise HTTPException(status_code=400, detail="organization_id is required")
+
+    project = create_project(
+        user_id=user_id,
+        organization_id=request.organization_id,
+        name=request.name,
+        project_type="database",
+        db_name=request.db_name,
+        min_acu=request.min_acu,
+        max_acu=request.max_acu,
+    )
+
+    send_database_provision_to_sqs(
+        project["project_id"],
+        request.db_name,
+        request.min_acu,
+        request.max_acu,
+    )
+
+    return {
+        "project_id": project["project_id"],
+        "organization_id": project.get("organization_id"),
+        "name": project["name"],
+        "project_type": "database",
+        "status": project["status"],
+    }
+
+
 @router.get("")
 async def get_projects(
     user_id: str = Depends(get_current_user_id),  # For auth
@@ -401,21 +535,34 @@ async def get_projects(
             None,
         )
 
-        result.append({
+        project_data = {
             "project_id": p["project_id"],
             "organization_id": p.get("organization_id"),
             "name": p["name"],
-            "github_url": p["github_url"],
-            "github_repo": p["github_repo"],
+            "project_type": p.get("project_type", "web-app"),
             "status": p["status"],
-            "function_url": p.get("function_url"),
-            "subdomain": p.get("subdomain"),
-            "custom_url": p.get("custom_url"),
-            "active_custom_domain": active_domain,
             "created_at": p["created_at"],
             "updated_at": p["updated_at"],
             "is_throttled": is_throttled,
-        })
+        }
+
+        if p.get("project_type", "web-app") == "database":
+            project_data.update({
+                "db_endpoint": p.get("db_endpoint"),
+                "db_port": p.get("db_port"),
+                "db_name": p.get("db_name"),
+            })
+        else:
+            project_data.update({
+                "github_url": p.get("github_url"),
+                "github_repo": p.get("github_repo"),
+                "function_url": p.get("function_url"),
+                "subdomain": p.get("subdomain"),
+                "custom_url": p.get("custom_url"),
+                "active_custom_domain": active_domain,
+            })
+
+        result.append(project_data)
 
     return result
 
@@ -433,37 +580,63 @@ async def get_project_details(
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    deployments = list_deployments(project_id)
+    project_type = project.get("project_type", "web-app")
 
-    # Fetch custom domains for this project
+    # Build base project response
+    project_response = {
+        "project_id": project["project_id"],
+        "organization_id": project.get("organization_id"),
+        "name": project["name"],
+        "project_type": project_type,
+        "status": project["status"],
+        "created_at": project["created_at"],
+        "updated_at": project["updated_at"],
+    }
+
+    if project_type == "database":
+        # Database-specific fields
+        project_response.update({
+            "db_cluster_identifier": project.get("db_cluster_identifier"),
+            "db_endpoint": project.get("db_endpoint"),
+            "db_port": project.get("db_port"),
+            "db_name": project.get("db_name"),
+            "db_master_username": project.get("db_master_username"),
+            "min_acu": project.get("min_acu"),
+            "max_acu": project.get("max_acu"),
+        })
+
+        return {
+            "project": project_response,
+            "deployments": [],
+            "custom_domains": [],
+        }
+
+    # Web-app-specific fields
     from api.db.dynamodb import get_throttle_state, list_project_domains
     throttle_state = get_throttle_state(org_id)
     is_throttled = bool(throttle_state and throttle_state.get("is_throttled"))
 
+    project_response.update({
+        "github_url": project.get("github_url"),
+        "github_repo": project.get("github_repo"),
+        "function_url": project.get("function_url"),
+        "subdomain": project.get("subdomain"),
+        "custom_url": project.get("custom_url"),
+        "ecr_repo": project.get("ecr_repo"),
+        "env_vars": project.get("env_vars", {}),
+        "start_command": project.get("start_command", ""),
+        "root_directory": project.get("root_directory", "./"),
+        "memory": project.get("memory", 1024),
+        "timeout": project.get("timeout", 30),
+        "ephemeral_storage": project.get("ephemeral_storage", 512),
+        "is_throttled": is_throttled,
+    })
+
+    deployments = list_deployments(project_id)
     custom_domains = list_project_domains(project_id)
 
     return {
-        "project": {
-            "project_id": project["project_id"],
-            "organization_id": project.get("organization_id"),
-            "name": project["name"],
-            "github_url": project["github_url"],
-            "github_repo": project["github_repo"],
-            "status": project["status"],
-            "function_url": project.get("function_url"),
-            "subdomain": project.get("subdomain"),
-            "custom_url": project.get("custom_url"),
-            "ecr_repo": project.get("ecr_repo"),
-            "env_vars": project.get("env_vars", {}),
-            "start_command": project.get("start_command", ""),
-            "root_directory": project.get("root_directory", "./"),
-            "memory": project.get("memory", 1024),
-            "timeout": project.get("timeout", 30),
-            "ephemeral_storage": project.get("ephemeral_storage", 512),
-            "created_at": project["created_at"],
-            "updated_at": project["updated_at"],
-            "is_throttled": is_throttled,
-        },
+        "project": project_response,
         "deployments": [
             {
                 "deploy_id": d["deploy_id"],
@@ -512,6 +685,43 @@ async def get_project_status(
         "project_id": project["project_id"],
         "status": project["status"],
         "function_url": project.get("function_url"),
+    }
+
+
+@router.get("/{project_id}/connection")
+async def get_database_connection(
+    project_id: str,
+    user_id: str = Depends(get_current_user_id),
+    org_id: str = Query(...),
+):
+    """Get connection details for a database project."""
+    project = get_project_by_key(org_id, project_id)
+
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    if project.get("project_type", "web-app") != "database":
+        raise HTTPException(status_code=400, detail="Not a database project")
+
+    cluster_id = project.get("db_cluster_identifier")
+    if not cluster_id:
+        raise HTTPException(status_code=404, detail="Database not yet provisioned")
+
+    credentials = get_cluster_secret(cluster_id)
+
+    endpoint = project["db_endpoint"]
+    port = int(project.get("db_port", 5432))
+    db_name = project["db_name"]
+    username = credentials["username"]
+    password = credentials["password"]
+
+    return {
+        "host": endpoint,
+        "port": port,
+        "database": db_name,
+        "username": username,
+        "password": password,
+        "connection_string": f"postgresql://{username}:{password}@{endpoint}:{port}/{db_name}",
     }
 
 
@@ -695,10 +905,22 @@ async def delete_project_endpoint(
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    # Get the stored function_name (for new projects) or derive from github_url (backwards compat)
+    project_type = project.get("project_type", "web-app")
+
+    print(f"🗑️ DELETE PROJECT: project_id={project_id}, type={project_type}")
+
+    if project_type == "database":
+        # Delete Aurora cluster resources
+        result = delete_database_resources(project_id)
+        delete_project(project_id)
+        return {
+            "deleted": True,
+            "cluster_deleted": result.get("cluster_deleted", False),
+        }
+
+    # Web-app deletion (existing logic)
     function_name = project.get("function_name")
 
-    print(f"🗑️ DELETE PROJECT: project_id={project_id}")
     print(f"🗑️ DELETE PROJECT: function_name from DB = '{function_name}'")
     print(f"🗑️ DELETE PROJECT: github_url = '{project.get('github_url')}'")
 
@@ -712,7 +934,7 @@ async def delete_project_endpoint(
             delete_domain_tenant(tenant_id)
 
     # Delete AWS resources (Lambda, ECR, and CloudWatch log group)
-    result = delete_project_resources(project["github_url"], function_name=function_name)
+    result = delete_project_resources(project.get("github_url", ""), function_name=function_name)
 
     # Delete from DynamoDB (includes deployments + domain items)
     delete_project(project_id)

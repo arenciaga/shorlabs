@@ -65,12 +65,22 @@ export async function checkGitHubConnection(token: string, orgId: string): Promi
 export interface Project {
     project_id: string;
     name: string;
-    github_url: string;
-    github_repo: string;
-    status: "PENDING" | "CLONING" | "PREPARING" | "UPLOADING" | "BUILDING" | "DEPLOYING" | "LIVE" | "FAILED";
-    function_url: string | null;
+    project_type: "web-app" | "database";
+    status: "PENDING" | "CLONING" | "PREPARING" | "UPLOADING" | "BUILDING" | "DEPLOYING" | "PROVISIONING" | "LIVE" | "FAILED";
     created_at: string;
     updated_at: string;
+    // Web-app fields
+    github_url?: string;
+    github_repo?: string;
+    function_url?: string | null;
+    // Database fields
+    db_endpoint?: string | null;
+    db_port?: number | null;
+    db_name?: string | null;
+    db_master_username?: string | null;
+    db_cluster_identifier?: string | null;
+    min_acu?: number | null;
+    max_acu?: number | null;
 }
 
 export interface Deployment {
@@ -190,6 +200,75 @@ export async function deleteProject(token: string, projectId: string, orgId: str
 
     const response = await fetch(url.toString(), {
         method: "DELETE",
+        headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+        },
+    });
+
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ detail: "Unknown error" }));
+        throw new Error(error.detail || `HTTP ${response.status}`);
+    }
+
+    return response.json();
+}
+
+// ─────────────────────────────────────────────────────────────
+// DATABASE API
+// ─────────────────────────────────────────────────────────────
+
+export interface CreateDatabaseProjectRequest {
+    name: string;
+    organization_id: string;
+    db_name?: string;
+    min_acu?: number;
+    max_acu?: number;
+}
+
+export interface DatabaseConnection {
+    host: string;
+    port: number;
+    database: string;
+    username: string;
+    password: string;
+    connection_string: string;
+}
+
+export async function createDatabaseProject(
+    token: string,
+    orgId: string,
+    data: { name: string; db_name?: string; min_acu?: number; max_acu?: number },
+): Promise<{ project_id: string; name: string; project_type: string; status: string }> {
+    const url = new URL(`${API_BASE_URL}/api/projects/database`);
+    url.searchParams.append("org_id", orgId);
+
+    const response = await fetch(url.toString(), {
+        method: "POST",
+        headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ ...data, organization_id: orgId }),
+    });
+
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ detail: "Unknown error" }));
+        throw new Error(error.detail || `HTTP ${response.status}`);
+    }
+
+    return response.json();
+}
+
+export async function fetchDatabaseConnection(
+    token: string,
+    projectId: string,
+    orgId: string,
+): Promise<DatabaseConnection> {
+    const url = new URL(`${API_BASE_URL}/api/projects/${projectId}/connection`);
+    url.searchParams.append("org_id", orgId);
+
+    const response = await fetch(url.toString(), {
         headers: {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",

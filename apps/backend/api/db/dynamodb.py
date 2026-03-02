@@ -238,8 +238,8 @@ def create_project(
     user_id: str,
     organization_id: str,
     name: str,
-    github_url: str,
-    github_repo: str,
+    github_url: str = None,
+    github_repo: str = None,
     env_vars: dict = None,
     root_directory: str = "./",
     start_command: str = "uvicorn main:app --host 0.0.0.0 --port 8080",
@@ -247,23 +247,24 @@ def create_project(
     memory: int = 1024,
     timeout: int = 30,
     ephemeral_storage: int = 512,
+    project_type: str = "web-app",
+    db_name: str = None,
+    min_acu: float = None,
+    max_acu: float = None,
 ) -> dict:
     """
     Create a new project owned by an organization.
-    
+
     Projects use PK=ORG#{org_id} following Vercel's model where
     organizations own projects, not individual users.
+
+    Supports two project types:
+    - "web-app": Lambda deployment from GitHub repo (default)
+    - "database": Aurora Serverless v2 PostgreSQL database
     """
     table = get_or_create_table()
     project_id = generate_project_id()
     now = datetime.utcnow().isoformat()
-    
-    # Generate unique subdomain if not provided
-    if not subdomain:
-        subdomain = generate_unique_subdomain(name)
-    
-    # Build custom URL
-    custom_url = f"https://{subdomain}.{SHORLABS_DOMAIN}"
 
     # Use ORG# for PK - organizations own projects (Vercel-like model)
     item = {
@@ -271,24 +272,40 @@ def create_project(
         "SK": f"PROJECT#{project_id}",
         "project_id": project_id,
         "organization_id": organization_id,
-        "created_by": user_id,  # Track who created it (for audit)
+        "created_by": user_id,
         "name": name,
-        "github_url": github_url,
-        "github_repo": github_repo,
+        "project_type": project_type,
         "status": "PENDING",
-        "function_url": None,
-        "ecr_repo": None,
-        "env_vars": env_vars or {},
-        "root_directory": root_directory,
-        "start_command": start_command,
-        "subdomain": subdomain,
-        "custom_url": custom_url,
-        "memory": memory,
-        "timeout": timeout,
-        "ephemeral_storage": ephemeral_storage,
         "created_at": now,
         "updated_at": now,
     }
+
+    if project_type == "database":
+        # Database-specific fields
+        item["db_name"] = db_name
+        item["min_acu"] = Decimal(str(min_acu))
+        item["max_acu"] = Decimal(str(max_acu))
+    else:
+        # Web-app-specific fields
+        if not subdomain:
+            subdomain = generate_unique_subdomain(name)
+        custom_url = f"https://{subdomain}.{SHORLABS_DOMAIN}"
+
+        item.update({
+            "github_url": github_url,
+            "github_repo": github_repo,
+            "function_url": None,
+            "ecr_repo": None,
+            "env_vars": env_vars or {},
+            "root_directory": root_directory,
+            "start_command": start_command,
+            "subdomain": subdomain,
+            "custom_url": custom_url,
+            "memory": memory,
+            "timeout": timeout,
+            "ephemeral_storage": ephemeral_storage,
+        })
+
     table.put_item(Item=item)
     return item
 

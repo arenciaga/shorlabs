@@ -15,10 +15,13 @@ Usage:
 """
 
 from .orchestrator import deploy_project, delete_project_resources
+from .database_orchestrator import provision_database, delete_database_resources
 from .utils import extract_project_name
 
 __all__ = [
     "deploy_project",
     "delete_project_resources",
+    "provision_database",
+    "delete_database_resources",
     "extract_project_name",
 ]

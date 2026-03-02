@@ -79,6 +79,9 @@ def get_or_create_lambda_role() -> str:
         "arn:aws:iam::aws:policy/AmazonS3FullAccess",                         # Build artifacts
         "arn:aws:iam::aws:policy/AWSCodeBuildAdminAccess",                    # CodeBuild
         "arn:aws:iam::aws:policy/IAMFullAccess",                              # Create roles
+        "arn:aws:iam::aws:policy/AmazonRDSFullAccess",                        # Aurora clusters
+        "arn:aws:iam::aws:policy/SecretsManagerReadWrite",                    # DB credentials
+        "arn:aws:iam::aws:policy/AmazonVPCFullAccess",                        # Default VPC + security groups
     ]
     
     try:

@@ -88,57 +88,63 @@ _mangum_handler = Mangum(app, lifespan="off")
 
 def _handle_sqs_event(event: dict) -> dict:
     """
-    Handle SQS deployment events.
-    Processes each message in the batch and runs the deployment.
+    Handle SQS events for deployments and database provisioning.
+    Routes based on message_type field.
     """
-    from api.routes.projects import _run_deployment_sync
-    
+    from api.routes.projects import _run_deployment_sync, _run_database_provision_sync
+
     records = event.get("Records", [])
     print(f"📥 Received {len(records)} SQS message(s)")
-    
+
     failed_message_ids = []
-    
+
     for record in records:
         message_id = record.get("messageId", "unknown")
         try:
-            # Parse the message body
             body = json.loads(record.get("body", "{}"))
-            print(f"📦 Processing message {message_id}: {body}")
-            
-            # Run the deployment synchronously
-            _run_deployment_sync(
-                project_id=body["project_id"],
-                github_url=body["github_url"],
-                github_token=body.get("github_token"),
-                root_directory=body.get("root_directory", "./"),
-                start_command=body.get("start_command", "uvicorn main:app --host 0.0.0.0 --port 8080"),
-                env_vars=body.get("env_vars"),  # Pass env_vars from SQS message
-                memory=body.get("memory", 1024),
-                timeout=body.get("timeout", 30),
-                ephemeral_storage=body.get("ephemeral_storage", 512),
-                commit_sha=body.get("commit_sha"),
-                commit_message=body.get("commit_message"),
-                commit_author_name=body.get("commit_author_name"),
-                commit_author_username=body.get("commit_author_username"),
-                branch=body.get("branch"),
-            )
+            message_type = body.get("message_type", "deployment")
+            print(f"📦 Processing message {message_id} (type: {message_type})")
+
+            if message_type == "database_provision":
+                _run_database_provision_sync(
+                    project_id=body["project_id"],
+                    db_name=body.get("db_name", "shorlabs"),
+                    min_acu=body.get("min_acu", 0),
+                    max_acu=body.get("max_acu", 2),
+                )
+            else:
+                _run_deployment_sync(
+                    project_id=body["project_id"],
+                    github_url=body["github_url"],
+                    github_token=body.get("github_token"),
+                    root_directory=body.get("root_directory", "./"),
+                    start_command=body.get("start_command", "uvicorn main:app --host 0.0.0.0 --port 8080"),
+                    env_vars=body.get("env_vars"),
+                    memory=body.get("memory", 1024),
+                    timeout=body.get("timeout", 30),
+                    ephemeral_storage=body.get("ephemeral_storage", 512),
+                    commit_sha=body.get("commit_sha"),
+                    commit_message=body.get("commit_message"),
+                    commit_author_name=body.get("commit_author_name"),
+                    commit_author_username=body.get("commit_author_username"),
+                    branch=body.get("branch"),
+                )
+
             print(f"✅ Message {message_id} processed successfully")
-            
+
         except Exception as e:
             print(f"❌ Failed to process message {message_id}: {e}")
             import traceback
             traceback.print_exc()
             failed_message_ids.append(message_id)
-    
-    # Return batch item failures for partial batch response
-    # This tells SQS which messages failed so they can be retried
+
     if failed_message_ids:
         return {
             "batchItemFailures": [
                 {"itemIdentifier": msg_id} for msg_id in failed_message_ids
             ]
         }
-    
+
     return {"statusCode": 200, "body": f"Processed {len(records)} messages"}
 
 

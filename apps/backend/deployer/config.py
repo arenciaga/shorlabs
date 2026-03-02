@@ -30,3 +30,12 @@ RESERVED_ENV_PREFIXES = (
 )
 
 RESERVED_ENV_VARS = ("_HANDLER", "TZ")
+
+# Aurora Serverless v2 Configuration
+AURORA_CLUSTER_PREFIX = "shorlabs"
+DB_SECURITY_GROUP_NAME = "shorlabs-db-sg"
+DEFAULT_DB_NAME = "shorlabs"
+DEFAULT_DB_PORT = 5432
+DEFAULT_MIN_ACU = 0       # Scale to zero
+DEFAULT_MAX_ACU = 2       # Default max capacity
+AURORA_ENGINE_VERSION = "16.1"  # PostgreSQL 16.1 (Aurora Serverless v2, supports scale-to-zero)

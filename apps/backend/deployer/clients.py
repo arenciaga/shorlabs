@@ -53,3 +53,21 @@ def get_aws_account_id() -> str:
 def get_aws_region() -> str:
     """Get the AWS region."""
     return boto3.session.Session().region_name or "us-east-1"
+
+
+@lru_cache()
+def get_rds_client():
+    """Get the RDS client (cached)."""
+    return boto3.client("rds")
+
+
+@lru_cache()
+def get_ec2_client():
+    """Get the EC2 client (cached). Used for security group management."""
+    return boto3.client("ec2")
+
+
+@lru_cache()
+def get_secretsmanager_client():
+    """Get the Secrets Manager client (cached)."""
+    return boto3.client("secretsmanager")

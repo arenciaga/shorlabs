@@ -30,6 +30,7 @@ import {
     RefreshCw,
     Cpu,
     HardDrive,
+    Database,
 } from "lucide-react"
 import Link from "next/link"
 
@@ -55,6 +56,7 @@ import { CustomDomains } from "@/components/CustomDomains"
 import { LazyLog, ScrollFollow } from "@melloware/react-logviewer"
 import { useIsPro } from "@/hooks/use-is-pro"
 import { trackEvent } from "@/lib/amplitude"
+import { fetchDatabaseConnection, DatabaseConnection } from "@/lib/api"
 
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
@@ -78,6 +80,14 @@ interface Project {
     created_at: string
     updated_at: string
     is_throttled?: boolean
+    project_type?: "web-app" | "database"
+    db_cluster_identifier?: string | null
+    db_endpoint?: string | null
+    db_port?: number | null
+    db_name?: string | null
+    db_master_username?: string | null
+    min_acu?: number | null
+    max_acu?: number | null
 }
 
 interface Deployment {
@@ -114,6 +124,7 @@ const STATUS_CONFIG: Record<string, { dot: string; label: string; color: string;
     UPLOADING: { dot: "bg-blue-600", label: "Uploading", color: "text-blue-600", bgGlow: "shadow-blue-500/20" },
     BUILDING: { dot: "bg-blue-900", label: "Building", color: "text-blue-900", bgGlow: "shadow-blue-900/20" },
     DEPLOYING: { dot: "bg-blue-900", label: "Deploying", color: "text-blue-900", bgGlow: "shadow-blue-900/20" },
+    PROVISIONING: { dot: "bg-blue-500", label: "Provisioning", color: "text-blue-600", bgGlow: "shadow-blue-500/20" },
     LIVE: { dot: "bg-emerald-500", label: "Live", color: "text-emerald-600", bgGlow: "shadow-emerald-500/30" },
     FAILED: { dot: "bg-red-500", label: "Failed", color: "text-red-600", bgGlow: "shadow-red-500/20" },
 }
@@ -135,7 +146,13 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     const [confirmPhrase, setConfirmPhrase] = useState("")
     const [copied, setCopied] = useState(false)
     const [redeploying, setRedeploying] = useState(false)
-    const [activeTab, setActiveTab] = useState<"deployments" | "domains" | "logs" | "compute" | "settings">("deployments")
+    const [activeTab, setActiveTab] = useState<"deployments" | "domains" | "logs" | "compute" | "settings" | "connection">("deployments")
+
+    // Database project state
+    const [dbConnection, setDbConnection] = useState<DatabaseConnection | null>(null)
+    const [showPassword, setShowPassword] = useState(false)
+    const [loadingConnection, setLoadingConnection] = useState(false)
+    const [copiedField, setCopiedField] = useState<string | null>(null)
 
     // Pro tier check via Autumn
     const { isPro, currentPlan } = useIsPro()
@@ -493,6 +510,318 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     const isBuilding = !["LIVE", "FAILED"].includes(project.status)
     const currentStepIndex = BUILD_STEPS.indexOf(project.status)
     const latestDeployment = deployments[0]
+
+    // ── Database Project View ──────────────────────────────────────
+    const copyFieldToClipboard = (text: string, field: string) => {
+        navigator.clipboard.writeText(text)
+        setCopiedField(field)
+        setTimeout(() => setCopiedField(null), 2000)
+    }
+
+    const handleShowPassword = async () => {
+        if (dbConnection) {
+            setShowPassword(!showPassword)
+            return
+        }
+        setLoadingConnection(true)
+        try {
+            const token = await getToken()
+            if (token && orgId) {
+                const conn = await fetchDatabaseConnection(token, project.project_id, orgId)
+                setDbConnection(conn)
+                setShowPassword(true)
+            }
+        } catch (err) {
+            console.error("Failed to fetch database connection:", err)
+        } finally {
+            setLoadingConnection(false)
+        }
+    }
+
+    if (project?.project_type === "database") {
+        const dbActiveTab = activeTab === "connection" || activeTab === "settings" ? activeTab : "connection"
+
+        return (
+            <>
+                <div className="min-h-screen bg-white">
+                    <div className="px-4 sm:px-6 lg:px-8">
+                        {/* Breadcrumb */}
+                        <div className="flex items-center gap-2 pt-5 pb-4">
+                            <Link
+                                href="/projects"
+                                className="inline-flex items-center gap-1.5 text-sm text-zinc-400 hover:text-zinc-900 transition-colors group"
+                            >
+                                <ArrowLeft className="h-3.5 w-3.5 transition-transform group-hover:-translate-x-0.5" />
+                                <span>Projects</span>
+                            </Link>
+                            <span className="text-zinc-300">/</span>
+                            <span className="text-sm text-zinc-900 font-medium truncate">{project.name}</span>
+                        </div>
+
+                        {/* Header */}
+                        <div className="flex items-center gap-3 py-3 mb-4">
+                            <div className="flex items-center gap-3 min-w-0 flex-1">
+                                <Database className="h-5 w-5 text-zinc-400 shrink-0" />
+                                <h1 className="text-xl font-semibold text-zinc-900 tracking-tight truncate">{project.name}</h1>
+                                <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-zinc-50 border border-zinc-200 shrink-0 ${statusConfig.bgGlow}`}>
+                                    <span className={`w-1.5 h-1.5 rounded-full ${statusConfig.dot} ${isBuilding ? 'animate-pulse' : ''}`} />
+                                    <span className={`text-xs font-medium ${statusConfig.color}`}>{statusConfig.label}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Connection Details Card */}
+                        <div className="bg-zinc-50 rounded-none border border-zinc-200 p-4 sm:p-5 mb-6 sm:mb-8">
+                            <div className="flex items-center gap-2 text-zinc-500 mb-3">
+                                <Database className="h-4 w-4" />
+                                <span className="text-xs font-medium uppercase tracking-wider">Connection Details</span>
+                            </div>
+                            {project.status === "LIVE" ? (
+                                <div className="space-y-0">
+                                    {/* Host */}
+                                    <div className="flex items-center justify-between py-2 border-b border-zinc-100 last:border-0">
+                                        <span className="text-sm text-zinc-500">Host</span>
+                                        <div className="flex items-center gap-2">
+                                            <code className="text-sm font-mono text-zinc-900">{project.db_endpoint}</code>
+                                            <button onClick={() => copyFieldToClipboard(project.db_endpoint || "", "host")} className="p-1 hover:bg-zinc-100 rounded">
+                                                {copiedField === "host" ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5 text-zinc-400" />}
+                                            </button>
+                                        </div>
+                                    </div>
+                                    {/* Port */}
+                                    <div className="flex items-center justify-between py-2 border-b border-zinc-100 last:border-0">
+                                        <span className="text-sm text-zinc-500">Port</span>
+                                        <div className="flex items-center gap-2">
+                                            <code className="text-sm font-mono text-zinc-900">{project.db_port || 5432}</code>
+                                            <button onClick={() => copyFieldToClipboard(String(project.db_port || 5432), "port")} className="p-1 hover:bg-zinc-100 rounded">
+                                                {copiedField === "port" ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5 text-zinc-400" />}
+                                            </button>
+                                        </div>
+                                    </div>
+                                    {/* Database */}
+                                    <div className="flex items-center justify-between py-2 border-b border-zinc-100 last:border-0">
+                                        <span className="text-sm text-zinc-500">Database</span>
+                                        <div className="flex items-center gap-2">
+                                            <code className="text-sm font-mono text-zinc-900">{project.db_name || "postgres"}</code>
+                                            <button onClick={() => copyFieldToClipboard(project.db_name || "postgres", "database")} className="p-1 hover:bg-zinc-100 rounded">
+                                                {copiedField === "database" ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5 text-zinc-400" />}
+                                            </button>
+                                        </div>
+                                    </div>
+                                    {/* Username */}
+                                    <div className="flex items-center justify-between py-2 border-b border-zinc-100 last:border-0">
+                                        <span className="text-sm text-zinc-500">Username</span>
+                                        <div className="flex items-center gap-2">
+                                            <code className="text-sm font-mono text-zinc-900">{project.db_master_username || "admin"}</code>
+                                            <button onClick={() => copyFieldToClipboard(project.db_master_username || "admin", "username")} className="p-1 hover:bg-zinc-100 rounded">
+                                                {copiedField === "username" ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5 text-zinc-400" />}
+                                            </button>
+                                        </div>
+                                    </div>
+                                    {/* Password */}
+                                    <div className="flex items-center justify-between py-2 border-b border-zinc-100 last:border-0">
+                                        <span className="text-sm text-zinc-500">Password</span>
+                                        <div className="flex items-center gap-2">
+                                            {showPassword && dbConnection ? (
+                                                <>
+                                                    <code className="text-sm font-mono text-zinc-900">{dbConnection.password}</code>
+                                                    <button onClick={() => copyFieldToClipboard(dbConnection.password, "password")} className="p-1 hover:bg-zinc-100 rounded">
+                                                        {copiedField === "password" ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5 text-zinc-400" />}
+                                                    </button>
+                                                </>
+                                            ) : (
+                                                <code className="text-sm font-mono text-zinc-400">{"••••••••••••"}</code>
+                                            )}
+                                            <button
+                                                onClick={handleShowPassword}
+                                                disabled={loadingConnection}
+                                                className="p-1 hover:bg-zinc-100 rounded"
+                                            >
+                                                {loadingConnection ? (
+                                                    <Loader2 className="h-3.5 w-3.5 text-zinc-400 animate-spin" />
+                                                ) : showPassword ? (
+                                                    <EyeOff className="h-3.5 w-3.5 text-zinc-400" />
+                                                ) : (
+                                                    <Eye className="h-3.5 w-3.5 text-zinc-400" />
+                                                )}
+                                            </button>
+                                        </div>
+                                    </div>
+                                    {/* Connection String */}
+                                    {showPassword && dbConnection && (
+                                        <div className="flex items-center justify-between py-2">
+                                            <span className="text-sm text-zinc-500">Connection String</span>
+                                            <div className="flex items-center gap-2">
+                                                <code className="text-sm font-mono text-zinc-900 max-w-md truncate">{dbConnection.connection_string}</code>
+                                                <button onClick={() => copyFieldToClipboard(dbConnection.connection_string, "connection_string")} className="p-1 hover:bg-zinc-100 rounded">
+                                                    {copiedField === "connection_string" ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5 text-zinc-400" />}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            ) : (
+                                <div className="text-zinc-400 text-sm">
+                                    {isBuilding ? "Provisioning database..." : "Database not available"}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Provisioning Progress */}
+                        {isBuilding && (
+                            <div className="bg-zinc-50 rounded-none border border-zinc-200 p-6 mb-8 overflow-hidden">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-none bg-blue-900 flex items-center justify-center">
+                                        <Zap className="h-5 w-5 text-white" />
+                                    </div>
+                                    <div>
+                                        <h3 className="font-semibold text-zinc-900">Provisioning your database</h3>
+                                        <p className="text-sm text-zinc-500">This may take a few minutes...</p>
+                                    </div>
+                                    <Loader2 className="h-5 w-5 text-blue-900 animate-spin ml-auto" />
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Tabs */}
+                        <div className="sticky top-14 z-40 bg-white -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8">
+                            <div className="flex items-center gap-1 border-b border-zinc-200 overflow-x-auto">
+                                <button
+                                    onClick={() => setActiveTab("connection")}
+                                    className={`px-3 sm:px-4 py-3 text-sm font-medium transition-colors relative whitespace-nowrap ${dbActiveTab === "connection"
+                                        ? "text-zinc-900"
+                                        : "text-zinc-500 hover:text-zinc-700"
+                                        }`}
+                                >
+                                    Connection
+                                    {dbActiveTab === "connection" && (
+                                        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-zinc-900" />
+                                    )}
+                                </button>
+                                <button
+                                    onClick={() => setActiveTab("settings")}
+                                    className={`px-3 sm:px-4 py-3 text-sm font-medium transition-colors relative whitespace-nowrap ${dbActiveTab === "settings"
+                                        ? "text-zinc-900"
+                                        : "text-zinc-500 hover:text-zinc-700"
+                                        }`}
+                                >
+                                    Settings
+                                    {dbActiveTab === "settings" && (
+                                        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-zinc-900" />
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="py-6">
+                            {/* Connection Tab */}
+                            {dbActiveTab === "connection" && (
+                                <div className="bg-zinc-50 rounded-none border border-zinc-200 p-6">
+                                    <div className="flex items-center gap-3 mb-4">
+                                        <Database className="h-5 w-5 text-zinc-400" />
+                                        <h3 className="font-semibold text-zinc-900">Database Information</h3>
+                                    </div>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <div>
+                                            <span className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Cluster</span>
+                                            <p className="text-sm text-zinc-900 font-mono mt-1">{project.db_cluster_identifier || "—"}</p>
+                                        </div>
+                                        <div>
+                                            <span className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Engine</span>
+                                            <p className="text-sm text-zinc-900 mt-1">PostgreSQL (Aurora Serverless v2)</p>
+                                        </div>
+                                        <div>
+                                            <span className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Min ACU</span>
+                                            <p className="text-sm text-zinc-900 mt-1">{project.min_acu ?? "—"}</p>
+                                        </div>
+                                        <div>
+                                            <span className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Max ACU</span>
+                                            <p className="text-sm text-zinc-900 mt-1">{project.max_acu ?? "—"}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Settings Tab */}
+                            {dbActiveTab === "settings" && (
+                                <div className="space-y-6">
+                                    {/* Danger Zone */}
+                                    <div className="bg-zinc-50 rounded-none border border-red-200 overflow-hidden">
+                                        <div className="px-6 py-4 border-b border-red-100 bg-red-50">
+                                            <h3 className="font-semibold text-red-900">Danger Zone</h3>
+                                        </div>
+                                        <div className="p-4 sm:p-6">
+                                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                                                <div>
+                                                    <p className="font-medium text-zinc-900">Delete this database</p>
+                                                    <p className="text-sm text-zinc-500">Once deleted, this cannot be undone. All data will be permanently lost.</p>
+                                                </div>
+                                                <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+                                                    <AlertDialogTrigger asChild>
+                                                        <Button
+                                                            variant="outline"
+                                                            className="text-red-600 border-red-200 hover:bg-red-50 rounded-full"
+                                                        >
+                                                            <Trash2 className="h-4 w-4 mr-2" />
+                                                            Delete Database
+                                                        </Button>
+                                                    </AlertDialogTrigger>
+                                                    <AlertDialogContent className="max-w-md rounded-none">
+                                                        <AlertDialogHeader>
+                                                            <AlertDialogTitle className="text-xl">Delete Database</AlertDialogTitle>
+                                                            <AlertDialogDescription>
+                                                                This will permanently delete <strong>{project.name}</strong> and all its data.
+                                                            </AlertDialogDescription>
+                                                        </AlertDialogHeader>
+                                                        <div className="space-y-4 py-4">
+                                                            <div>
+                                                                <label className="text-sm text-zinc-600 block mb-2">
+                                                                    Type <code className="bg-zinc-100 px-1.5 py-0.5 rounded text-zinc-800">{project.name}</code> to confirm
+                                                                </label>
+                                                                <Input
+                                                                    value={confirmProjectName}
+                                                                    onChange={(e) => setConfirmProjectName(e.target.value)}
+                                                                    placeholder={project.name}
+                                                                    className="font-mono"
+                                                                />
+                                                            </div>
+                                                            <div>
+                                                                <label className="text-sm text-zinc-600 block mb-2">
+                                                                    Type <code className="bg-zinc-100 px-1.5 py-0.5 rounded text-zinc-800">delete my project</code> to confirm
+                                                                </label>
+                                                                <Input
+                                                                    value={confirmPhrase}
+                                                                    onChange={(e) => setConfirmPhrase(e.target.value)}
+                                                                    placeholder="delete my project"
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                        <AlertDialogFooter>
+                                                            <AlertDialogCancel className="rounded-full">Cancel</AlertDialogCancel>
+                                                            <AlertDialogAction
+                                                                onClick={handleDeleteProject}
+                                                                disabled={deleting || confirmProjectName !== project.name || confirmPhrase !== "delete my project"}
+                                                                className="bg-red-600 hover:bg-red-700 rounded-full"
+                                                            >
+                                                                {deleting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                                                                Delete Database
+                                                            </AlertDialogAction>
+                                                        </AlertDialogFooter>
+                                                    </AlertDialogContent>
+                                                </AlertDialog>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+
+                <UpgradeModal isOpen={upgradeModalOpen} onClose={closeUpgradeModal} />
+            </>
+        )
+    }
 
     // Prefer active custom domain over the default shorlabs URL
     const activeCustomDomain = data.custom_domains?.find(d => d.is_active)

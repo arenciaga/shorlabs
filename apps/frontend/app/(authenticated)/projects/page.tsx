@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { useAuth, useClerk } from "@clerk/nextjs"
-import { Plus, Search, ExternalLink, Github, AlertCircle, Folder, Sparkles } from "lucide-react"
+import { Plus, Search, ExternalLink, Github, AlertCircle, Folder, Sparkles, Database } from "lucide-react"
 import Link from "next/link"
 
 import { Button } from "@/components/ui/button"
@@ -18,13 +18,17 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 interface Project {
     project_id: string
     name: string
-    github_url: string
-    github_repo: string
+    project_type?: "web-app" | "database"
+    github_url?: string
+    github_repo?: string
     status: string
-    function_url: string | null
-    custom_url: string | null
-    subdomain: string | null
-    active_custom_domain: string | null
+    function_url?: string | null
+    custom_url?: string | null
+    subdomain?: string | null
+    active_custom_domain?: string | null
+    db_endpoint?: string | null
+    db_port?: number | null
+    db_name?: string | null
     created_at: string
     updated_at: string
     is_throttled?: boolean
@@ -37,6 +41,7 @@ const STATUS_CONFIG: Record<string, { dot: string; label: string; bg: string }> 
     UPLOADING: { dot: "bg-blue-500 animate-pulse", label: "Uploading", bg: "bg-blue-50" },
     BUILDING: { dot: "bg-blue-900 animate-pulse", label: "Building", bg: "bg-blue-50" },
     DEPLOYING: { dot: "bg-blue-900 animate-pulse", label: "Deploying", bg: "bg-blue-50" },
+    PROVISIONING: { dot: "bg-blue-500 animate-pulse", label: "Provisioning", bg: "bg-blue-50" },
     LIVE: { dot: "bg-emerald-500", label: "Ready", bg: "bg-emerald-50" },
     FAILED: { dot: "bg-red-500", label: "Error", bg: "bg-red-50" },
 }
@@ -309,11 +314,16 @@ export default function ProjectsPage() {
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                                 {filteredProjects.map((project) => {
                                     const status = STATUS_CONFIG[project.status] || STATUS_CONFIG.PENDING
-                                    const displayUrl = project.active_custom_domain
-                                        ? `https://${project.active_custom_domain}`
-                                        : (project.custom_url || project.function_url)
-                                    const normalizedDisplayUrl = normalizeUrl(displayUrl)
-                                    const projectHost = getProjectHost(displayUrl)
+                                    const isDatabase = project.project_type === "database"
+                                    const displayUrl = isDatabase
+                                        ? null
+                                        : (project.active_custom_domain
+                                            ? `https://${project.active_custom_domain}`
+                                            : (project.custom_url || project.function_url))
+                                    const normalizedDisplayUrl = displayUrl ? normalizeUrl(displayUrl) : null
+                                    const projectHost = isDatabase
+                                        ? project.db_endpoint
+                                        : getProjectHost(displayUrl)
                                     return (
                                         <Link
                                             key={project.project_id}
@@ -324,12 +334,18 @@ export default function ProjectsPage() {
                                                 {/* Top: Icon + Name + Status */}
                                                 <div className="flex items-start justify-between mb-4">
                                                     <div className="flex items-center gap-3 min-w-0">
-                                                        <ProjectAvatar
-                                                            key={`avatar-${displayUrl || project.project_id}`}
-                                                            projectId={project.project_id}
-                                                            projectName={project.name}
-                                                            projectUrl={displayUrl}
-                                                        />
+                                                        {isDatabase ? (
+                                                            <div className="w-9 h-9 bg-blue-100 border border-blue-200 flex items-center justify-center shrink-0">
+                                                                <Database className="h-4 w-4 text-blue-600" />
+                                                            </div>
+                                                        ) : (
+                                                            <ProjectAvatar
+                                                                key={`avatar-${displayUrl || project.project_id}`}
+                                                                projectId={project.project_id}
+                                                                projectName={project.name}
+                                                                projectUrl={displayUrl}
+                                                            />
+                                                        )}
                                                         <div className="min-w-0">
                                                             <h3 className="font-semibold text-[15px] text-zinc-900 group-hover:text-black transition-colors truncate">
                                                                 {project.name.toLowerCase().replace(/_/g, '-')}
@@ -349,12 +365,19 @@ export default function ProjectsPage() {
                                                     </div>
                                                 </div>
 
-                                                {/* GitHub repo badge */}
+                                                {/* Type badge */}
                                                 <div className="flex items-center gap-1.5 mb-4">
-                                                    <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-zinc-100 border border-zinc-200 rounded-full">
-                                                        <Github className="h-3 w-3 text-zinc-500" />
-                                                        <span className="text-xs text-zinc-600 truncate max-w-[200px]">{project.github_repo}</span>
-                                                    </div>
+                                                    {isDatabase ? (
+                                                        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-blue-50 border border-blue-200 rounded-full">
+                                                            <Database className="h-3 w-3 text-blue-500" />
+                                                            <span className="text-xs text-blue-600">PostgreSQL</span>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-zinc-100 border border-zinc-200 rounded-full">
+                                                            <Github className="h-3 w-3 text-zinc-500" />
+                                                            <span className="text-xs text-zinc-600 truncate max-w-[200px]">{project.github_repo}</span>
+                                                        </div>
+                                                    )}
                                                 </div>
 
                                                 {/* Bottom: Date + Action icons */}
@@ -367,16 +390,18 @@ export default function ProjectsPage() {
                                                         })}
                                                     </span>
                                                     <div className="flex items-center gap-0.5">
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.preventDefault()
-                                                                e.stopPropagation()
-                                                                window.open(`https://github.com/${project.github_repo}`, "_blank")
-                                                            }}
-                                                            className="p-1.5 rounded-md text-zinc-300 hover:text-zinc-600 hover:bg-zinc-50 transition-colors cursor-pointer"
-                                                        >
-                                                            <Github className="h-3.5 w-3.5" />
-                                                        </button>
+                                                        {!isDatabase && project.github_repo && (
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.preventDefault()
+                                                                    e.stopPropagation()
+                                                                    window.open(`https://github.com/${project.github_repo}`, "_blank")
+                                                                }}
+                                                                className="p-1.5 rounded-md text-zinc-300 hover:text-zinc-600 hover:bg-zinc-50 transition-colors cursor-pointer"
+                                                            >
+                                                                <Github className="h-3.5 w-3.5" />
+                                                            </button>
+                                                        )}
                                                         {normalizedDisplayUrl && (
                                                             <button
                                                                 onClick={(e) => {

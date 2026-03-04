@@ -56,7 +56,7 @@ import { CustomDomains } from "@/components/CustomDomains"
 import { LazyLog, ScrollFollow } from "@melloware/react-logviewer"
 import { useIsPro } from "@/hooks/use-is-pro"
 import { trackEvent } from "@/lib/amplitude"
-import { fetchDatabaseConnection, DatabaseConnection } from "@/lib/api"
+import { fetchDatabaseConnection, DatabaseConnection, fetchSecurityRules, addSecurityRule, deleteSecurityRule, SecurityRulesResponse } from "@/lib/api"
 import { DatabaseExplorer } from "@/components/DatabaseExplorer"
 
 
@@ -155,6 +155,13 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     const [showPassword, setShowPassword] = useState(false)
     const [loadingConnection, setLoadingConnection] = useState(false)
     const [copiedField, setCopiedField] = useState<string | null>(null)
+
+    // Security rules state
+    const [securityRules, setSecurityRules] = useState<SecurityRulesResponse | null>(null)
+    const [loadingRules, setLoadingRules] = useState(false)
+    const [addingRule, setAddingRule] = useState(false)
+    const [deletingRuleId, setDeletingRuleId] = useState<string | null>(null)
+    const [newRule, setNewRule] = useState({ direction: "inbound" as "inbound" | "outbound", protocol: "tcp", from_port: "", to_port: "", cidr: "", description: "" })
 
     // Pro tier check via Autumn
     const { isPro, currentPlan } = useIsPro()
@@ -486,6 +493,32 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
         }
     }, [data?.deployments, expandedDeployId])
 
+    const isDatabaseProject = data?.project?.project_type === "database"
+    const dbActiveTab = activeTab === "configuration" || activeTab === "settings" || activeTab === "explorer" || activeTab === "security" ? activeTab : "configuration"
+
+    const loadSecurityRules = useCallback(async () => {
+        const projectId = data?.project?.project_id
+        if (!projectId || !orgId) return
+        setLoadingRules(true)
+        try {
+            const token = await getToken()
+            if (token) {
+                const rules = await fetchSecurityRules(token, projectId, orgId)
+                setSecurityRules(rules)
+            }
+        } catch (err) {
+            console.error("Failed to fetch security rules:", err)
+        } finally {
+            setLoadingRules(false)
+        }
+    }, [data?.project?.project_id, orgId, getToken])
+
+    useEffect(() => {
+        if (isDatabaseProject && dbActiveTab === "security" && !securityRules && !loadingRules) {
+            loadSecurityRules()
+        }
+    }, [isDatabaseProject, dbActiveTab, securityRules, loadingRules, loadSecurityRules])
+
     // Loading skeleton
     if (loading) {
         return (
@@ -557,9 +590,48 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
         }
     }
 
-    if (project?.project_type === "database") {
-        const dbActiveTab = activeTab === "configuration" || activeTab === "settings" || activeTab === "explorer" || activeTab === "security" ? activeTab : "configuration"
+    const handleAddRule = async () => {
+        if (!project?.project_id || !orgId || !newRule.cidr) return
+        setAddingRule(true)
+        try {
+            const token = await getToken()
+            if (token) {
+                await addSecurityRule(token, project.project_id, orgId, {
+                    direction: newRule.direction,
+                    protocol: newRule.protocol,
+                    from_port: newRule.protocol !== "-1" ? parseInt(newRule.from_port) || undefined : undefined,
+                    to_port: newRule.protocol !== "-1" ? parseInt(newRule.to_port) || undefined : undefined,
+                    cidr: newRule.cidr,
+                    description: newRule.description || undefined,
+                })
+                setNewRule({ direction: "inbound", protocol: "tcp", from_port: "", to_port: "", cidr: "", description: "" })
+                await loadSecurityRules()
+            }
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : "Failed to add rule"
+            alert(message)
+        } finally {
+            setAddingRule(false)
+        }
+    }
 
+    const handleDeleteRule = async (ruleId: string, direction: "inbound" | "outbound") => {
+        if (!project?.project_id || !orgId) return
+        setDeletingRuleId(ruleId)
+        try {
+            const token = await getToken()
+            if (token) {
+                await deleteSecurityRule(token, project.project_id, orgId, ruleId, direction)
+                await loadSecurityRules()
+            }
+        } catch (err) {
+            console.error("Failed to delete rule:", err)
+        } finally {
+            setDeletingRuleId(null)
+        }
+    }
+
+    if (project?.project_type === "database") {
         return (
             <>
                 <div className="min-h-screen bg-white">
@@ -811,34 +883,160 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                             )}
 
                             {/* Security Tab */}
-                            {dbActiveTab === "security" && (
-                                <div className="bg-zinc-50 rounded-none border border-zinc-200 p-4 sm:p-6">
-                                    <div className="flex items-center gap-3 mb-4">
-                                        <Settings2 className="h-5 w-5 text-zinc-400" />
-                                        <h3 className="font-semibold text-zinc-900">Security Rules</h3>
-                                    </div>
+                            {dbActiveTab === "security" && (() => {
+                                const renderRulesTable = (rules: SecurityRulesResponse["inbound"], direction: "inbound" | "outbound") => {
+                                    if (rules.length === 0) {
+                                        return (
+                                            <div className="bg-white border border-zinc-200 rounded-none p-8 flex flex-col items-center justify-center text-center">
+                                                <Globe className="h-8 w-8 text-zinc-300 mb-3" />
+                                                <p className="text-sm text-zinc-500">No {direction} rules configured</p>
+                                                <p className="text-xs text-zinc-400 mt-1">
+                                                    {direction === "inbound"
+                                                        ? "Inbound rules control which IPs can connect to your database."
+                                                        : "Outbound rules control which destinations your database can reach."}
+                                                </p>
+                                            </div>
+                                        )
+                                    }
 
-                                    {/* Inbound Rules */}
-                                    <div className="mb-6">
-                                        <h4 className="text-sm font-medium text-zinc-700 mb-3">Inbound Rules</h4>
-                                        <div className="bg-white border border-zinc-200 rounded-none p-8 flex flex-col items-center justify-center text-center">
-                                            <Globe className="h-8 w-8 text-zinc-300 mb-3" />
-                                            <p className="text-sm text-zinc-500">No inbound rules configured</p>
-                                            <p className="text-xs text-zinc-400 mt-1">Inbound rules control which IPs can connect to your database.</p>
+                                    return (
+                                        <div className="bg-white border border-zinc-200 rounded-none overflow-hidden">
+                                            <table className="w-full text-sm">
+                                                <thead>
+                                                    <tr className="border-b border-zinc-200 bg-zinc-50">
+                                                        <th className="text-left px-4 py-2 font-medium text-zinc-600">Protocol</th>
+                                                        <th className="text-left px-4 py-2 font-medium text-zinc-600">Port Range</th>
+                                                        <th className="text-left px-4 py-2 font-medium text-zinc-600">Source / Destination</th>
+                                                        <th className="text-left px-4 py-2 font-medium text-zinc-600">Description</th>
+                                                        <th className="px-4 py-2 w-10"></th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {rules.map((rule) => (
+                                                        <tr key={rule.rule_id} className="border-b border-zinc-100 last:border-0">
+                                                            <td className="px-4 py-2.5 font-mono text-zinc-700">
+                                                                {rule.protocol === "-1" ? "All" : rule.protocol.toUpperCase()}
+                                                            </td>
+                                                            <td className="px-4 py-2.5 font-mono text-zinc-700">
+                                                                {rule.protocol === "-1" ? "All" : rule.from_port === rule.to_port ? rule.from_port : `${rule.from_port}-${rule.to_port}`}
+                                                            </td>
+                                                            <td className="px-4 py-2.5 font-mono text-zinc-700">
+                                                                {rule.cidr_ipv4 || rule.cidr_ipv6 || "-"}
+                                                            </td>
+                                                            <td className="px-4 py-2.5 text-zinc-500">
+                                                                {rule.description || "-"}
+                                                            </td>
+                                                            <td className="px-4 py-2.5">
+                                                                <button
+                                                                    onClick={() => handleDeleteRule(rule.rule_id, direction)}
+                                                                    disabled={deletingRuleId === rule.rule_id}
+                                                                    className="text-zinc-400 hover:text-red-500 transition-colors disabled:opacity-50"
+                                                                >
+                                                                    {deletingRuleId === rule.rule_id ? (
+                                                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                                                    ) : (
+                                                                        <Trash2 className="h-4 w-4" />
+                                                                    )}
+                                                                </button>
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
                                         </div>
-                                    </div>
+                                    )
+                                }
 
-                                    {/* Outbound Rules */}
-                                    <div>
-                                        <h4 className="text-sm font-medium text-zinc-700 mb-3">Outbound Rules</h4>
-                                        <div className="bg-white border border-zinc-200 rounded-none p-8 flex flex-col items-center justify-center text-center">
-                                            <Globe className="h-8 w-8 text-zinc-300 mb-3" />
-                                            <p className="text-sm text-zinc-500">No outbound rules configured</p>
-                                            <p className="text-xs text-zinc-400 mt-1">Outbound rules control which destinations your database can reach.</p>
+                                return (
+                                    <div className="bg-zinc-50 rounded-none border border-zinc-200 p-4 sm:p-6">
+                                        <div className="flex items-center justify-between mb-4">
+                                            <div className="flex items-center gap-3">
+                                                <Settings2 className="h-5 w-5 text-zinc-400" />
+                                                <h3 className="font-semibold text-zinc-900">Security Rules</h3>
+                                            </div>
+                                            <button
+                                                onClick={loadSecurityRules}
+                                                disabled={loadingRules}
+                                                className="text-zinc-400 hover:text-zinc-600 transition-colors"
+                                            >
+                                                <RefreshCw className={`h-4 w-4 ${loadingRules ? "animate-spin" : ""}`} />
+                                            </button>
                                         </div>
+
+                                        {loadingRules && !securityRules ? (
+                                            <div className="flex items-center justify-center py-12">
+                                                <Loader2 className="h-6 w-6 animate-spin text-zinc-400" />
+                                            </div>
+                                        ) : (
+                                            <>
+                                                {/* Inbound Rules */}
+                                                <div className="mb-6">
+                                                    <h4 className="text-sm font-medium text-zinc-700 mb-3">Inbound Rules</h4>
+                                                    {renderRulesTable(securityRules?.inbound || [], "inbound")}
+                                                </div>
+
+                                                {/* Outbound Rules */}
+                                                <div className="mb-6">
+                                                    <h4 className="text-sm font-medium text-zinc-700 mb-3">Outbound Rules</h4>
+                                                    {renderRulesTable(securityRules?.outbound || [], "outbound")}
+                                                </div>
+
+                                                {/* Add Rule Form */}
+                                                <div className="border-t border-zinc-200 pt-4">
+                                                    <h4 className="text-sm font-medium text-zinc-700 mb-3">Add Rule</h4>
+                                                    <div className="grid grid-cols-1 sm:grid-cols-6 gap-3">
+                                                        <select
+                                                            value={newRule.direction}
+                                                            onChange={(e) => setNewRule({ ...newRule, direction: e.target.value as "inbound" | "outbound" })}
+                                                            className="border border-zinc-200 rounded-none px-3 py-2 text-sm bg-white"
+                                                        >
+                                                            <option value="inbound">Inbound</option>
+                                                            <option value="outbound">Outbound</option>
+                                                        </select>
+                                                        <select
+                                                            value={newRule.protocol}
+                                                            onChange={(e) => setNewRule({ ...newRule, protocol: e.target.value })}
+                                                            className="border border-zinc-200 rounded-none px-3 py-2 text-sm bg-white"
+                                                        >
+                                                            <option value="tcp">TCP</option>
+                                                            <option value="udp">UDP</option>
+                                                            <option value="-1">All Traffic</option>
+                                                        </select>
+                                                        {newRule.protocol !== "-1" && (
+                                                            <Input
+                                                                placeholder="Port (e.g. 5432)"
+                                                                value={newRule.from_port}
+                                                                onChange={(e) => setNewRule({ ...newRule, from_port: e.target.value, to_port: e.target.value })}
+                                                                className="rounded-none"
+                                                            />
+                                                        )}
+                                                        <Input
+                                                            placeholder="CIDR (e.g. 0.0.0.0/0)"
+                                                            value={newRule.cidr}
+                                                            onChange={(e) => setNewRule({ ...newRule, cidr: e.target.value })}
+                                                            className="rounded-none"
+                                                        />
+                                                        <Input
+                                                            placeholder="Description"
+                                                            value={newRule.description}
+                                                            onChange={(e) => setNewRule({ ...newRule, description: e.target.value })}
+                                                            className="rounded-none"
+                                                        />
+                                                        <Button
+                                                            onClick={handleAddRule}
+                                                            disabled={addingRule || !newRule.cidr}
+                                                            className="rounded-none"
+                                                        >
+                                                            {addingRule ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
+                                                            Add
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                            </>
+                                        )}
                                     </div>
-                                </div>
-                            )}
+                                )
+                            })()}
 
                             {/* Settings Tab */}
                             {dbActiveTab === "settings" && (

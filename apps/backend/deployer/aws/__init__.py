@@ -18,6 +18,8 @@ from .rds import (
     get_cluster_status,
     get_cluster_secret,
     delete_aurora_cluster,
+    get_cluster_security_group_ids,
+    get_security_group_rules,
 )
 
 __all__ = [
@@ -47,4 +49,6 @@ __all__ = [
     "get_cluster_status",
     "get_cluster_secret",
     "delete_aurora_cluster",
+    "get_cluster_security_group_ids",
+    "get_security_group_rules",
 ]

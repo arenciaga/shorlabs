@@ -419,3 +419,106 @@ export async function fetchTableData(
 
     return response.json();
 }
+
+// ─────────────────────────────────────────────────────────────
+// DATABASE SECURITY RULES
+// ─────────────────────────────────────────────────────────────
+
+export interface SecurityRule {
+    rule_id: string;
+    protocol: string;
+    from_port: number | null;
+    to_port: number | null;
+    cidr_ipv4: string | null;
+    cidr_ipv6: string | null;
+    description: string | null;
+}
+
+export interface SecurityRulesResponse {
+    security_group_id: string;
+    inbound: SecurityRule[];
+    outbound: SecurityRule[];
+}
+
+export async function fetchSecurityRules(
+    token: string,
+    projectId: string,
+    orgId: string,
+): Promise<SecurityRulesResponse> {
+    const url = new URL(`${API_BASE_URL}/api/projects/${projectId}/database/security-rules`);
+    url.searchParams.append("org_id", orgId);
+
+    const response = await fetch(url.toString(), {
+        headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+        },
+    });
+
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ detail: "Unknown error" }));
+        throw new Error(error.detail || `HTTP ${response.status}`);
+    }
+
+    return response.json();
+}
+
+export async function addSecurityRule(
+    token: string,
+    projectId: string,
+    orgId: string,
+    rule: {
+        direction: "inbound" | "outbound";
+        protocol: string;
+        from_port?: number;
+        to_port?: number;
+        cidr: string;
+        description?: string;
+    },
+): Promise<{ status: string }> {
+    const url = new URL(`${API_BASE_URL}/api/projects/${projectId}/database/security-rules`);
+    url.searchParams.append("org_id", orgId);
+
+    const response = await fetch(url.toString(), {
+        method: "POST",
+        headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify(rule),
+    });
+
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ detail: "Unknown error" }));
+        throw new Error(error.detail || `HTTP ${response.status}`);
+    }
+
+    return response.json();
+}
+
+export async function deleteSecurityRule(
+    token: string,
+    projectId: string,
+    orgId: string,
+    ruleId: string,
+    direction: "inbound" | "outbound",
+): Promise<{ status: string }> {
+    const url = new URL(`${API_BASE_URL}/api/projects/${projectId}/database/security-rules/${ruleId}`);
+    url.searchParams.append("org_id", orgId);
+    url.searchParams.append("direction", direction);
+
+    const response = await fetch(url.toString(), {
+        method: "DELETE",
+        headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+        },
+    });
+
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ detail: "Unknown error" }));
+        throw new Error(error.detail || `HTTP ${response.status}`);
+    }
+
+    return response.json();
+}

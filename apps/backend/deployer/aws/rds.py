@@ -7,6 +7,7 @@ Uses the account's default VPC — no custom VPC/subnet setup needed.
 
 import json
 import time
+import traceback
 
 from ..clients import get_rds_client, get_ec2_client, get_secretsmanager_client
 from ..config import (
@@ -112,6 +113,69 @@ def ensure_db_security_group() -> str:
 
     print(f"✅ Security group created: {sg_id}")
     return sg_id
+
+
+def get_cluster_security_group_ids(cluster_identifier: str) -> list[str]:
+    """Get VPC security group IDs attached to an Aurora cluster."""
+    rds = get_rds_client()
+    try:
+        response = rds.describe_db_clusters(DBClusterIdentifier=cluster_identifier)
+        cluster = response["DBClusters"][0]
+        sg_ids = [sg["VpcSecurityGroupId"] for sg in cluster.get("VpcSecurityGroups", [])]
+        print(f"🔎 RDS SG IDS: cluster={cluster_identifier} sg_ids={sg_ids}")
+        return sg_ids
+    except Exception as e:
+        print(f"❌ RDS SG IDS ERROR: cluster={cluster_identifier} error={type(e).__name__}: {e}")
+        print(traceback.format_exc())
+        raise
+
+
+def get_security_group_rules(sg_id: str) -> dict:
+    """
+    Get inbound and outbound rules for a security group.
+
+    Uses describe_security_group_rules (newer API) which returns
+    individual SecurityGroupRuleId per rule.
+
+    Returns:
+        Dict with security_group_id, inbound (list), outbound (list).
+    """
+    ec2 = get_ec2_client()
+    try:
+        response = ec2.describe_security_group_rules(
+            Filters=[{"Name": "group-id", "Values": [sg_id]}],
+            MaxResults=1000,
+        )
+    except Exception as e:
+        print(f"❌ EC2 SG RULES ERROR: sg_id={sg_id} error={type(e).__name__}: {e}")
+        print(traceback.format_exc())
+        raise
+
+    inbound = []
+    outbound = []
+
+    for rule in response.get("SecurityGroupRules", []):
+        parsed = {
+            "rule_id": rule["SecurityGroupRuleId"],
+            "protocol": rule.get("IpProtocol", "-1"),
+            "from_port": rule.get("FromPort"),
+            "to_port": rule.get("ToPort"),
+            "cidr_ipv4": rule.get("CidrIpv4"),
+            "cidr_ipv6": rule.get("CidrIpv6"),
+            "description": rule.get("Description"),
+        }
+        if rule.get("IsEgress"):
+            outbound.append(parsed)
+        else:
+            inbound.append(parsed)
+
+    result = {
+        "security_group_id": sg_id,
+        "inbound": inbound,
+        "outbound": outbound,
+    }
+    print(f"🔎 EC2 SG RULES: sg_id={sg_id} inbound={len(inbound)} outbound={len(outbound)}")
+    return result
 
 
 # ─────────────────────────────────────────────────────────────

@@ -4,6 +4,7 @@ Projects API routes - CRUD operations for projects.
 import os
 import json
 import threading
+import traceback
 from typing import Optional
 from datetime import datetime
 
@@ -31,7 +32,7 @@ from deployer import provision_database, delete_database_resources
 from deployer.aws import (
     get_lambda_logs,
 )
-from deployer.aws.rds import get_cluster_secret
+from deployer.aws.rds import get_cluster_secret, get_cluster_security_group_ids, get_security_group_rules
 from api.db.pg_explorer import (
     list_schemas as pg_list_schemas,
     list_tables as pg_list_tables,
@@ -930,6 +931,193 @@ async def get_database_table_data(
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database query failed: {str(e)}")
+
+
+# ─────────────────────────────────────────────────────────────
+# DATABASE SECURITY RULES
+# ─────────────────────────────────────────────────────────────
+
+
+def _security_debug_context(org_id: str, project_id: str, project: Optional[dict] = None, sg_id: Optional[str] = None) -> dict:
+    """Build a minimal debug context for security-rules handlers."""
+    ctx = {
+        "org_id": org_id,
+        "project_id": project_id,
+    }
+    if project:
+        ctx.update({
+            "status": project.get("status"),
+            "project_type": project.get("project_type"),
+            "db_cluster_identifier": project.get("db_cluster_identifier"),
+            "db_endpoint": project.get("db_endpoint"),
+            "db_port": project.get("db_port"),
+        })
+    if sg_id:
+        ctx["security_group_id"] = sg_id
+    return ctx
+
+
+def _get_sg_id_for_project(project: dict) -> str:
+    """Get the first VPC security group ID attached to the project's cluster."""
+    print(f"🔎 SG LOOKUP: cluster={project.get('db_cluster_identifier')} project_id={project.get('project_id')}")
+    sg_ids = get_cluster_security_group_ids(project["db_cluster_identifier"])
+    print(f"🔎 SG LOOKUP RESULT: cluster={project.get('db_cluster_identifier')} sg_ids={sg_ids}")
+    if not sg_ids:
+        raise HTTPException(status_code=404, detail="No security group found for this database")
+    return sg_ids[0]
+
+
+@router.get("/{project_id}/database/security-rules")
+async def get_database_security_rules(
+    project_id: str,
+    user_id: str = Depends(get_current_user_id),
+    org_id: str = Query(...),
+):
+    """Get inbound and outbound security group rules for this database."""
+    project = _get_live_database_project(org_id, project_id)
+    debug_ctx = _security_debug_context(org_id, project_id, project=project)
+    print(f"🛡️ SECURITY RULES GET START: {debug_ctx}")
+    try:
+        sg_id = _get_sg_id_for_project(project)
+        debug_ctx = _security_debug_context(org_id, project_id, project=project, sg_id=sg_id)
+        rules = get_security_group_rules(sg_id)
+        print(
+            "🛡️ SECURITY RULES GET SUCCESS: "
+            f"{debug_ctx} inbound={len(rules.get('inbound', []))} outbound={len(rules.get('outbound', []))}"
+        )
+        return rules
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ SECURITY RULES GET ERROR: {debug_ctx} error={type(e).__name__}: {e}")
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Failed to fetch security rules: {str(e)}")
+
+
+class AddSecurityRuleRequest(BaseModel):
+    direction: str  # "inbound" or "outbound"
+    protocol: str  # "tcp", "udp", or "-1"
+    from_port: Optional[int] = None
+    to_port: Optional[int] = None
+    cidr: str  # IPv4 CIDR e.g. "203.0.113.50/32"
+    description: Optional[str] = None
+
+
+@router.post("/{project_id}/database/security-rules")
+async def add_database_security_rule(
+    project_id: str,
+    request: AddSecurityRuleRequest,
+    user_id: str = Depends(get_current_user_id),
+    org_id: str = Query(...),
+):
+    """Add an inbound or outbound security group rule."""
+    import ipaddress
+    from botocore.exceptions import ClientError
+    from deployer.clients import get_ec2_client
+
+    project = _get_live_database_project(org_id, project_id)
+    sg_id = _get_sg_id_for_project(project)
+    debug_ctx = _security_debug_context(org_id, project_id, project=project, sg_id=sg_id)
+    print(
+        "🛡️ SECURITY RULES ADD START: "
+        f"{debug_ctx} direction={request.direction} protocol={request.protocol} "
+        f"from_port={request.from_port} to_port={request.to_port} cidr={request.cidr}"
+    )
+
+    if request.direction not in ("inbound", "outbound"):
+        raise HTTPException(status_code=400, detail="direction must be 'inbound' or 'outbound'")
+
+    if request.protocol not in ("tcp", "udp", "-1"):
+        raise HTTPException(status_code=400, detail="protocol must be 'tcp', 'udp', or '-1'")
+
+    if request.protocol in ("tcp", "udp") and (request.from_port is None or request.to_port is None):
+        raise HTTPException(status_code=400, detail="from_port and to_port required for tcp/udp")
+
+    # Validate and canonicalize CIDR
+    try:
+        network = ipaddress.ip_network(request.cidr, strict=False)
+        cidr = str(network)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid CIDR format")
+
+    ip_permission = {"IpProtocol": request.protocol}
+    if request.protocol != "-1":
+        ip_permission["FromPort"] = request.from_port
+        ip_permission["ToPort"] = request.to_port
+
+    ip_range = {"CidrIp": cidr}
+    if request.description:
+        ip_range["Description"] = request.description
+    ip_permission["IpRanges"] = [ip_range]
+
+    ec2 = get_ec2_client()
+    try:
+        if request.direction == "inbound":
+            ec2.authorize_security_group_ingress(GroupId=sg_id, IpPermissions=[ip_permission])
+        else:
+            ec2.authorize_security_group_egress(GroupId=sg_id, IpPermissions=[ip_permission])
+        print(f"🛡️ SECURITY RULES ADD SUCCESS: {debug_ctx}")
+        return {"status": "created"}
+    except ClientError as e:
+        err = e.response.get("Error", {})
+        print(f"❌ SECURITY RULES ADD AWS ERROR: {debug_ctx} code={err.get('Code')} message={err.get('Message')}")
+        print(traceback.format_exc())
+        if e.response["Error"]["Code"] == "InvalidPermission.Duplicate":
+            raise HTTPException(status_code=409, detail="Rule already exists")
+        raise HTTPException(status_code=500, detail=f"Failed to add rule: {str(e)}")
+    except Exception as e:
+        print(f"❌ SECURITY RULES ADD ERROR: {debug_ctx} error={type(e).__name__}: {e}")
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Failed to add rule: {str(e)}")
+
+
+@router.delete("/{project_id}/database/security-rules/{rule_id}")
+async def delete_database_security_rule(
+    project_id: str,
+    rule_id: str,
+    user_id: str = Depends(get_current_user_id),
+    org_id: str = Query(...),
+    direction: str = Query(...),
+):
+    """Remove a security group rule by its SecurityGroupRuleId."""
+    from botocore.exceptions import ClientError
+    from deployer.clients import get_ec2_client
+
+    project = _get_live_database_project(org_id, project_id)
+    sg_id = _get_sg_id_for_project(project)
+    debug_ctx = _security_debug_context(org_id, project_id, project=project, sg_id=sg_id)
+    print(f"🛡️ SECURITY RULES DELETE START: {debug_ctx} rule_id={rule_id} direction={direction}")
+
+    if direction not in ("inbound", "outbound"):
+        raise HTTPException(status_code=400, detail="direction must be 'inbound' or 'outbound'")
+
+    # Verify rule belongs to this SG
+    rules_data = get_security_group_rules(sg_id)
+    rule_list = rules_data["inbound"] if direction == "inbound" else rules_data["outbound"]
+    if not any(r["rule_id"] == rule_id for r in rule_list):
+        raise HTTPException(status_code=404, detail="Rule not found in this security group")
+
+    ec2 = get_ec2_client()
+    try:
+        if direction == "inbound":
+            ec2.revoke_security_group_ingress(GroupId=sg_id, SecurityGroupRuleIds=[rule_id])
+        else:
+            ec2.revoke_security_group_egress(GroupId=sg_id, SecurityGroupRuleIds=[rule_id])
+        print(f"🛡️ SECURITY RULES DELETE SUCCESS: {debug_ctx} rule_id={rule_id} direction={direction}")
+        return {"status": "deleted"}
+    except ClientError as e:
+        err = e.response.get("Error", {})
+        print(
+            "❌ SECURITY RULES DELETE AWS ERROR: "
+            f"{debug_ctx} rule_id={rule_id} direction={direction} "
+            f"code={err.get('Code')} message={err.get('Message')}"
+        )
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Failed to delete rule: {str(e)}")
+    except Exception as e:
+        print(f"❌ SECURITY RULES DELETE ERROR: {debug_ctx} rule_id={rule_id} direction={direction} error={type(e).__name__}: {e}")
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Failed to delete rule: {str(e)}")
 
 
 @router.get("/{project_id}/runtime")

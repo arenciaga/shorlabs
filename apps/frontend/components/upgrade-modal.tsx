@@ -192,10 +192,10 @@ export function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
                                                 </Badge>
                                             )
                                         }
-                                        if (isPaidPlan) {
+                                        if (plan.trialLabel) {
                                             return (
                                                 <Badge className="rounded-none bg-gradient-to-r from-violet-500 to-blue-500 px-2 py-0.5 text-xs font-medium text-white">
-                                                    30 day free trial
+                                                    {plan.trialLabel}
                                                 </Badge>
                                             )
                                         }

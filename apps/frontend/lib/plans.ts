@@ -62,7 +62,6 @@ export const PLANS: Plan[] = [
         price: "$20",
         period: "/ month",
         highlighted: true,
-        trialLabel: "30 day free trial",
         features: [
             { label: "$20 Included Usage/Month", icon: DollarSign },
             { label: USAGE_PRICING.requests, icon: Globe },

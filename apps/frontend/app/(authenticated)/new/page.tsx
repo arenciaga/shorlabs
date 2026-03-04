@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { ArrowLeft, ArrowRight, Globe, Database } from "lucide-react"
+import { ArrowLeft, ArrowRight, Globe /* , Database */ } from "lucide-react"
 
 const PROJECT_TYPES = [
     {
@@ -11,13 +11,13 @@ const PROJECT_TYPES = [
         icon: Globe,
         href: "/new/web-app",
     },
-    {
-        id: "database",
-        name: "Database",
-        description: "Provision a PostgreSQL database with scale-to-zero",
-        icon: Database,
-        href: "/new/database",
-    },
+    // {
+    //     id: "database",
+    //     name: "Database",
+    //     description: "Provision a PostgreSQL database with scale-to-zero",
+    //     icon: Database,
+    //     href: "/new/database",
+    // },
 ]
 
 export default function NewProjectPage() {
@@ -51,7 +51,14 @@ export default function NewProjectPage() {
                                 <type.icon className="h-5 w-5 text-white" />
                             </div>
                             <div className="flex-1 min-w-0">
-                                <p className="font-medium text-zinc-900">{type.name}</p>
+                                <div className="flex items-center gap-2">
+                                    <p className="font-medium text-zinc-900">{type.name}</p>
+                                    {type.id === "database" && (
+                                        <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-amber-800">
+                                            Beta
+                                        </span>
+                                    )}
+                                </div>
                                 <p className="text-sm text-zinc-500">{type.description}</p>
                             </div>
                             <ArrowRight className="h-4 w-4 text-zinc-400 group-hover:text-zinc-900 transition-colors shrink-0" />

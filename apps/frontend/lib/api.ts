@@ -282,3 +282,140 @@ export async function fetchDatabaseConnection(
 
     return response.json();
 }
+
+// ─────────────────────────────────────────────────────────────
+// DATABASE EXPLORER
+// ─────────────────────────────────────────────────────────────
+
+export interface SchemaInfo {
+    schema_name: string;
+}
+
+export interface TableInfo {
+    table_name: string;
+    table_type: string;
+    estimated_row_count: number;
+}
+
+export interface ColumnInfo {
+    column_name: string;
+    data_type: string;
+    character_maximum_length: number | null;
+    is_nullable: string;
+    column_default: string | null;
+    ordinal_position: number;
+    is_primary_key: boolean;
+}
+
+export interface TableData {
+    columns: string[];
+    rows: Record<string, unknown>[];
+    page: number;
+    page_size: number;
+    total_count: number;
+    total_pages: number;
+}
+
+export async function fetchDatabaseSchemas(
+    token: string,
+    projectId: string,
+    orgId: string,
+): Promise<{ schemas: SchemaInfo[] }> {
+    const url = new URL(`${API_BASE_URL}/api/projects/${projectId}/database/schemas`);
+    url.searchParams.append("org_id", orgId);
+
+    const response = await fetch(url.toString(), {
+        headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+        },
+    });
+
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ detail: "Unknown error" }));
+        throw new Error(error.detail || `HTTP ${response.status}`);
+    }
+
+    return response.json();
+}
+
+export async function fetchDatabaseTables(
+    token: string,
+    projectId: string,
+    orgId: string,
+    schema: string = "public",
+): Promise<{ tables: TableInfo[]; schema: string }> {
+    const url = new URL(`${API_BASE_URL}/api/projects/${projectId}/database/tables`);
+    url.searchParams.append("org_id", orgId);
+    url.searchParams.append("schema", schema);
+
+    const response = await fetch(url.toString(), {
+        headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+        },
+    });
+
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ detail: "Unknown error" }));
+        throw new Error(error.detail || `HTTP ${response.status}`);
+    }
+
+    return response.json();
+}
+
+export async function fetchTableColumns(
+    token: string,
+    projectId: string,
+    orgId: string,
+    tableName: string,
+    schema: string = "public",
+): Promise<{ columns: ColumnInfo[]; schema: string; table_name: string }> {
+    const url = new URL(`${API_BASE_URL}/api/projects/${projectId}/database/tables/${tableName}/columns`);
+    url.searchParams.append("org_id", orgId);
+    url.searchParams.append("schema", schema);
+
+    const response = await fetch(url.toString(), {
+        headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+        },
+    });
+
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ detail: "Unknown error" }));
+        throw new Error(error.detail || `HTTP ${response.status}`);
+    }
+
+    return response.json();
+}
+
+export async function fetchTableData(
+    token: string,
+    projectId: string,
+    orgId: string,
+    tableName: string,
+    schema: string = "public",
+    page: number = 1,
+    pageSize: number = 50,
+): Promise<TableData> {
+    const url = new URL(`${API_BASE_URL}/api/projects/${projectId}/database/tables/${tableName}/data`);
+    url.searchParams.append("org_id", orgId);
+    url.searchParams.append("schema", schema);
+    url.searchParams.append("page", String(page));
+    url.searchParams.append("page_size", String(pageSize));
+
+    const response = await fetch(url.toString(), {
+        headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+        },
+    });
+
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ detail: "Unknown error" }));
+        throw new Error(error.detail || `HTTP ${response.status}`);
+    }
+
+    return response.json();
+}

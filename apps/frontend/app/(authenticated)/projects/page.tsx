@@ -44,6 +44,7 @@ const STATUS_CONFIG: Record<string, { dot: string; label: string; bg: string }> 
     PROVISIONING: { dot: "bg-blue-500 animate-pulse", label: "Provisioning", bg: "bg-blue-50" },
     LIVE: { dot: "bg-emerald-500", label: "Ready", bg: "bg-emerald-50" },
     FAILED: { dot: "bg-red-500", label: "Error", bg: "bg-red-50" },
+    DELETING: { dot: "bg-red-400 animate-pulse", label: "Deleting", bg: "bg-red-50" },
 }
 
 const getProjectGradient = (id: string) => {
@@ -323,7 +324,7 @@ export default function ProjectsPage() {
                                     const normalizedDisplayUrl = displayUrl ? normalizeUrl(displayUrl) : null
                                     const projectHost = isDatabase
                                         ? project.db_endpoint
-                                        : getProjectHost(displayUrl)
+                                        : getProjectHost(displayUrl ?? null)
                                     return (
                                         <Link
                                             key={project.project_id}
@@ -343,7 +344,7 @@ export default function ProjectsPage() {
                                                                 key={`avatar-${displayUrl || project.project_id}`}
                                                                 projectId={project.project_id}
                                                                 projectName={project.name}
-                                                                projectUrl={displayUrl}
+                                                                projectUrl={displayUrl ?? null}
                                                             />
                                                         )}
                                                         <div className="min-w-0">

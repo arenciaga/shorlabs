@@ -35,6 +35,32 @@ def _get_default_vpc_id() -> str:
     return vpcs[0]["VpcId"]
 
 
+def _ensure_vpc_dns_settings(vpc_id: str) -> None:
+    """
+    Ensure the VPC has DNS hostnames and DNS resolution enabled.
+
+    Both are required for PubliclyAccessible RDS instances to get a
+    public DNS name that resolves from outside AWS. enableDnsSupport
+    is on by default, but enableDnsHostnames is OFF by default.
+    Without it, the RDS endpoint hostname won't resolve externally.
+    """
+    ec2 = get_ec2_client()
+
+    # Enable DNS resolution (usually already on, but ensure it)
+    ec2.modify_vpc_attribute(
+        VpcId=vpc_id,
+        EnableDnsSupport={"Value": True},
+    )
+
+    # Enable DNS hostnames (OFF by default — this is the critical one)
+    ec2.modify_vpc_attribute(
+        VpcId=vpc_id,
+        EnableDnsHostnames={"Value": True},
+    )
+
+    print(f"✅ VPC {vpc_id}: DNS support and DNS hostnames enabled")
+
+
 def ensure_db_security_group() -> str:
     """
     Get or create a security group that allows PostgreSQL inbound (port 5432).
@@ -89,6 +115,88 @@ def ensure_db_security_group() -> str:
 
 
 # ─────────────────────────────────────────────────────────────
+# DB SUBNET GROUP (public subnets for external DNS resolution)
+# ─────────────────────────────────────────────────────────────
+
+DB_SUBNET_GROUP_NAME = "shorlabs-db-public-subnets"
+
+
+def ensure_db_subnet_group() -> str:
+    """
+    Get or create a DB subnet group using the default VPC's public subnets.
+
+    A PubliclyAccessible RDS instance must be in public subnets (subnets
+    with a route to an internet gateway) for its hostname to resolve
+    from outside AWS. Without an explicit subnet group, Aurora may use
+    private subnets and the endpoint DNS won't resolve externally.
+
+    Idempotent: reuses existing subnet group if present.
+
+    Returns:
+        The DB subnet group name.
+    """
+    rds = get_rds_client()
+    ec2 = get_ec2_client()
+
+    # Check if subnet group already exists
+    try:
+        rds.describe_db_subnet_groups(DBSubnetGroupName=DB_SUBNET_GROUP_NAME)
+        return DB_SUBNET_GROUP_NAME
+    except rds.exceptions.DBSubnetGroupNotFoundFault:
+        pass
+
+    # Get the default VPC's subnets that have a route to an internet gateway
+    vpc_id = _get_default_vpc_id()
+    subnets_resp = ec2.describe_subnets(
+        Filters=[{"Name": "vpc-id", "Values": [vpc_id]}]
+    )
+    subnet_ids = [s["SubnetId"] for s in subnets_resp["Subnets"]]
+
+    if len(subnet_ids) < 2:
+        raise Exception(
+            f"Need at least 2 subnets in the default VPC for a DB subnet group, found {len(subnet_ids)}"
+        )
+
+    # Filter to public subnets (those with MapPublicIpOnLaunch or a route to an IGW)
+    route_tables_resp = ec2.describe_route_tables(
+        Filters=[{"Name": "vpc-id", "Values": [vpc_id]}]
+    )
+    # Find subnets that have a route to an internet gateway
+    public_subnet_ids = set()
+    for rt in route_tables_resp["RouteTables"]:
+        has_igw = any(
+            r.get("GatewayId", "").startswith("igw-")
+            for r in rt.get("Routes", [])
+        )
+        if has_igw:
+            associations = rt.get("Associations", [])
+            for assoc in associations:
+                if assoc.get("Main", False):
+                    # Main route table with IGW → all subnets without explicit association are public
+                    public_subnet_ids.update(subnet_ids)
+                elif assoc.get("SubnetId"):
+                    public_subnet_ids.add(assoc["SubnetId"])
+
+    # Intersect with actual subnet IDs
+    public_subnet_ids = list(public_subnet_ids & set(subnet_ids))
+
+    if len(public_subnet_ids) < 2:
+        raise Exception(
+            f"Need at least 2 public subnets for a DB subnet group, found {len(public_subnet_ids)}"
+        )
+
+    print(f"🔐 Creating DB subnet group: {DB_SUBNET_GROUP_NAME} with {len(public_subnet_ids)} public subnets")
+    rds.create_db_subnet_group(
+        DBSubnetGroupName=DB_SUBNET_GROUP_NAME,
+        DBSubnetGroupDescription="Shorlabs - Public subnets for externally accessible databases",
+        SubnetIds=public_subnet_ids,
+    )
+
+    print(f"✅ DB subnet group created: {DB_SUBNET_GROUP_NAME}")
+    return DB_SUBNET_GROUP_NAME
+
+
+# ─────────────────────────────────────────────────────────────
 # AURORA CLUSTER MANAGEMENT
 # ─────────────────────────────────────────────────────────────
 
@@ -107,6 +215,7 @@ def create_aurora_cluster(
     project_id: str,
     db_name: str = DEFAULT_DB_NAME,
     security_group_id: str = None,
+    db_subnet_group_name: str = None,
     min_acu: float = DEFAULT_MIN_ACU,
     max_acu: float = DEFAULT_MAX_ACU,
 ) -> dict:
@@ -116,12 +225,11 @@ def create_aurora_cluster(
     Uses manage_master_user_password=True so RDS auto-creates and rotates
     the master password in Secrets Manager.
 
-    No DBSubnetGroupName — uses the default VPC automatically.
-
     Args:
         project_id: Unique project identifier
         db_name: Initial database name
         security_group_id: VPC security group for port 5432 access
+        db_subnet_group_name: DB subnet group with public subnets (required for external DNS)
         min_acu: Minimum ACU (0 = scale to zero)
         max_acu: Maximum ACU
 
@@ -151,6 +259,9 @@ def create_aurora_cluster(
     if security_group_id:
         cluster_params["VpcSecurityGroupIds"] = [security_group_id]
 
+    if db_subnet_group_name:
+        cluster_params["DBSubnetGroupName"] = db_subnet_group_name
+
     # Step 1: Create the cluster
     print(f"🗄️ Creating Aurora Serverless v2 cluster: {cluster_id}")
     response = rds.create_db_cluster(**cluster_params)
@@ -176,7 +287,11 @@ def create_aurora_cluster(
 
 def wait_for_cluster_available(cluster_identifier: str, timeout: int = 900) -> dict:
     """
-    Poll until the Aurora cluster and its instance are available.
+    Poll until the Aurora cluster AND its writer instance are both available.
+
+    The cluster can report "available" before the writer instance is ready.
+    Connections will fail until the instance is also available, so we must
+    wait for both.
 
     Args:
         cluster_identifier: The DB cluster identifier
@@ -194,22 +309,47 @@ def wait_for_cluster_available(cluster_identifier: str, timeout: int = 900) -> d
     while time.time() - start < timeout:
         response = rds.describe_db_clusters(DBClusterIdentifier=cluster_identifier)
         cluster = response["DBClusters"][0]
-        status = cluster["Status"]
+        cluster_status = cluster["Status"]
 
-        if status == "available":
-            endpoint = cluster["Endpoint"]
-            port = cluster["Port"]
-            secret_arn = cluster.get("MasterUserSecret", {}).get("SecretArn")
+        if cluster_status == "available":
+            # Cluster is ready — now check if the writer instance is also available
+            members = cluster.get("DBClusterMembers", [])
+            writer_instance_id = None
+            for member in members:
+                if member.get("IsClusterWriter"):
+                    writer_instance_id = member["DBInstanceIdentifier"]
+                    break
 
-            print(f"✅ Cluster available: {endpoint}:{port}")
-            return {
-                "endpoint": endpoint,
-                "port": port,
-                "secret_arn": secret_arn,
-            }
+            if writer_instance_id:
+                try:
+                    inst_response = rds.describe_db_instances(DBInstanceIdentifier=writer_instance_id)
+                    instance = inst_response["DBInstances"][0]
+                    instance_status = instance["DBInstanceStatus"]
 
-        elapsed = int(time.time() - start)
-        print(f"   Status: {status} ({elapsed}s elapsed)")
+                    if instance_status == "available":
+                        endpoint = cluster["Endpoint"]
+                        port = cluster["Port"]
+                        secret_arn = cluster.get("MasterUserSecret", {}).get("SecretArn")
+
+                        print(f"✅ Cluster + writer instance available: {endpoint}:{port}")
+                        return {
+                            "endpoint": endpoint,
+                            "port": port,
+                            "secret_arn": secret_arn,
+                        }
+                    else:
+                        elapsed = int(time.time() - start)
+                        print(f"   Cluster available, writer instance: {instance_status} ({elapsed}s elapsed)")
+                except Exception:
+                    elapsed = int(time.time() - start)
+                    print(f"   Cluster available, waiting for writer instance to appear ({elapsed}s elapsed)")
+            else:
+                elapsed = int(time.time() - start)
+                print(f"   Cluster available, no writer instance registered yet ({elapsed}s elapsed)")
+        else:
+            elapsed = int(time.time() - start)
+            print(f"   Cluster status: {cluster_status} ({elapsed}s elapsed)")
+
         time.sleep(poll_interval)
 
     raise Exception(f"Cluster {cluster_identifier} did not become available within {timeout}s")

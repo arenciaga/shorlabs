@@ -57,6 +57,7 @@ import { LazyLog, ScrollFollow } from "@melloware/react-logviewer"
 import { useIsPro } from "@/hooks/use-is-pro"
 import { trackEvent } from "@/lib/amplitude"
 import { fetchDatabaseConnection, DatabaseConnection } from "@/lib/api"
+import { DatabaseExplorer } from "@/components/DatabaseExplorer"
 
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
@@ -127,6 +128,7 @@ const STATUS_CONFIG: Record<string, { dot: string; label: string; color: string;
     PROVISIONING: { dot: "bg-blue-500", label: "Provisioning", color: "text-blue-600", bgGlow: "shadow-blue-500/20" },
     LIVE: { dot: "bg-emerald-500", label: "Live", color: "text-emerald-600", bgGlow: "shadow-emerald-500/30" },
     FAILED: { dot: "bg-red-500", label: "Failed", color: "text-red-600", bgGlow: "shadow-red-500/20" },
+    DELETING: { dot: "bg-red-400", label: "Deleting", color: "text-red-500", bgGlow: "shadow-red-400/20" },
 }
 
 // Include PENDING as the first step so users can see that a redeploy has been queued
@@ -146,7 +148,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     const [confirmPhrase, setConfirmPhrase] = useState("")
     const [copied, setCopied] = useState(false)
     const [redeploying, setRedeploying] = useState(false)
-    const [activeTab, setActiveTab] = useState<"deployments" | "domains" | "logs" | "compute" | "settings" | "connection">("deployments")
+    const [activeTab, setActiveTab] = useState<"deployments" | "domains" | "logs" | "compute" | "settings" | "configuration" | "explorer" | "security">("deployments")
 
     // Database project state
     const [dbConnection, setDbConnection] = useState<DatabaseConnection | null>(null)
@@ -222,6 +224,18 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                 throw new Error(data.detail || "Failed to delete project")
             }
 
+            // 202 = async deletion (database projects) — optimistically show DELETING status immediately
+            if (response.status === 202) {
+                setDeleteDialogOpen(false)
+                setConfirmProjectName("")
+                setConfirmPhrase("")
+                setDeleting(false)
+                // Optimistic update: set status to DELETING instantly so UI reflects it without waiting for a re-fetch
+                setData(prev => prev ? { ...prev, project: { ...prev.project, status: "DELETING" } } : prev)
+                return
+            }
+
+            // 200 = synchronous deletion (web-app projects) — redirect immediately
             router.push("/projects")
         } catch (err) {
             console.error("Failed to delete project:", err)
@@ -424,12 +438,17 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
             })
 
             if (!response.ok) {
-                const data = await response.json()
-                if (response.status === 401 && data.detail === "Token expired") {
+                // Project was deleted (async deletion completed) — redirect to projects list
+                if (response.status === 404 && data?.project?.status === "DELETING") {
+                    router.push("/projects")
+                    return
+                }
+                const errorData = await response.json()
+                if (response.status === 401 && errorData.detail === "Token expired") {
                     signOut({ redirectUrl: "/sign-in" })
                     return
                 }
-                throw new Error(data.detail || "Failed to fetch project")
+                throw new Error(errorData.detail || "Failed to fetch project")
             }
 
             const result = await response.json()
@@ -476,7 +495,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                         <div className="h-4 w-20 bg-zinc-200 rounded mb-8" />
                         <div className="h-10 w-64 bg-zinc-200 rounded-none mb-2" />
                         <div className="h-5 w-48 bg-zinc-100 rounded mb-8" />
-                        <div className="grid grid-cols-3 gap-4 mb-8">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
                             {[1, 2, 3].map(i => (
                                 <div key={i} className="h-24 bg-zinc-50 rounded-none border border-zinc-200" />
                             ))}
@@ -539,7 +558,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     }
 
     if (project?.project_type === "database") {
-        const dbActiveTab = activeTab === "connection" || activeTab === "settings" ? activeTab : "connection"
+        const dbActiveTab = activeTab === "configuration" || activeTab === "settings" || activeTab === "explorer" || activeTab === "security" ? activeTab : "configuration"
 
         return (
             <>
@@ -570,7 +589,21 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                             </div>
                         </div>
 
+                        {/* Deleting Banner */}
+                        {project.status === "DELETING" && (
+                            <div className="bg-red-50 border border-red-200 rounded-none p-4 mb-6 sm:mb-8">
+                                <div className="flex items-center gap-3">
+                                    <Loader2 className="h-5 w-5 text-red-500 animate-spin shrink-0" />
+                                    <div>
+                                        <p className="font-medium text-red-900">Deleting database...</p>
+                                        <p className="text-sm text-red-600 mt-0.5">This will take a few minutes. You can safely navigate away.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
                         {/* Connection Details Card */}
+                        {project.status !== "DELETING" && (
                         <div className="bg-zinc-50 rounded-none border border-zinc-200 p-4 sm:p-5 mb-6 sm:mb-8">
                             <div className="flex items-center gap-2 text-zinc-500 mb-3">
                                 <Database className="h-4 w-4" />
@@ -579,11 +612,11 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                             {project.status === "LIVE" ? (
                                 <div className="space-y-0">
                                     {/* Host */}
-                                    <div className="flex items-center justify-between py-2 border-b border-zinc-100 last:border-0">
-                                        <span className="text-sm text-zinc-500">Host</span>
-                                        <div className="flex items-center gap-2">
-                                            <code className="text-sm font-mono text-zinc-900">{project.db_endpoint}</code>
-                                            <button onClick={() => copyFieldToClipboard(project.db_endpoint || "", "host")} className="p-1 hover:bg-zinc-100 rounded">
+                                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-2 py-2 border-b border-zinc-100 last:border-0">
+                                        <span className="text-sm text-zinc-500 shrink-0">Host</span>
+                                        <div className="flex items-center gap-2 min-w-0">
+                                            <code className="text-sm font-mono text-zinc-900 truncate">{project.db_endpoint}</code>
+                                            <button onClick={() => copyFieldToClipboard(project.db_endpoint || "", "host")} className="p-1 hover:bg-zinc-100 rounded shrink-0">
                                                 {copiedField === "host" ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5 text-zinc-400" />}
                                             </button>
                                         </div>
@@ -619,13 +652,13 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                                         </div>
                                     </div>
                                     {/* Password */}
-                                    <div className="flex items-center justify-between py-2 border-b border-zinc-100 last:border-0">
-                                        <span className="text-sm text-zinc-500">Password</span>
-                                        <div className="flex items-center gap-2">
+                                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-2 py-2 border-b border-zinc-100 last:border-0">
+                                        <span className="text-sm text-zinc-500 shrink-0">Password</span>
+                                        <div className="flex items-center gap-2 min-w-0">
                                             {showPassword && dbConnection ? (
                                                 <>
-                                                    <code className="text-sm font-mono text-zinc-900">{dbConnection.password}</code>
-                                                    <button onClick={() => copyFieldToClipboard(dbConnection.password, "password")} className="p-1 hover:bg-zinc-100 rounded">
+                                                    <code className="text-sm font-mono text-zinc-900 truncate">{dbConnection.password}</code>
+                                                    <button onClick={() => copyFieldToClipboard(dbConnection.password, "password")} className="p-1 hover:bg-zinc-100 rounded shrink-0">
                                                         {copiedField === "password" ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5 text-zinc-400" />}
                                                     </button>
                                                 </>
@@ -635,7 +668,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                                             <button
                                                 onClick={handleShowPassword}
                                                 disabled={loadingConnection}
-                                                className="p-1 hover:bg-zinc-100 rounded"
+                                                className="p-1 hover:bg-zinc-100 rounded shrink-0"
                                             >
                                                 {loadingConnection ? (
                                                     <Loader2 className="h-3.5 w-3.5 text-zinc-400 animate-spin" />
@@ -649,11 +682,11 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                                     </div>
                                     {/* Connection String */}
                                     {showPassword && dbConnection && (
-                                        <div className="flex items-center justify-between py-2">
-                                            <span className="text-sm text-zinc-500">Connection String</span>
-                                            <div className="flex items-center gap-2">
-                                                <code className="text-sm font-mono text-zinc-900 max-w-md truncate">{dbConnection.connection_string}</code>
-                                                <button onClick={() => copyFieldToClipboard(dbConnection.connection_string, "connection_string")} className="p-1 hover:bg-zinc-100 rounded">
+                                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-2 py-2">
+                                            <span className="text-sm text-zinc-500 shrink-0">Connection String</span>
+                                            <div className="flex items-center gap-2 min-w-0">
+                                                <code className="text-sm font-mono text-zinc-900 truncate">{dbConnection.connection_string}</code>
+                                                <button onClick={() => copyFieldToClipboard(dbConnection.connection_string, "connection_string")} className="p-1 hover:bg-zinc-100 rounded shrink-0">
                                                     {copiedField === "connection_string" ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5 text-zinc-400" />}
                                                 </button>
                                             </div>
@@ -666,9 +699,10 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                                 </div>
                             )}
                         </div>
+                        )}
 
-                        {/* Provisioning Progress */}
-                        {isBuilding && (
+                        {/* Provisioning Progress — not shown during deletion */}
+                        {isBuilding && project.status !== "DELETING" && (
                             <div className="bg-zinc-50 rounded-none border border-zinc-200 p-6 mb-8 overflow-hidden">
                                 <div className="flex items-center gap-3">
                                     <div className="w-10 h-10 rounded-none bg-blue-900 flex items-center justify-center">
@@ -683,18 +717,43 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                             </div>
                         )}
 
-                        {/* Tabs */}
+                        {/* Tabs + Content — hidden while deleting */}
+                        {project.status !== "DELETING" && (<>
                         <div className="sticky top-14 z-40 bg-white -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8">
                             <div className="flex items-center gap-1 border-b border-zinc-200 overflow-x-auto">
                                 <button
-                                    onClick={() => setActiveTab("connection")}
-                                    className={`px-3 sm:px-4 py-3 text-sm font-medium transition-colors relative whitespace-nowrap ${dbActiveTab === "connection"
+                                    onClick={() => setActiveTab("configuration")}
+                                    className={`px-3 sm:px-4 py-3 text-sm font-medium transition-colors relative whitespace-nowrap ${dbActiveTab === "configuration"
                                         ? "text-zinc-900"
                                         : "text-zinc-500 hover:text-zinc-700"
                                         }`}
                                 >
-                                    Connection
-                                    {dbActiveTab === "connection" && (
+                                    Configuration
+                                    {dbActiveTab === "configuration" && (
+                                        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-zinc-900" />
+                                    )}
+                                </button>
+                                <button
+                                    onClick={() => setActiveTab("explorer")}
+                                    className={`px-3 sm:px-4 py-3 text-sm font-medium transition-colors relative whitespace-nowrap ${dbActiveTab === "explorer"
+                                        ? "text-zinc-900"
+                                        : "text-zinc-500 hover:text-zinc-700"
+                                        }`}
+                                >
+                                    Explorer
+                                    {dbActiveTab === "explorer" && (
+                                        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-zinc-900" />
+                                    )}
+                                </button>
+                                <button
+                                    onClick={() => setActiveTab("security")}
+                                    className={`px-3 sm:px-4 py-3 text-sm font-medium transition-colors relative whitespace-nowrap ${dbActiveTab === "security"
+                                        ? "text-zinc-900"
+                                        : "text-zinc-500 hover:text-zinc-700"
+                                        }`}
+                                >
+                                    Security
+                                    {dbActiveTab === "security" && (
                                         <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-zinc-900" />
                                     )}
                                 </button>
@@ -714,8 +773,8 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                         </div>
 
                         <div className="py-6">
-                            {/* Connection Tab */}
-                            {dbActiveTab === "connection" && (
+                            {/* Configuration Tab */}
+                            {dbActiveTab === "configuration" && (
                                 <div className="bg-zinc-50 rounded-none border border-zinc-200 p-6">
                                     <div className="flex items-center gap-3 mb-4">
                                         <Database className="h-5 w-5 text-zinc-400" />
@@ -728,7 +787,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                                         </div>
                                         <div>
                                             <span className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Engine</span>
-                                            <p className="text-sm text-zinc-900 mt-1">PostgreSQL (Aurora Serverless v2)</p>
+                                            <p className="text-sm text-zinc-900 mt-1">PostgreSQL</p>
                                         </div>
                                         <div>
                                             <span className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Min ACU</span>
@@ -737,6 +796,45 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                                         <div>
                                             <span className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Max ACU</span>
                                             <p className="text-sm text-zinc-900 mt-1">{project.max_acu ?? "—"}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Explorer Tab */}
+                            {dbActiveTab === "explorer" && (
+                                <DatabaseExplorer
+                                    projectId={project.project_id}
+                                    orgId={orgId ?? null}
+                                    projectStatus={project.status}
+                                />
+                            )}
+
+                            {/* Security Tab */}
+                            {dbActiveTab === "security" && (
+                                <div className="bg-zinc-50 rounded-none border border-zinc-200 p-4 sm:p-6">
+                                    <div className="flex items-center gap-3 mb-4">
+                                        <Settings2 className="h-5 w-5 text-zinc-400" />
+                                        <h3 className="font-semibold text-zinc-900">Security Rules</h3>
+                                    </div>
+
+                                    {/* Inbound Rules */}
+                                    <div className="mb-6">
+                                        <h4 className="text-sm font-medium text-zinc-700 mb-3">Inbound Rules</h4>
+                                        <div className="bg-white border border-zinc-200 rounded-none p-8 flex flex-col items-center justify-center text-center">
+                                            <Globe className="h-8 w-8 text-zinc-300 mb-3" />
+                                            <p className="text-sm text-zinc-500">No inbound rules configured</p>
+                                            <p className="text-xs text-zinc-400 mt-1">Inbound rules control which IPs can connect to your database.</p>
+                                        </div>
+                                    </div>
+
+                                    {/* Outbound Rules */}
+                                    <div>
+                                        <h4 className="text-sm font-medium text-zinc-700 mb-3">Outbound Rules</h4>
+                                        <div className="bg-white border border-zinc-200 rounded-none p-8 flex flex-col items-center justify-center text-center">
+                                            <Globe className="h-8 w-8 text-zinc-300 mb-3" />
+                                            <p className="text-sm text-zinc-500">No outbound rules configured</p>
+                                            <p className="text-xs text-zinc-400 mt-1">Outbound rules control which destinations your database can reach.</p>
                                         </div>
                                     </div>
                                 </div>
@@ -815,6 +913,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                                 </div>
                             )}
                         </div>
+                        </>)}
                     </div>
                 </div>
 
@@ -918,20 +1017,20 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                                 <span className="text-xs font-medium uppercase tracking-wider">Production</span>
                             </div>
                             {displayUrl ? (
-                                <div className="flex items-center gap-3">
-                                    <div className="flex-1 bg-zinc-50 rounded-none px-4 py-3 font-mono text-sm text-zinc-700 border border-zinc-100 truncate">
+                                <div className="flex items-center gap-2 sm:gap-3">
+                                    <div className="flex-1 min-w-0 bg-zinc-50 rounded-none px-3 sm:px-4 py-3 font-mono text-xs sm:text-sm text-zinc-700 border border-zinc-100 truncate">
                                         {displayUrl.replace("https://", "")}
                                     </div>
                                     <Button
                                         variant="ghost"
                                         size="icon"
                                         onClick={() => copyToClipboard(displayUrl)}
-                                        className="h-10 w-10 rounded-none hover:bg-zinc-100 shrink-0"
+                                        className="h-9 w-9 sm:h-10 sm:w-10 rounded-none hover:bg-zinc-100 shrink-0"
                                     >
                                         {copied ? <Check className="h-4 w-4 text-emerald-500" /> : <Copy className="h-4 w-4" />}
                                     </Button>
                                     <a href={displayUrl} target="_blank" rel="noopener noreferrer">
-                                        <Button variant="ghost" size="icon" className="h-10 w-10 rounded-none hover:bg-zinc-100 shrink-0">
+                                        <Button variant="ghost" size="icon" className="h-9 w-9 sm:h-10 sm:w-10 rounded-none hover:bg-zinc-100 shrink-0">
                                             <ExternalLink className="h-4 w-4" />
                                         </Button>
                                     </a>
@@ -998,10 +1097,10 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
 
                     {/* Build Progress - Only show when building */}
                     {isBuilding && (
-                        <div className="bg-zinc-50 rounded-none border border-zinc-200 p-6 mb-8 overflow-hidden">
+                        <div className="bg-zinc-50 rounded-none border border-zinc-200 p-4 sm:p-6 mb-6 sm:mb-8 overflow-hidden">
                             <div className="flex items-center justify-between mb-6">
                                 <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 rounded-none bg-blue-900 flex items-center justify-center">
+                                    <div className="w-10 h-10 rounded-none bg-blue-900 flex items-center justify-center shrink-0">
                                         <Zap className="h-5 w-5 text-white" />
                                     </div>
                                     <div>
@@ -1012,38 +1111,40 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                             </div>
 
                             {/* Progress Steps */}
-                            <div className="relative">
-                                <div className="absolute top-4 left-0 right-0 h-0.5 bg-zinc-100" />
-                                <div
-                                    className="absolute top-4 left-0 h-0.5 bg-zinc-900 transition-all duration-500"
-                                    style={{ width: `${(currentStepIndex / (BUILD_STEPS.length - 1)) * 100}%` }}
-                                />
-                                <div className="relative flex justify-between">
-                                    {BUILD_STEPS.map((step, index) => {
-                                        const isComplete = index < currentStepIndex
-                                        const isCurrent = step === project.status
-                                        return (
-                                            <div key={step} className="flex flex-col items-center">
-                                                <div className={`
-                                                w-8 h-8 rounded-full flex items-center justify-center z-10 transition-all
-                                                ${isComplete ? "bg-zinc-900 text-white" : ""}
-                                                ${isCurrent ? "bg-zinc-900 text-white ring-4 ring-zinc-100" : ""}
-                                                ${!isComplete && !isCurrent ? "bg-zinc-100 text-zinc-400" : ""}
-                                            `}>
-                                                    {isComplete ? (
-                                                        <Check className="h-4 w-4" />
-                                                    ) : isCurrent ? (
-                                                        <Loader2 className="h-4 w-4 animate-spin" />
-                                                    ) : (
-                                                        <span className="text-xs font-medium">{index + 1}</span>
-                                                    )}
+                            <div className="relative overflow-x-auto -mx-4 sm:-mx-6 px-4 sm:px-6">
+                                <div className="relative min-w-[400px]">
+                                    <div className="absolute top-4 left-0 right-0 h-0.5 bg-zinc-100" />
+                                    <div
+                                        className="absolute top-4 left-0 h-0.5 bg-zinc-900 transition-all duration-500"
+                                        style={{ width: `${(currentStepIndex / (BUILD_STEPS.length - 1)) * 100}%` }}
+                                    />
+                                    <div className="relative flex justify-between">
+                                        {BUILD_STEPS.map((step, index) => {
+                                            const isComplete = index < currentStepIndex
+                                            const isCurrent = step === project.status
+                                            return (
+                                                <div key={step} className="flex flex-col items-center">
+                                                    <div className={`
+                                                    w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center z-10 transition-all
+                                                    ${isComplete ? "bg-zinc-900 text-white" : ""}
+                                                    ${isCurrent ? "bg-zinc-900 text-white ring-4 ring-zinc-100" : ""}
+                                                    ${!isComplete && !isCurrent ? "bg-zinc-100 text-zinc-400" : ""}
+                                                `}>
+                                                        {isComplete ? (
+                                                            <Check className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                                                        ) : isCurrent ? (
+                                                            <Loader2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 animate-spin" />
+                                                        ) : (
+                                                            <span className="text-xs font-medium">{index + 1}</span>
+                                                        )}
+                                                    </div>
+                                                    <span className={`text-[10px] sm:text-xs mt-2 font-medium ${isCurrent || isComplete ? "text-zinc-900" : "text-zinc-400"}`}>
+                                                        {step.charAt(0) + step.slice(1).toLowerCase()}
+                                                    </span>
                                                 </div>
-                                                <span className={`text-xs mt-2 font-medium ${isCurrent || isComplete ? "text-zinc-900" : "text-zinc-400"}`}>
-                                                    {step.charAt(0) + step.slice(1).toLowerCase()}
-                                                </span>
-                                            </div>
-                                        )
-                                    })}
+                                            )
+                                        })}
+                                    </div>
                                 </div>
                             </div>
                         </div>

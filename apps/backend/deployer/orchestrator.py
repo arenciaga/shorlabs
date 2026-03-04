@@ -36,12 +36,13 @@ def deploy_project(
     ephemeral_storage: Optional[int] = None,
     on_build_start: Optional[callable] = None,
     project_id: Optional[str] = None,
+    codebuild_compute_type: Optional[str] = None,
 ) -> str:
     """
     Deploy a project from GitHub to AWS Lambda using Lambda Web Adapter.
-    
+
     This is the main entry point for deployments.
-    
+
     Args:
         github_url: GitHub repository URL
         github_token: OAuth token for private repos
@@ -53,6 +54,7 @@ def deploy_project(
         ephemeral_storage: Ephemeral storage in MB (optional, uses default)
         on_build_start: Optional callback(build_id) called immediately when build starts
         project_id: Unique project identifier for Lambda naming (ensures unique per deployment)
+        codebuild_compute_type: CodeBuild compute type override (e.g. BUILD_GENERAL1_SMALL for hobby)
         
     Returns:
         Dict with 'function_url', 'build_id', and 'function_name'
@@ -102,6 +104,7 @@ def deploy_project(
         runtime=runtime,
         root_directory=root_directory,
         env_vars=env_vars,
+        compute_type_override=codebuild_compute_type,
     )
     print(f"🔨 Build started: {build_id}")
     

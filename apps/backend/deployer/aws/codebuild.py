@@ -72,6 +72,7 @@ def start_build(
     runtime: str = "python",
     root_directory: str = "./",
     env_vars: Optional[dict] = None,
+    compute_type_override: Optional[str] = None,
 ) -> str:
     """
     Start a CodeBuild build and return the build ID.
@@ -85,6 +86,7 @@ def start_build(
         runtime: Runtime type ("python" or "nodejs")
         root_directory: Root directory for monorepos
         env_vars: Optional user environment variables for the build
+        compute_type_override: Override CodeBuild compute type (e.g. BUILD_GENERAL1_SMALL for hobby plans)
 
     Returns:
         The build ID
@@ -186,12 +188,18 @@ def start_build(
             "type": "PLAINTEXT"
         })
 
-    response = codebuild_client.start_build(
-        projectName=CODEBUILD_PROJECT_NAME,
-        buildspecOverride=buildspec,
-        environmentVariablesOverride=env_overrides,
-    )
-    
+    start_build_kwargs = {
+        "projectName": CODEBUILD_PROJECT_NAME,
+        "buildspecOverride": buildspec,
+        "environmentVariablesOverride": env_overrides,
+    }
+
+    if compute_type_override:
+        start_build_kwargs["computeTypeOverride"] = compute_type_override
+        print(f"   Compute type override: {compute_type_override}")
+
+    response = codebuild_client.start_build(**start_build_kwargs)
+
     build_id = response["build"]["id"]
     print(f"✅ Build started: {build_id}")
     return build_id

@@ -88,10 +88,10 @@ _mangum_handler = Mangum(app, lifespan="off")
 
 def _handle_sqs_event(event: dict) -> dict:
     """
-    Handle SQS events for deployments and database provisioning.
+    Handle SQS events for deployments, database provisioning, and database deletion.
     Routes based on message_type field.
     """
-    from api.routes.projects import _run_deployment_sync, _run_database_provision_sync
+    from api.routes.projects import _run_deployment_sync, _run_database_provision_sync, _run_database_delete_sync
 
     records = event.get("Records", [])
     print(f"📥 Received {len(records)} SQS message(s)")
@@ -112,6 +112,10 @@ def _handle_sqs_event(event: dict) -> dict:
                     min_acu=body.get("min_acu", 0),
                     max_acu=body.get("max_acu", 2),
                 )
+            elif message_type == "database_delete":
+                _run_database_delete_sync(
+                    project_id=body["project_id"],
+                )
             else:
                 _run_deployment_sync(
                     project_id=body["project_id"],
@@ -128,6 +132,7 @@ def _handle_sqs_event(event: dict) -> dict:
                     commit_author_name=body.get("commit_author_name"),
                     commit_author_username=body.get("commit_author_username"),
                     branch=body.get("branch"),
+                    org_id=body.get("org_id"),
                 )
 
             print(f"✅ Message {message_id} processed successfully")

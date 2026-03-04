@@ -32,6 +32,12 @@ from deployer.aws import (
     get_lambda_logs,
 )
 from deployer.aws.rds import get_cluster_secret
+from api.db.pg_explorer import (
+    list_schemas as pg_list_schemas,
+    list_tables as pg_list_tables,
+    get_columns as pg_get_columns,
+    get_table_data as pg_get_table_data,
+)
 from deployer.aws.ecr import get_ecr_repo_name
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
@@ -96,6 +102,7 @@ def _run_deployment_sync(
     commit_author_name: Optional[str] = None,
     commit_author_username: Optional[str] = None,
     branch: Optional[str] = None,
+    org_id: Optional[str] = None,
 ):
     """Synchronous deployment function - runs in thread pool using new deployer."""
     from datetime import datetime
@@ -120,7 +127,19 @@ def _run_deployment_sync(
     try:
         # Update status to building
         update_project(project_id, {"status": "BUILDING"})
-        
+
+        # Determine CodeBuild compute type based on org plan:
+        #   Hobby/Free → BUILD_GENERAL1_SMALL
+        #   Paid (Pro/Plus) → BUILD_GENERAL1_LARGE
+        codebuild_compute_type = "BUILD_GENERAL1_LARGE"  # default for paid
+        if org_id:
+            from api.lambda_warmer import _is_paid_org
+            if not _is_paid_org(org_id):
+                codebuild_compute_type = "BUILD_GENERAL1_SMALL"
+                print(f"⚡ Hobby plan detected — using {codebuild_compute_type} compute")
+            else:
+                print(f"⚡ Paid plan detected — using {codebuild_compute_type} compute")
+
         # Use the new deploy_project from deployer with callback
         # Pass project_id to ensure unique Lambda function per deployment
         result = deploy_project(
@@ -134,6 +153,7 @@ def _run_deployment_sync(
             ephemeral_storage=ephemeral_storage,
             on_build_start=on_build_start,  # Create deployment record immediately
             project_id=project_id,  # Pass project_id for unique Lambda naming
+            codebuild_compute_type=codebuild_compute_type,
         )
         
         function_url = result["function_url"]
@@ -227,6 +247,7 @@ def send_deployment_to_sqs(
     commit_author_name: Optional[str] = None,
     commit_author_username: Optional[str] = None,
     branch: Optional[str] = None,
+    org_id: Optional[str] = None,
 ):
     """
     Send deployment task to SQS queue for background processing.
@@ -249,6 +270,7 @@ def send_deployment_to_sqs(
                 commit_sha=commit_sha, commit_message=commit_message,
                 commit_author_name=commit_author_name,
                 commit_author_username=commit_author_username, branch=branch,
+                org_id=org_id,
             )
         thread = threading.Thread(target=run_in_thread)
         thread.start()
@@ -269,6 +291,7 @@ def send_deployment_to_sqs(
                 commit_sha=commit_sha, commit_message=commit_message,
                 commit_author_name=commit_author_name,
                 commit_author_username=commit_author_username, branch=branch,
+                org_id=org_id,
             )
         thread = threading.Thread(target=run_in_thread)
         thread.start()
@@ -289,6 +312,7 @@ def send_deployment_to_sqs(
         "commit_author_name": commit_author_name,
         "commit_author_username": commit_author_username,
         "branch": branch,
+        "org_id": org_id,
     }
     
     response = sqs_client.send_message(
@@ -395,6 +419,70 @@ def send_database_provision_to_sqs(
 
 
 # ─────────────────────────────────────────────────────────────
+# DATABASE DELETION (BACKGROUND TASK)
+# ─────────────────────────────────────────────────────────────
+
+
+def _run_database_delete_sync(project_id: str):
+    """Synchronous database deletion - runs in thread pool or via SQS."""
+    try:
+        result = delete_database_resources(project_id)
+        print(f"✅ Database resources deleted for project {project_id}: {result}")
+
+        # Now remove the DynamoDB record
+        delete_project(project_id)
+        print(f"✅ Project record deleted for {project_id}")
+
+    except Exception as e:
+        # Mark as FAILED so the user knows something went wrong
+        update_project(project_id, {"status": "FAILED"})
+        print(f"❌ Database deletion failed for {project_id}: {e}")
+        import traceback
+        traceback.print_exc()
+
+
+def send_database_delete_to_sqs(project_id: str):
+    """Send database deletion task to SQS queue for background processing."""
+    import time
+
+    # Check if running on Lambda
+    if not os.environ.get("AWS_LAMBDA_FUNCTION_NAME"):
+        # Running locally - use thread pool fallback
+        def run_in_thread():
+            _run_database_delete_sync(project_id)
+        thread = threading.Thread(target=run_in_thread)
+        thread.start()
+        print(f"📤 Local: Database deletion started in background thread for project {project_id}")
+        return
+
+    # Running on Lambda - send message to SQS queue
+    sqs_client = boto3.client("sqs")
+
+    queue_url = os.environ.get("DEPLOY_QUEUE_URL")
+    if not queue_url:
+        print("⚠️ DEPLOY_QUEUE_URL not set, falling back to thread-based execution")
+        def run_in_thread():
+            _run_database_delete_sync(project_id)
+        thread = threading.Thread(target=run_in_thread)
+        thread.start()
+        return
+
+    message_body = {
+        "message_type": "database_delete",
+        "project_id": project_id,
+    }
+
+    response = sqs_client.send_message(
+        QueueUrl=queue_url,
+        MessageBody=json.dumps(message_body),
+        MessageGroupId=project_id,
+        MessageDeduplicationId=f"{project_id}-delete-{int(time.time())}",
+    )
+
+    print(f"📤 Database deletion queued for project {project_id}, MessageId: {response['MessageId']}")
+
+
+# ─────────────────────────────────────────────────────────────
 # API ENDPOINTS
 # ─────────────────────────────────────────────────────────────
 
@@ -465,6 +553,7 @@ async def create_new_project(
         timeout,
         ephemeral_storage,
         **commit_info,
+        org_id=request.organization_id,
     )
     
     return {
@@ -725,6 +814,124 @@ async def get_database_connection(
     }
 
 
+# ─────────────────────────────────────────────────────────────
+# DATABASE EXPLORER ENDPOINTS
+# ─────────────────────────────────────────────────────────────
+
+
+def _get_live_database_project(org_id: str, project_id: str) -> dict:
+    """Shared validation for explorer endpoints."""
+    project = get_project_by_key(org_id, project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    if project.get("project_type", "web-app") != "database":
+        raise HTTPException(status_code=400, detail="Not a database project")
+    cluster_id = project.get("db_cluster_identifier")
+    if not cluster_id or project.get("status") != "LIVE":
+        raise HTTPException(status_code=400, detail="Database not available")
+    return project
+
+
+@router.get("/{project_id}/database/schemas")
+async def get_database_schemas(
+    project_id: str,
+    user_id: str = Depends(get_current_user_id),
+    org_id: str = Query(...),
+):
+    """List all schemas in the user's database."""
+    project = _get_live_database_project(org_id, project_id)
+    try:
+        schemas = pg_list_schemas(
+            cluster_identifier=project["db_cluster_identifier"],
+            db_name=project["db_name"],
+            port=int(project.get("db_port", 5432)),
+            endpoint=project["db_endpoint"],
+        )
+        return {"schemas": schemas}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database connection failed: {str(e)}")
+
+
+@router.get("/{project_id}/database/tables")
+async def get_database_tables(
+    project_id: str,
+    user_id: str = Depends(get_current_user_id),
+    org_id: str = Query(...),
+    schema: str = Query(default="public"),
+):
+    """List all tables in a schema."""
+    project = _get_live_database_project(org_id, project_id)
+    try:
+        tables = pg_list_tables(
+            cluster_identifier=project["db_cluster_identifier"],
+            db_name=project["db_name"],
+            port=int(project.get("db_port", 5432)),
+            endpoint=project["db_endpoint"],
+            schema=schema,
+        )
+        return {"tables": tables, "schema": schema}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database query failed: {str(e)}")
+
+
+@router.get("/{project_id}/database/tables/{table_name}/columns")
+async def get_database_table_columns(
+    project_id: str,
+    table_name: str,
+    user_id: str = Depends(get_current_user_id),
+    org_id: str = Query(...),
+    schema: str = Query(default="public"),
+):
+    """Get column definitions for a table."""
+    project = _get_live_database_project(org_id, project_id)
+    try:
+        columns = pg_get_columns(
+            cluster_identifier=project["db_cluster_identifier"],
+            db_name=project["db_name"],
+            port=int(project.get("db_port", 5432)),
+            endpoint=project["db_endpoint"],
+            schema=schema,
+            table_name=table_name,
+        )
+        return {"columns": columns, "schema": schema, "table_name": table_name}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database query failed: {str(e)}")
+
+
+@router.get("/{project_id}/database/tables/{table_name}/data")
+async def get_database_table_data(
+    project_id: str,
+    table_name: str,
+    user_id: str = Depends(get_current_user_id),
+    org_id: str = Query(...),
+    schema: str = Query(default="public"),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=50, ge=1, le=100),
+):
+    """Get paginated data rows from a table."""
+    project = _get_live_database_project(org_id, project_id)
+    try:
+        result = pg_get_table_data(
+            cluster_identifier=project["db_cluster_identifier"],
+            db_name=project["db_name"],
+            port=int(project.get("db_port", 5432)),
+            endpoint=project["db_endpoint"],
+            schema=schema,
+            table_name=table_name,
+            page=page,
+            page_size=page_size,
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database query failed: {str(e)}")
+
+
 @router.get("/{project_id}/runtime")
 async def get_runtime_logs(
     project_id: str,
@@ -883,6 +1090,7 @@ async def redeploy_project(
         timeout,
         ephemeral_storage,
         **commit_info,
+        org_id=org_id,
     )
     
     return {
@@ -910,13 +1118,15 @@ async def delete_project_endpoint(
     print(f"🗑️ DELETE PROJECT: project_id={project_id}, type={project_type}")
 
     if project_type == "database":
-        # Delete Aurora cluster resources
-        result = delete_database_resources(project_id)
-        delete_project(project_id)
-        return {
-            "deleted": True,
-            "cluster_deleted": result.get("cluster_deleted", False),
-        }
+        # Mark as DELETING immediately, then process deletion asynchronously via SQS
+        update_project(project_id, {"status": "DELETING"})
+        send_database_delete_to_sqs(project_id)
+
+        from fastapi.responses import JSONResponse
+        return JSONResponse(
+            status_code=202,
+            content={"status": "DELETING", "message": "Database deletion initiated"},
+        )
 
     # Web-app deletion (existing logic)
     function_name = project.get("function_name")

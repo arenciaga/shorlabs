@@ -1,4 +1,4 @@
-import { Clock, Cpu, DollarSign, Flame, FolderOpen, Globe, HardDrive, type LucideIcon, Zap } from 'lucide-react'
+import { Clock, Cpu, DollarSign, Flame, FolderOpen, Globe, Hammer, HardDrive, type LucideIcon, Zap } from 'lucide-react'
 
 export interface PlanFeature {
     label: string
@@ -34,6 +34,7 @@ export const PLANS: Plan[] = [
             { label: "1 GB Memory", icon: Cpu },
             { label: "Up to 30s Timeout", icon: Clock },
             { label: "1 GB Temporary storage", icon: HardDrive },
+            { label: "Standard Builds", icon: Hammer },
         ],
     },
     {
@@ -50,6 +51,7 @@ export const PLANS: Plan[] = [
             { label: "Up to 4 GB Memory", icon: Cpu },
             { label: "Up to 60s Timeout", icon: Clock },
             { label: "Up to 2 GB Temporary storage", icon: HardDrive },
+            { label: "Faster Builds", icon: Hammer },
             { label: "Zero Cold Starts", icon: Flame },
         ],
     },
@@ -68,6 +70,7 @@ export const PLANS: Plan[] = [
             { label: "Up to 8 GB Memory", icon: Cpu },
             { label: "Up to 300s Timeout", icon: Clock },
             { label: "Up to 8 GB Temporary storage", icon: HardDrive },
+            { label: "Faster Builds", icon: Hammer },
             { label: "Zero Cold Starts", icon: Flame },
         ],
     },

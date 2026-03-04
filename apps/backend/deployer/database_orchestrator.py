@@ -9,6 +9,7 @@ from typing import Optional
 
 from .aws.rds import (
     ensure_db_security_group,
+    ensure_db_subnet_group,
     create_aurora_cluster,
     wait_for_cluster_available,
     get_cluster_identifier,
@@ -46,15 +47,19 @@ def provision_database(
     print(f"   Database: {db_name}")
     print(f"   Capacity: {min_acu} - {max_acu} ACU\n")
 
-    # Step 1: Ensure security group
+    # Step 1: Ensure security group + public subnet group
     sg_id = ensure_db_security_group()
     print(f"✅ Security group ready: {sg_id}")
+
+    subnet_group = ensure_db_subnet_group()
+    print(f"✅ DB subnet group ready: {subnet_group}")
 
     # Step 2: Create cluster + instance
     result = create_aurora_cluster(
         project_id=project_id,
         db_name=db_name,
         security_group_id=sg_id,
+        db_subnet_group_name=subnet_group,
         min_acu=min_acu,
         max_acu=max_acu,
     )

@@ -11,6 +11,7 @@ from .lambda_service import create_or_update_lambda, delete_lambda
 from .cloudwatch import get_build_logs, get_lambda_logs, delete_lambda_logs
 from .rds import (
     ensure_db_security_group,
+    ensure_db_subnet_group,
     get_cluster_identifier,
     create_aurora_cluster,
     wait_for_cluster_available,
@@ -39,6 +40,7 @@ __all__ = [
     "delete_lambda_logs",
     # RDS (Aurora Serverless v2)
     "ensure_db_security_group",
+    "ensure_db_subnet_group",
     "get_cluster_identifier",
     "create_aurora_cluster",
     "wait_for_cluster_available",

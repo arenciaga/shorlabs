@@ -161,6 +161,7 @@ async def github_webhook(request: Request):
             commit_author_name=commit_author_name,
             commit_author_username=commit_author_username,
             branch=pushed_branch,
+            org_id=org_id,
         )
         print(f"[webhook] push {full_name}@{pushed_branch}: triggered deploy for project_id={project_id}")
         triggered += 1

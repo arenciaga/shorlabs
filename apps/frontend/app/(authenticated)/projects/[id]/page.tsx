@@ -31,6 +31,10 @@ import {
     Cpu,
     HardDrive,
     Database,
+    Shield,
+    ShieldCheck,
+    ShieldAlert,
+    Info,
 } from "lucide-react"
 import Link from "next/link"
 
@@ -161,7 +165,10 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     const [loadingRules, setLoadingRules] = useState(false)
     const [addingRule, setAddingRule] = useState(false)
     const [deletingRuleId, setDeletingRuleId] = useState<string | null>(null)
-    const [newRule, setNewRule] = useState({ direction: "inbound" as "inbound" | "outbound", protocol: "tcp", from_port: "", to_port: "", cidr: "", description: "" })
+    const [newIpCidr, setNewIpCidr] = useState("")
+    const [newIpLabel, setNewIpLabel] = useState("")
+    const [userIp, setUserIp] = useState<string | null>(null)
+    const [togglingAccess, setTogglingAccess] = useState(false)
 
     // Pro tier check via Autumn
     const { isPro, currentPlan } = useIsPro()
@@ -519,6 +526,14 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
         }
     }, [isDatabaseProject, dbActiveTab, securityRules, loadingRules, loadSecurityRules])
 
+    // Detect user's public IP on mount (for "Add my IP" feature)
+    useEffect(() => {
+        fetch("https://api.ipify.org?format=json")
+            .then(res => res.json())
+            .then(data => setUserIp(data.ip))
+            .catch(() => setUserIp(null))
+    }, [])
+
     // Loading skeleton
     if (loading) {
         return (
@@ -590,38 +605,89 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
         }
     }
 
-    const handleAddRule = async () => {
-        if (!project?.project_id || !orgId || !newRule.cidr) return
+
+    // Derive access mode from rules: "open" if 0.0.0.0/0 exists in inbound
+    const isOpenAccess = securityRules?.inbound?.some(
+        rule => rule.cidr_ipv4 === "0.0.0.0/0" && rule.protocol === "tcp" && rule.from_port === 5432
+    ) ?? true
+
+    // Filter inbound rules to only show user-added IPs (not 0.0.0.0/0)
+    const userIpRules = securityRules?.inbound?.filter(
+        rule => rule.cidr_ipv4 !== "0.0.0.0/0" && rule.protocol === "tcp" && rule.from_port === 5432
+    ) ?? []
+
+    // Find the 0.0.0.0/0 rule ID (for toggling)
+    const openAccessRule = securityRules?.inbound?.find(
+        rule => rule.cidr_ipv4 === "0.0.0.0/0" && rule.protocol === "tcp" && rule.from_port === 5432
+    )
+
+    const handleToggleAccessMode = async (mode: "open" | "restricted") => {
+        if (!project?.project_id || !orgId) return
+        setTogglingAccess(true)
+        try {
+            const token = await getToken()
+            if (!token) return
+
+            if (mode === "open" && !isOpenAccess) {
+                // Add 0.0.0.0/0 rule
+                await addSecurityRule(token, project.project_id, orgId, {
+                    direction: "inbound",
+                    protocol: "tcp",
+                    from_port: 5432,
+                    to_port: 5432,
+                    cidr: "0.0.0.0/0",
+                    description: "PostgreSQL public access",
+                })
+            } else if (mode === "restricted" && isOpenAccess && openAccessRule) {
+                // Remove 0.0.0.0/0 rule
+                await deleteSecurityRule(token, project.project_id, orgId, openAccessRule.rule_id, "inbound")
+            }
+            await loadSecurityRules()
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : "Failed to update access mode"
+            alert(message)
+        } finally {
+            setTogglingAccess(false)
+        }
+    }
+
+    const handleAddIp = async (cidr?: string, label?: string) => {
+        const ipToAdd = cidr || newIpCidr
+        const labelToUse = label || newIpLabel
+        if (!project?.project_id || !orgId || !ipToAdd) return
         setAddingRule(true)
         try {
             const token = await getToken()
             if (token) {
+                // Ensure CIDR notation
+                const cidrValue = ipToAdd.includes("/") ? ipToAdd : `${ipToAdd}/32`
                 await addSecurityRule(token, project.project_id, orgId, {
-                    direction: newRule.direction,
-                    protocol: newRule.protocol,
-                    from_port: newRule.protocol !== "-1" ? parseInt(newRule.from_port) || undefined : undefined,
-                    to_port: newRule.protocol !== "-1" ? parseInt(newRule.to_port) || undefined : undefined,
-                    cidr: newRule.cidr,
-                    description: newRule.description || undefined,
+                    direction: "inbound",
+                    protocol: "tcp",
+                    from_port: 5432,
+                    to_port: 5432,
+                    cidr: cidrValue,
+                    description: labelToUse || undefined,
                 })
-                setNewRule({ direction: "inbound", protocol: "tcp", from_port: "", to_port: "", cidr: "", description: "" })
+                setNewIpCidr("")
+                setNewIpLabel("")
                 await loadSecurityRules()
             }
         } catch (err: unknown) {
-            const message = err instanceof Error ? err.message : "Failed to add rule"
+            const message = err instanceof Error ? err.message : "Failed to add IP"
             alert(message)
         } finally {
             setAddingRule(false)
         }
     }
 
-    const handleDeleteRule = async (ruleId: string, direction: "inbound" | "outbound") => {
+    const handleDeleteRule = async (ruleId: string) => {
         if (!project?.project_id || !orgId) return
         setDeletingRuleId(ruleId)
         try {
             const token = await getToken()
             if (token) {
-                await deleteSecurityRule(token, project.project_id, orgId, ruleId, direction)
+                await deleteSecurityRule(token, project.project_id, orgId, ruleId, "inbound")
                 await loadSecurityRules()
             }
         } catch (err) {
@@ -676,101 +742,101 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
 
                         {/* Connection Details Card */}
                         {project.status !== "DELETING" && (
-                        <div className="bg-zinc-50 rounded-none border border-zinc-200 p-4 sm:p-5 mb-6 sm:mb-8">
-                            <div className="flex items-center gap-2 text-zinc-500 mb-3">
-                                <Database className="h-4 w-4" />
-                                <span className="text-xs font-medium uppercase tracking-wider">Connection Details</span>
-                            </div>
-                            {project.status === "LIVE" ? (
-                                <div className="space-y-0">
-                                    {/* Host */}
-                                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-2 py-2 border-b border-zinc-100 last:border-0">
-                                        <span className="text-sm text-zinc-500 shrink-0">Host</span>
-                                        <div className="flex items-center gap-2 min-w-0">
-                                            <code className="text-sm font-mono text-zinc-900 truncate">{project.db_endpoint}</code>
-                                            <button onClick={() => copyFieldToClipboard(project.db_endpoint || "", "host")} className="p-1 hover:bg-zinc-100 rounded shrink-0">
-                                                {copiedField === "host" ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5 text-zinc-400" />}
-                                            </button>
-                                        </div>
-                                    </div>
-                                    {/* Port */}
-                                    <div className="flex items-center justify-between py-2 border-b border-zinc-100 last:border-0">
-                                        <span className="text-sm text-zinc-500">Port</span>
-                                        <div className="flex items-center gap-2">
-                                            <code className="text-sm font-mono text-zinc-900">{project.db_port || 5432}</code>
-                                            <button onClick={() => copyFieldToClipboard(String(project.db_port || 5432), "port")} className="p-1 hover:bg-zinc-100 rounded">
-                                                {copiedField === "port" ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5 text-zinc-400" />}
-                                            </button>
-                                        </div>
-                                    </div>
-                                    {/* Database */}
-                                    <div className="flex items-center justify-between py-2 border-b border-zinc-100 last:border-0">
-                                        <span className="text-sm text-zinc-500">Database</span>
-                                        <div className="flex items-center gap-2">
-                                            <code className="text-sm font-mono text-zinc-900">{project.db_name || "postgres"}</code>
-                                            <button onClick={() => copyFieldToClipboard(project.db_name || "postgres", "database")} className="p-1 hover:bg-zinc-100 rounded">
-                                                {copiedField === "database" ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5 text-zinc-400" />}
-                                            </button>
-                                        </div>
-                                    </div>
-                                    {/* Username */}
-                                    <div className="flex items-center justify-between py-2 border-b border-zinc-100 last:border-0">
-                                        <span className="text-sm text-zinc-500">Username</span>
-                                        <div className="flex items-center gap-2">
-                                            <code className="text-sm font-mono text-zinc-900">{project.db_master_username || "admin"}</code>
-                                            <button onClick={() => copyFieldToClipboard(project.db_master_username || "admin", "username")} className="p-1 hover:bg-zinc-100 rounded">
-                                                {copiedField === "username" ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5 text-zinc-400" />}
-                                            </button>
-                                        </div>
-                                    </div>
-                                    {/* Password */}
-                                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-2 py-2 border-b border-zinc-100 last:border-0">
-                                        <span className="text-sm text-zinc-500 shrink-0">Password</span>
-                                        <div className="flex items-center gap-2 min-w-0">
-                                            {showPassword && dbConnection ? (
-                                                <>
-                                                    <code className="text-sm font-mono text-zinc-900 truncate">{dbConnection.password}</code>
-                                                    <button onClick={() => copyFieldToClipboard(dbConnection.password, "password")} className="p-1 hover:bg-zinc-100 rounded shrink-0">
-                                                        {copiedField === "password" ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5 text-zinc-400" />}
-                                                    </button>
-                                                </>
-                                            ) : (
-                                                <code className="text-sm font-mono text-zinc-400">{"••••••••••••"}</code>
-                                            )}
-                                            <button
-                                                onClick={handleShowPassword}
-                                                disabled={loadingConnection}
-                                                className="p-1 hover:bg-zinc-100 rounded shrink-0"
-                                            >
-                                                {loadingConnection ? (
-                                                    <Loader2 className="h-3.5 w-3.5 text-zinc-400 animate-spin" />
-                                                ) : showPassword ? (
-                                                    <EyeOff className="h-3.5 w-3.5 text-zinc-400" />
-                                                ) : (
-                                                    <Eye className="h-3.5 w-3.5 text-zinc-400" />
-                                                )}
-                                            </button>
-                                        </div>
-                                    </div>
-                                    {/* Connection String */}
-                                    {showPassword && dbConnection && (
-                                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-2 py-2">
-                                            <span className="text-sm text-zinc-500 shrink-0">Connection String</span>
+                            <div className="bg-zinc-50 rounded-none border border-zinc-200 p-4 sm:p-5 mb-6 sm:mb-8">
+                                <div className="flex items-center gap-2 text-zinc-500 mb-3">
+                                    <Database className="h-4 w-4" />
+                                    <span className="text-xs font-medium uppercase tracking-wider">Connection Details</span>
+                                </div>
+                                {project.status === "LIVE" ? (
+                                    <div className="space-y-0">
+                                        {/* Host */}
+                                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-2 py-2 border-b border-zinc-100 last:border-0">
+                                            <span className="text-sm text-zinc-500 shrink-0">Host</span>
                                             <div className="flex items-center gap-2 min-w-0">
-                                                <code className="text-sm font-mono text-zinc-900 truncate">{dbConnection.connection_string}</code>
-                                                <button onClick={() => copyFieldToClipboard(dbConnection.connection_string, "connection_string")} className="p-1 hover:bg-zinc-100 rounded shrink-0">
-                                                    {copiedField === "connection_string" ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5 text-zinc-400" />}
+                                                <code className="text-sm font-mono text-zinc-900 truncate">{project.db_endpoint}</code>
+                                                <button onClick={() => copyFieldToClipboard(project.db_endpoint || "", "host")} className="p-1 hover:bg-zinc-100 rounded shrink-0">
+                                                    {copiedField === "host" ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5 text-zinc-400" />}
                                                 </button>
                                             </div>
                                         </div>
-                                    )}
-                                </div>
-                            ) : (
-                                <div className="text-zinc-400 text-sm">
-                                    {isBuilding ? "Provisioning database..." : "Database not available"}
-                                </div>
-                            )}
-                        </div>
+                                        {/* Port */}
+                                        <div className="flex items-center justify-between py-2 border-b border-zinc-100 last:border-0">
+                                            <span className="text-sm text-zinc-500">Port</span>
+                                            <div className="flex items-center gap-2">
+                                                <code className="text-sm font-mono text-zinc-900">{project.db_port || 5432}</code>
+                                                <button onClick={() => copyFieldToClipboard(String(project.db_port || 5432), "port")} className="p-1 hover:bg-zinc-100 rounded">
+                                                    {copiedField === "port" ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5 text-zinc-400" />}
+                                                </button>
+                                            </div>
+                                        </div>
+                                        {/* Database */}
+                                        <div className="flex items-center justify-between py-2 border-b border-zinc-100 last:border-0">
+                                            <span className="text-sm text-zinc-500">Database</span>
+                                            <div className="flex items-center gap-2">
+                                                <code className="text-sm font-mono text-zinc-900">{project.db_name || "postgres"}</code>
+                                                <button onClick={() => copyFieldToClipboard(project.db_name || "postgres", "database")} className="p-1 hover:bg-zinc-100 rounded">
+                                                    {copiedField === "database" ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5 text-zinc-400" />}
+                                                </button>
+                                            </div>
+                                        </div>
+                                        {/* Username */}
+                                        <div className="flex items-center justify-between py-2 border-b border-zinc-100 last:border-0">
+                                            <span className="text-sm text-zinc-500">Username</span>
+                                            <div className="flex items-center gap-2">
+                                                <code className="text-sm font-mono text-zinc-900">{project.db_master_username || "admin"}</code>
+                                                <button onClick={() => copyFieldToClipboard(project.db_master_username || "admin", "username")} className="p-1 hover:bg-zinc-100 rounded">
+                                                    {copiedField === "username" ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5 text-zinc-400" />}
+                                                </button>
+                                            </div>
+                                        </div>
+                                        {/* Password */}
+                                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-2 py-2 border-b border-zinc-100 last:border-0">
+                                            <span className="text-sm text-zinc-500 shrink-0">Password</span>
+                                            <div className="flex items-center gap-2 min-w-0">
+                                                {showPassword && dbConnection ? (
+                                                    <>
+                                                        <code className="text-sm font-mono text-zinc-900 truncate">{dbConnection.password}</code>
+                                                        <button onClick={() => copyFieldToClipboard(dbConnection.password, "password")} className="p-1 hover:bg-zinc-100 rounded shrink-0">
+                                                            {copiedField === "password" ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5 text-zinc-400" />}
+                                                        </button>
+                                                    </>
+                                                ) : (
+                                                    <code className="text-sm font-mono text-zinc-400">{"••••••••••••"}</code>
+                                                )}
+                                                <button
+                                                    onClick={handleShowPassword}
+                                                    disabled={loadingConnection}
+                                                    className="p-1 hover:bg-zinc-100 rounded shrink-0"
+                                                >
+                                                    {loadingConnection ? (
+                                                        <Loader2 className="h-3.5 w-3.5 text-zinc-400 animate-spin" />
+                                                    ) : showPassword ? (
+                                                        <EyeOff className="h-3.5 w-3.5 text-zinc-400" />
+                                                    ) : (
+                                                        <Eye className="h-3.5 w-3.5 text-zinc-400" />
+                                                    )}
+                                                </button>
+                                            </div>
+                                        </div>
+                                        {/* Connection String */}
+                                        {showPassword && dbConnection && (
+                                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-2 py-2">
+                                                <span className="text-sm text-zinc-500 shrink-0">Connection String</span>
+                                                <div className="flex items-center gap-2 min-w-0">
+                                                    <code className="text-sm font-mono text-zinc-900 truncate">{dbConnection.connection_string}</code>
+                                                    <button onClick={() => copyFieldToClipboard(dbConnection.connection_string, "connection_string")} className="p-1 hover:bg-zinc-100 rounded shrink-0">
+                                                        {copiedField === "connection_string" ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5 text-zinc-400" />}
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <div className="text-zinc-400 text-sm">
+                                        {isBuilding ? "Provisioning database..." : "Database not available"}
+                                    </div>
+                                )}
+                            </div>
                         )}
 
                         {/* Provisioning Progress — not shown during deletion */}
@@ -791,176 +857,116 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
 
                         {/* Tabs + Content — hidden while deleting */}
                         {project.status !== "DELETING" && (<>
-                        <div className="sticky top-14 z-40 bg-white -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8">
-                            <div className="flex items-center gap-1 border-b border-zinc-200 overflow-x-auto">
-                                <button
-                                    onClick={() => setActiveTab("configuration")}
-                                    className={`px-3 sm:px-4 py-3 text-sm font-medium transition-colors relative whitespace-nowrap ${dbActiveTab === "configuration"
-                                        ? "text-zinc-900"
-                                        : "text-zinc-500 hover:text-zinc-700"
-                                        }`}
-                                >
-                                    Configuration
-                                    {dbActiveTab === "configuration" && (
-                                        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-zinc-900" />
-                                    )}
-                                </button>
-                                <button
-                                    onClick={() => setActiveTab("explorer")}
-                                    className={`px-3 sm:px-4 py-3 text-sm font-medium transition-colors relative whitespace-nowrap ${dbActiveTab === "explorer"
-                                        ? "text-zinc-900"
-                                        : "text-zinc-500 hover:text-zinc-700"
-                                        }`}
-                                >
-                                    Explorer
-                                    {dbActiveTab === "explorer" && (
-                                        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-zinc-900" />
-                                    )}
-                                </button>
-                                <button
-                                    onClick={() => setActiveTab("security")}
-                                    className={`px-3 sm:px-4 py-3 text-sm font-medium transition-colors relative whitespace-nowrap ${dbActiveTab === "security"
-                                        ? "text-zinc-900"
-                                        : "text-zinc-500 hover:text-zinc-700"
-                                        }`}
-                                >
-                                    Security
-                                    {dbActiveTab === "security" && (
-                                        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-zinc-900" />
-                                    )}
-                                </button>
-                                <button
-                                    onClick={() => setActiveTab("settings")}
-                                    className={`px-3 sm:px-4 py-3 text-sm font-medium transition-colors relative whitespace-nowrap ${dbActiveTab === "settings"
-                                        ? "text-zinc-900"
-                                        : "text-zinc-500 hover:text-zinc-700"
-                                        }`}
-                                >
-                                    Settings
-                                    {dbActiveTab === "settings" && (
-                                        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-zinc-900" />
-                                    )}
-                                </button>
-                            </div>
-                        </div>
-
-                        <div className="py-6">
-                            {/* Configuration Tab */}
-                            {dbActiveTab === "configuration" && (
-                                <div className="bg-zinc-50 rounded-none border border-zinc-200 p-6">
-                                    <div className="flex items-center gap-3 mb-4">
-                                        <Database className="h-5 w-5 text-zinc-400" />
-                                        <h3 className="font-semibold text-zinc-900">Database Information</h3>
-                                    </div>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                        <div>
-                                            <span className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Cluster</span>
-                                            <p className="text-sm text-zinc-900 font-mono mt-1">{project.db_cluster_identifier || "—"}</p>
-                                        </div>
-                                        <div>
-                                            <span className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Engine</span>
-                                            <p className="text-sm text-zinc-900 mt-1">PostgreSQL</p>
-                                        </div>
-                                        <div>
-                                            <span className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Min ACU</span>
-                                            <p className="text-sm text-zinc-900 mt-1">{project.min_acu ?? "—"}</p>
-                                        </div>
-                                        <div>
-                                            <span className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Max ACU</span>
-                                            <p className="text-sm text-zinc-900 mt-1">{project.max_acu ?? "—"}</p>
-                                        </div>
-                                    </div>
+                            <div className="sticky top-14 z-40 bg-white -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8">
+                                <div className="flex items-center gap-1 border-b border-zinc-200 overflow-x-auto">
+                                    <button
+                                        onClick={() => setActiveTab("configuration")}
+                                        className={`px-3 sm:px-4 py-3 text-sm font-medium transition-colors relative whitespace-nowrap ${dbActiveTab === "configuration"
+                                            ? "text-zinc-900"
+                                            : "text-zinc-500 hover:text-zinc-700"
+                                            }`}
+                                    >
+                                        Configuration
+                                        {dbActiveTab === "configuration" && (
+                                            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-zinc-900" />
+                                        )}
+                                    </button>
+                                    <button
+                                        onClick={() => setActiveTab("explorer")}
+                                        className={`px-3 sm:px-4 py-3 text-sm font-medium transition-colors relative whitespace-nowrap ${dbActiveTab === "explorer"
+                                            ? "text-zinc-900"
+                                            : "text-zinc-500 hover:text-zinc-700"
+                                            }`}
+                                    >
+                                        Explorer
+                                        {dbActiveTab === "explorer" && (
+                                            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-zinc-900" />
+                                        )}
+                                    </button>
+                                    <button
+                                        onClick={() => setActiveTab("security")}
+                                        className={`px-3 sm:px-4 py-3 text-sm font-medium transition-colors relative whitespace-nowrap ${dbActiveTab === "security"
+                                            ? "text-zinc-900"
+                                            : "text-zinc-500 hover:text-zinc-700"
+                                            }`}
+                                    >
+                                        Security
+                                        {dbActiveTab === "security" && (
+                                            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-zinc-900" />
+                                        )}
+                                    </button>
+                                    <button
+                                        onClick={() => setActiveTab("settings")}
+                                        className={`px-3 sm:px-4 py-3 text-sm font-medium transition-colors relative whitespace-nowrap ${dbActiveTab === "settings"
+                                            ? "text-zinc-900"
+                                            : "text-zinc-500 hover:text-zinc-700"
+                                            }`}
+                                    >
+                                        Settings
+                                        {dbActiveTab === "settings" && (
+                                            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-zinc-900" />
+                                        )}
+                                    </button>
                                 </div>
-                            )}
+                            </div>
 
-                            {/* Explorer Tab */}
-                            {dbActiveTab === "explorer" && (
-                                <DatabaseExplorer
-                                    projectId={project.project_id}
-                                    orgId={orgId ?? null}
-                                    projectStatus={project.status}
-                                />
-                            )}
-
-                            {/* Security Tab */}
-                            {dbActiveTab === "security" && (() => {
-                                const renderRulesTable = (rules: SecurityRulesResponse["inbound"], direction: "inbound" | "outbound") => {
-                                    if (rules.length === 0) {
-                                        return (
-                                            <div className="bg-white border border-zinc-200 rounded-none p-8 flex flex-col items-center justify-center text-center">
-                                                <Globe className="h-8 w-8 text-zinc-300 mb-3" />
-                                                <p className="text-sm text-zinc-500">No {direction} rules configured</p>
-                                                <p className="text-xs text-zinc-400 mt-1">
-                                                    {direction === "inbound"
-                                                        ? "Inbound rules control which IPs can connect to your database."
-                                                        : "Outbound rules control which destinations your database can reach."}
-                                                </p>
-                                            </div>
-                                        )
-                                    }
-
-                                    return (
-                                        <div className="bg-white border border-zinc-200 rounded-none overflow-hidden">
-                                            <table className="w-full text-sm">
-                                                <thead>
-                                                    <tr className="border-b border-zinc-200 bg-zinc-50">
-                                                        <th className="text-left px-4 py-2 font-medium text-zinc-600">Protocol</th>
-                                                        <th className="text-left px-4 py-2 font-medium text-zinc-600">Port Range</th>
-                                                        <th className="text-left px-4 py-2 font-medium text-zinc-600">Source / Destination</th>
-                                                        <th className="text-left px-4 py-2 font-medium text-zinc-600">Description</th>
-                                                        <th className="px-4 py-2 w-10"></th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {rules.map((rule) => (
-                                                        <tr key={rule.rule_id} className="border-b border-zinc-100 last:border-0">
-                                                            <td className="px-4 py-2.5 font-mono text-zinc-700">
-                                                                {rule.protocol === "-1" ? "All" : rule.protocol.toUpperCase()}
-                                                            </td>
-                                                            <td className="px-4 py-2.5 font-mono text-zinc-700">
-                                                                {rule.protocol === "-1" ? "All" : rule.from_port === rule.to_port ? rule.from_port : `${rule.from_port}-${rule.to_port}`}
-                                                            </td>
-                                                            <td className="px-4 py-2.5 font-mono text-zinc-700">
-                                                                {rule.cidr_ipv4 || rule.cidr_ipv6 || "-"}
-                                                            </td>
-                                                            <td className="px-4 py-2.5 text-zinc-500">
-                                                                {rule.description || "-"}
-                                                            </td>
-                                                            <td className="px-4 py-2.5">
-                                                                <button
-                                                                    onClick={() => handleDeleteRule(rule.rule_id, direction)}
-                                                                    disabled={deletingRuleId === rule.rule_id}
-                                                                    className="text-zinc-400 hover:text-red-500 transition-colors disabled:opacity-50"
-                                                                >
-                                                                    {deletingRuleId === rule.rule_id ? (
-                                                                        <Loader2 className="h-4 w-4 animate-spin" />
-                                                                    ) : (
-                                                                        <Trash2 className="h-4 w-4" />
-                                                                    )}
-                                                                </button>
-                                                            </td>
-                                                        </tr>
-                                                    ))}
-                                                </tbody>
-                                            </table>
+                            <div className="py-6">
+                                {/* Configuration Tab */}
+                                {dbActiveTab === "configuration" && (
+                                    <div className="bg-zinc-50 rounded-none border border-zinc-200 p-6">
+                                        <div className="flex items-center gap-3 mb-4">
+                                            <Database className="h-5 w-5 text-zinc-400" />
+                                            <h3 className="font-semibold text-zinc-900">Database Information</h3>
                                         </div>
-                                    )
-                                }
-
-                                return (
-                                    <div className="bg-zinc-50 rounded-none border border-zinc-200 p-4 sm:p-6">
-                                        <div className="flex items-center justify-between mb-4">
-                                            <div className="flex items-center gap-3">
-                                                <Settings2 className="h-5 w-5 text-zinc-400" />
-                                                <h3 className="font-semibold text-zinc-900">Security Rules</h3>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                            <div>
+                                                <span className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Cluster</span>
+                                                <p className="text-sm text-zinc-900 font-mono mt-1">{project.db_cluster_identifier || "—"}</p>
                                             </div>
-                                            <button
-                                                onClick={loadSecurityRules}
-                                                disabled={loadingRules}
-                                                className="text-zinc-400 hover:text-zinc-600 transition-colors"
-                                            >
-                                                <RefreshCw className={`h-4 w-4 ${loadingRules ? "animate-spin" : ""}`} />
-                                            </button>
+                                            <div>
+                                                <span className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Engine</span>
+                                                <p className="text-sm text-zinc-900 mt-1">PostgreSQL</p>
+                                            </div>
+                                            <div>
+                                                <span className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Min ACU</span>
+                                                <p className="text-sm text-zinc-900 mt-1">{project.min_acu ?? "—"}</p>
+                                            </div>
+                                            <div>
+                                                <span className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Max ACU</span>
+                                                <p className="text-sm text-zinc-900 mt-1">{project.max_acu ?? "—"}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Explorer Tab */}
+                                {dbActiveTab === "explorer" && (
+                                    <DatabaseExplorer
+                                        projectId={project.project_id}
+                                        orgId={orgId ?? null}
+                                        projectStatus={project.status}
+                                    />
+                                )}
+
+                                {/* Security Tab */}
+                                {dbActiveTab === "security" && (
+                                    <div className="space-y-6">
+                                        {/* Header */}
+                                        <div className="bg-zinc-50 rounded-none border border-zinc-200 p-4 sm:p-6">
+                                            <div className="flex items-center justify-between mb-1">
+                                                <div className="flex items-center gap-3">
+                                                    <Shield className="h-5 w-5 text-zinc-400" />
+                                                    <h3 className="font-semibold text-zinc-900">Network Access</h3>
+                                                </div>
+                                                <button
+                                                    onClick={loadSecurityRules}
+                                                    disabled={loadingRules}
+                                                    className="text-zinc-400 hover:text-zinc-600 transition-colors"
+                                                >
+                                                    <RefreshCw className={`h-4 w-4 ${loadingRules ? "animate-spin" : ""}`} />
+                                                </button>
+                                            </div>
+                                            <p className="text-sm text-zinc-500 ml-8">Control which IP addresses can connect to your database. SSL/TLS is always enforced.</p>
                                         </div>
 
                                         {loadingRules && !securityRules ? (
@@ -969,148 +975,267 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                                             </div>
                                         ) : (
                                             <>
-                                                {/* Inbound Rules */}
-                                                <div className="mb-6">
-                                                    <h4 className="text-sm font-medium text-zinc-700 mb-3">Inbound Rules</h4>
-                                                    {renderRulesTable(securityRules?.inbound || [], "inbound")}
-                                                </div>
+                                                {/* Access Mode Toggle */}
+                                                <div className="bg-zinc-50 rounded-none border border-zinc-200 p-4 sm:p-6">
+                                                    <h4 className="text-sm font-medium text-zinc-900 mb-4">Access Mode</h4>
+                                                    <div className="space-y-3">
+                                                        {/* Open Mode */}
+                                                        <button
+                                                            onClick={() => handleToggleAccessMode("open")}
+                                                            disabled={togglingAccess || isOpenAccess}
+                                                            className={`w-full text-left px-4 py-3 border transition-colors ${isOpenAccess
+                                                                ? "border-zinc-900 bg-white"
+                                                                : "border-zinc-200 bg-white hover:border-zinc-300"
+                                                                }`}
+                                                        >
+                                                            <div className="flex items-start gap-3">
+                                                                <div className={`mt-0.5 w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${isOpenAccess ? "border-zinc-900" : "border-zinc-300"
+                                                                    }`}>
+                                                                    {isOpenAccess && <div className="w-2 h-2 rounded-full bg-zinc-900" />}
+                                                                </div>
+                                                                <div>
+                                                                    <div className="flex items-center gap-2">
+                                                                        <ShieldCheck className="h-4 w-4 text-emerald-500" />
+                                                                        <span className="text-sm font-medium text-zinc-900">Open</span>
+                                                                        <span className="text-xs text-zinc-400 bg-zinc-100 px-1.5 py-0.5">Recommended</span>
+                                                                    </div>
+                                                                    <p className="text-xs text-zinc-500 mt-1">
+                                                                        Any IP with valid credentials can connect. Your Shorlabs backends connect automatically.
+                                                                    </p>
+                                                                </div>
+                                                            </div>
+                                                        </button>
 
-                                                {/* Outbound Rules */}
-                                                <div className="mb-6">
-                                                    <h4 className="text-sm font-medium text-zinc-700 mb-3">Outbound Rules</h4>
-                                                    {renderRulesTable(securityRules?.outbound || [], "outbound")}
-                                                </div>
-
-                                                {/* Add Rule Form */}
-                                                <div className="border-t border-zinc-200 pt-4">
-                                                    <h4 className="text-sm font-medium text-zinc-700 mb-3">Add Rule</h4>
-                                                    <div className="grid grid-cols-1 sm:grid-cols-6 gap-3">
-                                                        <select
-                                                            value={newRule.direction}
-                                                            onChange={(e) => setNewRule({ ...newRule, direction: e.target.value as "inbound" | "outbound" })}
-                                                            className="border border-zinc-200 rounded-none px-3 py-2 text-sm bg-white"
+                                                        {/* Restricted Mode */}
+                                                        <button
+                                                            onClick={() => handleToggleAccessMode("restricted")}
+                                                            disabled={togglingAccess || !isOpenAccess}
+                                                            className={`w-full text-left px-4 py-3 border transition-colors ${!isOpenAccess
+                                                                ? "border-zinc-900 bg-white"
+                                                                : "border-zinc-200 bg-white hover:border-zinc-300"
+                                                                }`}
                                                         >
-                                                            <option value="inbound">Inbound</option>
-                                                            <option value="outbound">Outbound</option>
-                                                        </select>
-                                                        <select
-                                                            value={newRule.protocol}
-                                                            onChange={(e) => setNewRule({ ...newRule, protocol: e.target.value })}
-                                                            className="border border-zinc-200 rounded-none px-3 py-2 text-sm bg-white"
-                                                        >
-                                                            <option value="tcp">TCP</option>
-                                                            <option value="udp">UDP</option>
-                                                            <option value="-1">All Traffic</option>
-                                                        </select>
-                                                        {newRule.protocol !== "-1" && (
-                                                            <Input
-                                                                placeholder="Port (e.g. 5432)"
-                                                                value={newRule.from_port}
-                                                                onChange={(e) => setNewRule({ ...newRule, from_port: e.target.value, to_port: e.target.value })}
-                                                                className="rounded-none"
-                                                            />
-                                                        )}
-                                                        <Input
-                                                            placeholder="CIDR (e.g. 0.0.0.0/0)"
-                                                            value={newRule.cidr}
-                                                            onChange={(e) => setNewRule({ ...newRule, cidr: e.target.value })}
-                                                            className="rounded-none"
-                                                        />
-                                                        <Input
-                                                            placeholder="Description"
-                                                            value={newRule.description}
-                                                            onChange={(e) => setNewRule({ ...newRule, description: e.target.value })}
-                                                            className="rounded-none"
-                                                        />
-                                                        <Button
-                                                            onClick={handleAddRule}
-                                                            disabled={addingRule || !newRule.cidr}
-                                                            className="rounded-none"
-                                                        >
-                                                            {addingRule ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
-                                                            Add
-                                                        </Button>
+                                                            <div className="flex items-start gap-3">
+                                                                <div className={`mt-0.5 w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${!isOpenAccess ? "border-zinc-900" : "border-zinc-300"
+                                                                    }`}>
+                                                                    {!isOpenAccess && <div className="w-2 h-2 rounded-full bg-zinc-900" />}
+                                                                </div>
+                                                                <div>
+                                                                    <div className="flex items-center gap-2">
+                                                                        <ShieldAlert className="h-4 w-4 text-amber-500" />
+                                                                        <span className="text-sm font-medium text-zinc-900">Restricted</span>
+                                                                    </div>
+                                                                    <p className="text-xs text-zinc-500 mt-1">
+                                                                        Only specific IP addresses can connect.
+                                                                    </p>
+                                                                </div>
+                                                            </div>
+                                                        </button>
                                                     </div>
+
+                                                    {togglingAccess && (
+                                                        <div className="flex items-center gap-2 mt-3 text-sm text-zinc-500">
+                                                            <Loader2 className="h-4 w-4 animate-spin" />
+                                                            Updating access mode...
+                                                        </div>
+                                                    )}
+
+                                                    {/* Warning for restricted mode */}
+                                                    {!isOpenAccess && (
+                                                        <div className="flex items-start gap-2.5 mt-4 px-3 py-2.5 bg-amber-50 border border-amber-200">
+                                                            <Info className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+                                                            <p className="text-xs text-amber-800">
+                                                                <strong>Heads up:</strong> Shorlabs-deployed backends use dynamic IPs. If you restrict access, your Shorlabs backend may not be able to connect to this database. Add your backend&apos;s IPs below or switch back to Open.
+                                                            </p>
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                {/* Allowed IPs Section — shown when restricted */}
+                                                {!isOpenAccess && (
+                                                    <div className="bg-zinc-50 rounded-none border border-zinc-200 p-4 sm:p-6">
+                                                        <h4 className="text-sm font-medium text-zinc-900 mb-4">Allowed IPs</h4>
+
+                                                        {/* IP List */}
+                                                        {userIpRules.length === 0 ? (
+                                                            <div className="bg-white border border-zinc-200 rounded-none p-6 flex flex-col items-center justify-center text-center mb-4">
+                                                                <Globe className="h-7 w-7 text-zinc-300 mb-2" />
+                                                                <p className="text-sm text-zinc-500">No IPs added yet</p>
+                                                                <p className="text-xs text-zinc-400 mt-1">
+                                                                    Add IP addresses that should be allowed to connect to your database.
+                                                                </p>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="bg-white border border-zinc-200 rounded-none overflow-hidden mb-4">
+                                                                <table className="w-full text-sm">
+                                                                    <thead>
+                                                                        <tr className="border-b border-zinc-200 bg-zinc-50">
+                                                                            <th className="text-left px-4 py-2 font-medium text-zinc-600">IP / CIDR</th>
+                                                                            <th className="text-left px-4 py-2 font-medium text-zinc-600">Label</th>
+                                                                            <th className="px-4 py-2 w-10"></th>
+                                                                        </tr>
+                                                                    </thead>
+                                                                    <tbody>
+                                                                        {userIpRules.map((rule) => (
+                                                                            <tr key={rule.rule_id} className="border-b border-zinc-100 last:border-0">
+                                                                                <td className="px-4 py-2.5 font-mono text-zinc-700">
+                                                                                    {rule.cidr_ipv4 || rule.cidr_ipv6 || "-"}
+                                                                                </td>
+                                                                                <td className="px-4 py-2.5 text-zinc-500">
+                                                                                    {rule.description || "-"}
+                                                                                </td>
+                                                                                <td className="px-4 py-2.5">
+                                                                                    <button
+                                                                                        onClick={() => handleDeleteRule(rule.rule_id)}
+                                                                                        disabled={deletingRuleId === rule.rule_id}
+                                                                                        className="text-zinc-400 hover:text-red-500 transition-colors disabled:opacity-50"
+                                                                                    >
+                                                                                        {deletingRuleId === rule.rule_id ? (
+                                                                                            <Loader2 className="h-4 w-4 animate-spin" />
+                                                                                        ) : (
+                                                                                            <Trash2 className="h-4 w-4" />
+                                                                                        )}
+                                                                                    </button>
+                                                                                </td>
+                                                                            </tr>
+                                                                        ))}
+                                                                    </tbody>
+                                                                </table>
+                                                            </div>
+                                                        )}
+
+                                                        {/* Add IP Form */}
+                                                        <div className="border-t border-zinc-200 pt-4">
+                                                            <h4 className="text-sm font-medium text-zinc-700 mb-3">Add IP Address</h4>
+                                                            <div className="flex flex-col sm:flex-row gap-3">
+                                                                <Input
+                                                                    placeholder="IP or CIDR (e.g. 203.0.113.0/24)"
+                                                                    value={newIpCidr}
+                                                                    onChange={(e) => setNewIpCidr(e.target.value)}
+                                                                    className="rounded-none flex-1"
+                                                                />
+                                                                <Input
+                                                                    placeholder="Label (optional)"
+                                                                    value={newIpLabel}
+                                                                    onChange={(e) => setNewIpLabel(e.target.value)}
+                                                                    className="rounded-none flex-1 sm:max-w-[200px]"
+                                                                />
+                                                                <Button
+                                                                    onClick={() => handleAddIp()}
+                                                                    disabled={addingRule || !newIpCidr}
+                                                                    className="rounded-none shrink-0"
+                                                                >
+                                                                    {addingRule ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
+                                                                    Add
+                                                                </Button>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Add My IP shortcut */}
+                                                        {userIp && (
+                                                            <div className="flex items-center gap-2 mt-4 px-3 py-2.5 bg-blue-50 border border-blue-200">
+                                                                <Info className="h-4 w-4 text-blue-500 shrink-0" />
+                                                                <span className="text-xs text-blue-800">Your current IP: <code className="font-mono bg-blue-100 px-1 py-0.5">{userIp}</code></span>
+                                                                <button
+                                                                    onClick={() => handleAddIp(userIp, "My IP")}
+                                                                    disabled={addingRule || userIpRules.some(r => r.cidr_ipv4 === `${userIp}/32`)}
+                                                                    className="ml-auto text-xs font-medium text-blue-700 hover:text-blue-900 disabled:opacity-50 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
+                                                                >
+                                                                    {userIpRules.some(r => r.cidr_ipv4 === `${userIp}/32`) ? "✓ Added" : "+ Add my IP"}
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+
+                                                {/* SSL info — always shown */}
+                                                <div className="bg-zinc-50 rounded-none border border-zinc-200 p-4 sm:p-6">
+                                                    <div className="flex items-center gap-3 mb-2">
+                                                        <ShieldCheck className="h-5 w-5 text-emerald-500" />
+                                                        <h4 className="text-sm font-medium text-zinc-900">Encryption</h4>
+                                                    </div>
+                                                    <p className="text-sm text-zinc-500 ml-8">
+                                                        All connections use SSL/TLS encryption. Credentials are managed and auto-rotated via AWS Secrets Manager.
+                                                    </p>
                                                 </div>
                                             </>
                                         )}
                                     </div>
-                                )
-                            })()}
+                                )}
 
-                            {/* Settings Tab */}
-                            {dbActiveTab === "settings" && (
-                                <div className="space-y-6">
-                                    {/* Danger Zone */}
-                                    <div className="bg-zinc-50 rounded-none border border-red-200 overflow-hidden">
-                                        <div className="px-6 py-4 border-b border-red-100 bg-red-50">
-                                            <h3 className="font-semibold text-red-900">Danger Zone</h3>
-                                        </div>
-                                        <div className="p-4 sm:p-6">
-                                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                                                <div>
-                                                    <p className="font-medium text-zinc-900">Delete this database</p>
-                                                    <p className="text-sm text-zinc-500">Once deleted, this cannot be undone. All data will be permanently lost.</p>
-                                                </div>
-                                                <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-                                                    <AlertDialogTrigger asChild>
-                                                        <Button
-                                                            variant="outline"
-                                                            className="text-red-600 border-red-200 hover:bg-red-50 rounded-full"
-                                                        >
-                                                            <Trash2 className="h-4 w-4 mr-2" />
-                                                            Delete Database
-                                                        </Button>
-                                                    </AlertDialogTrigger>
-                                                    <AlertDialogContent className="max-w-md rounded-none">
-                                                        <AlertDialogHeader>
-                                                            <AlertDialogTitle className="text-xl">Delete Database</AlertDialogTitle>
-                                                            <AlertDialogDescription>
-                                                                This will permanently delete <strong>{project.name}</strong> and all its data.
-                                                            </AlertDialogDescription>
-                                                        </AlertDialogHeader>
-                                                        <div className="space-y-4 py-4">
-                                                            <div>
-                                                                <label className="text-sm text-zinc-600 block mb-2">
-                                                                    Type <code className="bg-zinc-100 px-1.5 py-0.5 rounded text-zinc-800">{project.name}</code> to confirm
-                                                                </label>
-                                                                <Input
-                                                                    value={confirmProjectName}
-                                                                    onChange={(e) => setConfirmProjectName(e.target.value)}
-                                                                    placeholder={project.name}
-                                                                    className="font-mono"
-                                                                />
-                                                            </div>
-                                                            <div>
-                                                                <label className="text-sm text-zinc-600 block mb-2">
-                                                                    Type <code className="bg-zinc-100 px-1.5 py-0.5 rounded text-zinc-800">delete my project</code> to confirm
-                                                                </label>
-                                                                <Input
-                                                                    value={confirmPhrase}
-                                                                    onChange={(e) => setConfirmPhrase(e.target.value)}
-                                                                    placeholder="delete my project"
-                                                                />
-                                                            </div>
-                                                        </div>
-                                                        <AlertDialogFooter>
-                                                            <AlertDialogCancel className="rounded-full">Cancel</AlertDialogCancel>
-                                                            <AlertDialogAction
-                                                                onClick={handleDeleteProject}
-                                                                disabled={deleting || confirmProjectName !== project.name || confirmPhrase !== "delete my project"}
-                                                                className="bg-red-600 hover:bg-red-700 rounded-full"
+                                {/* Settings Tab */}
+                                {dbActiveTab === "settings" && (
+                                    <div className="space-y-6">
+                                        {/* Danger Zone */}
+                                        <div className="bg-zinc-50 rounded-none border border-red-200 overflow-hidden">
+                                            <div className="px-6 py-4 border-b border-red-100 bg-red-50">
+                                                <h3 className="font-semibold text-red-900">Danger Zone</h3>
+                                            </div>
+                                            <div className="p-4 sm:p-6">
+                                                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                                                    <div>
+                                                        <p className="font-medium text-zinc-900">Delete this database</p>
+                                                        <p className="text-sm text-zinc-500">Once deleted, this cannot be undone. All data will be permanently lost.</p>
+                                                    </div>
+                                                    <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+                                                        <AlertDialogTrigger asChild>
+                                                            <Button
+                                                                variant="outline"
+                                                                className="text-red-600 border-red-200 hover:bg-red-50 rounded-full"
                                                             >
-                                                                {deleting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                                                                <Trash2 className="h-4 w-4 mr-2" />
                                                                 Delete Database
-                                                            </AlertDialogAction>
-                                                        </AlertDialogFooter>
-                                                    </AlertDialogContent>
-                                                </AlertDialog>
+                                                            </Button>
+                                                        </AlertDialogTrigger>
+                                                        <AlertDialogContent className="max-w-md rounded-none">
+                                                            <AlertDialogHeader>
+                                                                <AlertDialogTitle className="text-xl">Delete Database</AlertDialogTitle>
+                                                                <AlertDialogDescription>
+                                                                    This will permanently delete <strong>{project.name}</strong> and all its data.
+                                                                </AlertDialogDescription>
+                                                            </AlertDialogHeader>
+                                                            <div className="space-y-4 py-4">
+                                                                <div>
+                                                                    <label className="text-sm text-zinc-600 block mb-2">
+                                                                        Type <code className="bg-zinc-100 px-1.5 py-0.5 rounded text-zinc-800">{project.name}</code> to confirm
+                                                                    </label>
+                                                                    <Input
+                                                                        value={confirmProjectName}
+                                                                        onChange={(e) => setConfirmProjectName(e.target.value)}
+                                                                        placeholder={project.name}
+                                                                        className="font-mono"
+                                                                    />
+                                                                </div>
+                                                                <div>
+                                                                    <label className="text-sm text-zinc-600 block mb-2">
+                                                                        Type <code className="bg-zinc-100 px-1.5 py-0.5 rounded text-zinc-800">delete my project</code> to confirm
+                                                                    </label>
+                                                                    <Input
+                                                                        value={confirmPhrase}
+                                                                        onChange={(e) => setConfirmPhrase(e.target.value)}
+                                                                        placeholder="delete my project"
+                                                                    />
+                                                                </div>
+                                                            </div>
+                                                            <AlertDialogFooter>
+                                                                <AlertDialogCancel className="rounded-full">Cancel</AlertDialogCancel>
+                                                                <AlertDialogAction
+                                                                    onClick={handleDeleteProject}
+                                                                    disabled={deleting || confirmProjectName !== project.name || confirmPhrase !== "delete my project"}
+                                                                    className="bg-red-600 hover:bg-red-700 rounded-full"
+                                                                >
+                                                                    {deleting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                                                                    Delete Database
+                                                                </AlertDialogAction>
+                                                            </AlertDialogFooter>
+                                                        </AlertDialogContent>
+                                                    </AlertDialog>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
-                                </div>
-                            )}
-                        </div>
+                                )}
+                            </div>
                         </>)}
                     </div>
                 </div>

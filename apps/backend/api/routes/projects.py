@@ -333,6 +333,32 @@ def send_deployment_to_sqs(
 # DATABASE PROVISIONING (BACKGROUND TASK)
 # ─────────────────────────────────────────────────────────────
 
+AURORA_SERVERLESS_V2_MIN_MAX_ACU = 1.0
+
+
+def _round_to_half_step(value: float) -> float:
+    """Aurora Serverless v2 values are expected in 0.5 ACU increments."""
+    return round(float(value) * 2) / 2
+
+
+def _normalize_serverless_v2_capacity(min_acu: float, max_acu: float) -> tuple[float, float]:
+    """Normalize min/max ACU values so they satisfy Aurora Serverless v2 constraints."""
+    try:
+        parsed_min = float(min_acu)
+    except (TypeError, ValueError):
+        parsed_min = 0.0
+
+    try:
+        parsed_max = float(max_acu)
+    except (TypeError, ValueError):
+        parsed_max = 2.0
+
+    normalized_min = max(0.0, _round_to_half_step(parsed_min))
+    normalized_max = max(AURORA_SERVERLESS_V2_MIN_MAX_ACU, _round_to_half_step(parsed_max))
+    if normalized_max < normalized_min:
+        normalized_max = normalized_min
+    return normalized_min, normalized_max
+
 
 def _run_database_provision_sync(
     project_id: str,
@@ -342,13 +368,14 @@ def _run_database_provision_sync(
 ):
     """Synchronous database provisioning - runs in thread pool or via SQS."""
     try:
+        normalized_min_acu, normalized_max_acu = _normalize_serverless_v2_capacity(min_acu, max_acu)
         update_project(project_id, {"status": "PROVISIONING"})
 
         result = provision_database(
             project_id=project_id,
             db_name=db_name,
-            min_acu=min_acu,
-            max_acu=max_acu,
+            min_acu=normalized_min_acu,
+            max_acu=normalized_max_acu,
         )
 
         update_project(project_id, {
@@ -378,12 +405,13 @@ def send_database_provision_to_sqs(
 ):
     """Send database provisioning task to SQS queue for background processing."""
     import time
+    normalized_min_acu, normalized_max_acu = _normalize_serverless_v2_capacity(min_acu, max_acu)
 
     # Check if running on Lambda
     if not os.environ.get("AWS_LAMBDA_FUNCTION_NAME"):
         # Running locally - use thread pool fallback
         def run_in_thread():
-            _run_database_provision_sync(project_id, db_name, min_acu, max_acu)
+            _run_database_provision_sync(project_id, db_name, normalized_min_acu, normalized_max_acu)
         thread = threading.Thread(target=run_in_thread)
         thread.start()
         print(f"📤 Local: Database provisioning started in background thread for project {project_id}")
@@ -396,7 +424,7 @@ def send_database_provision_to_sqs(
     if not queue_url:
         print("⚠️ DEPLOY_QUEUE_URL not set, falling back to thread-based execution")
         def run_in_thread():
-            _run_database_provision_sync(project_id, db_name, min_acu, max_acu)
+            _run_database_provision_sync(project_id, db_name, normalized_min_acu, normalized_max_acu)
         thread = threading.Thread(target=run_in_thread)
         thread.start()
         return
@@ -405,8 +433,8 @@ def send_database_provision_to_sqs(
         "message_type": "database_provision",
         "project_id": project_id,
         "db_name": db_name,
-        "min_acu": min_acu,
-        "max_acu": max_acu,
+        "min_acu": normalized_min_acu,
+        "max_acu": normalized_max_acu,
     }
 
     response = sqs_client.send_message(
@@ -577,21 +605,26 @@ async def create_database_project(
     if not request.organization_id or not request.organization_id.strip():
         raise HTTPException(status_code=400, detail="organization_id is required")
 
+    normalized_min_acu, normalized_max_acu = _normalize_serverless_v2_capacity(
+        request.min_acu if request.min_acu is not None else 0,
+        request.max_acu if request.max_acu is not None else 2,
+    )
+
     project = create_project(
         user_id=user_id,
         organization_id=request.organization_id,
         name=request.name,
         project_type="database",
         db_name=request.db_name,
-        min_acu=request.min_acu,
-        max_acu=request.max_acu,
+        min_acu=normalized_min_acu,
+        max_acu=normalized_max_acu,
     )
 
     send_database_provision_to_sqs(
         project["project_id"],
         request.db_name,
-        request.min_acu,
-        request.max_acu,
+        normalized_min_acu,
+        normalized_max_acu,
     )
 
     return {

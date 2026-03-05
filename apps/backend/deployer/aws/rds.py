@@ -264,6 +264,41 @@ def ensure_db_subnet_group() -> str:
 # AURORA CLUSTER MANAGEMENT
 # ─────────────────────────────────────────────────────────────
 
+AURORA_SERVERLESS_V2_MIN_MAX_ACU = 1.0
+
+
+def _round_to_half_step(value: float) -> float:
+    """Aurora Serverless v2 scaling values must be in 0.5 ACU increments."""
+    return round(float(value) * 2) / 2
+
+
+def _normalize_serverless_v2_capacity(min_acu: float, max_acu: float) -> tuple[float, float]:
+    """
+    Normalize Aurora Serverless v2 capacity values to AWS-compatible bounds.
+
+    AWS requires:
+    - 0.5 ACU increments
+    - MaxCapacity > 0.5 (effectively >= 1.0)
+    - MaxCapacity >= MinCapacity
+    """
+    try:
+        parsed_min = float(min_acu)
+    except (TypeError, ValueError):
+        parsed_min = DEFAULT_MIN_ACU
+
+    try:
+        parsed_max = float(max_acu)
+    except (TypeError, ValueError):
+        parsed_max = DEFAULT_MAX_ACU
+
+    normalized_min = max(0.0, _round_to_half_step(parsed_min))
+    normalized_max = max(AURORA_SERVERLESS_V2_MIN_MAX_ACU, _round_to_half_step(parsed_max))
+
+    if normalized_max < normalized_min:
+        normalized_max = normalized_min
+
+    return normalized_min, normalized_max
+
 
 def get_cluster_identifier(project_id: str) -> str:
     """Generate a unique Aurora cluster identifier from project ID."""
@@ -306,6 +341,13 @@ def create_aurora_cluster(
     instance_id = get_instance_identifier(project_id)
     master_username = "shorlabs_admin"
 
+    normalized_min_acu, normalized_max_acu = _normalize_serverless_v2_capacity(min_acu, max_acu)
+    if (normalized_min_acu, normalized_max_acu) != (min_acu, max_acu):
+        print(
+            "⚠️ Adjusted Aurora Serverless v2 capacity from "
+            f"{min_acu}-{max_acu} to {normalized_min_acu}-{normalized_max_acu} ACU"
+        )
+
     # Build cluster params
     cluster_params = {
         "DBClusterIdentifier": cluster_id,
@@ -315,8 +357,8 @@ def create_aurora_cluster(
         "ManageMasterUserPassword": True,  # Auto-manage via Secrets Manager
         "StorageEncrypted": True,  # Required for managed credentials (uses default aws/rds KMS key)
         "ServerlessV2ScalingConfiguration": {
-            "MinCapacity": min_acu,
-            "MaxCapacity": max_acu,
+            "MinCapacity": normalized_min_acu,
+            "MaxCapacity": normalized_max_acu,
         },
     }
 

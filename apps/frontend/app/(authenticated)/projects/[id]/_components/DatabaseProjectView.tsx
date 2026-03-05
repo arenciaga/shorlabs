@@ -136,6 +136,7 @@ export function DatabaseProjectView({ hook }: DatabaseProjectViewProps) {
                             {/* Security Tab */}
                             {hook.dbActiveTab === "security" && (
                                 <DatabaseSecurityTab
+                                    isProvisioning={!hook.isDbLive}
                                     securityRules={hook.securityRules}
                                     loadingRules={hook.loadingRules}
                                     isOpenAccess={hook.isOpenAccess}

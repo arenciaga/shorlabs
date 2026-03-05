@@ -14,6 +14,8 @@ import { Input } from "@/components/ui/input"
 import type { SecurityRulesResponse } from "@/lib/api"
 
 interface DatabaseSecurityTabProps {
+    /** When true, DB is not live yet (e.g. PROVISIONING); show placeholder instead of fetching rules. */
+    isProvisioning?: boolean
     securityRules: SecurityRulesResponse | null
     loadingRules: boolean
     isOpenAccess: boolean
@@ -38,6 +40,7 @@ interface DatabaseSecurityTabProps {
 }
 
 export function DatabaseSecurityTab({
+    isProvisioning = false,
     securityRules,
     loadingRules,
     isOpenAccess,
@@ -55,6 +58,26 @@ export function DatabaseSecurityTab({
     onNewIpCidrChange,
     onNewIpLabelChange,
 }: DatabaseSecurityTabProps) {
+    // While DB is provisioning, no security group exists yet — show placeholder instead of fetching
+    if (isProvisioning) {
+        return (
+            <div className="space-y-6">
+                <div className="bg-zinc-50 rounded-none border border-zinc-200 p-4 sm:p-6">
+                    <div className="flex items-center gap-3 mb-1">
+                        <Shield className="h-5 w-5 text-zinc-400" />
+                        <h3 className="font-semibold text-zinc-900">Network Access</h3>
+                    </div>
+                    <p className="text-sm text-zinc-500 ml-8">Control which IP addresses can connect to your database. SSL/TLS is always enforced.</p>
+                </div>
+                <div className="bg-zinc-50 rounded-none border border-zinc-200 border-dashed p-8 text-center">
+                    <Shield className="h-10 w-10 text-zinc-300 mx-auto mb-3" />
+                    <p className="text-sm text-zinc-500">Security rules will be available once your database is provisioned.</p>
+                    <p className="text-xs text-zinc-400 mt-1">No need to refresh — this tab will update automatically.</p>
+                </div>
+            </div>
+        )
+    }
+
     return (
         <div className="space-y-6">
             {/* Header */}

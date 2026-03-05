@@ -506,15 +506,16 @@ export function useProjectDetail(id: string) {
         }
     }, [activeTab, fetchLogs])
 
-    // Load security rules when security tab selected
+    // Load security rules when security tab selected (only when DB is LIVE — no rules exist while provisioning)
     const isDatabaseProject = data?.project?.project_type === "database"
     const dbActiveTab = activeTab === "configuration" || activeTab === "settings" || activeTab === "explorer" || activeTab === "security" ? activeTab : "configuration"
+    const isDbLive = data?.project?.status === "LIVE"
 
     useEffect(() => {
-        if (isDatabaseProject && dbActiveTab === "security" && !securityRules && !loadingRules) {
+        if (isDatabaseProject && dbActiveTab === "security" && isDbLive && !securityRules && !loadingRules) {
             loadSecurityRules()
         }
-    }, [isDatabaseProject, dbActiveTab, securityRules, loadingRules, loadSecurityRules])
+    }, [isDatabaseProject, dbActiveTab, isDbLive, securityRules, loadingRules, loadSecurityRules])
 
     // Detect user's public IP on mount (for "Add my IP" feature)
     useEffect(() => {
@@ -608,6 +609,7 @@ export function useProjectDetail(id: string) {
         handleShowPassword,
 
         // Security
+        isDbLive,
         securityRules,
         loadingRules,
         loadSecurityRules,

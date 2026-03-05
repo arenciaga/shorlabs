@@ -52,7 +52,7 @@ export function AppNavbar() {
                                 alt="Shorlabs"
                                 width={22}
                                 height={22}
-                                className="rounded-none"
+                                className="rounded-full"
                                 priority
                             />
                         </Link>

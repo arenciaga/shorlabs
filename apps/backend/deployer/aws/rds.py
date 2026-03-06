@@ -62,24 +62,29 @@ def _ensure_vpc_dns_settings(vpc_id: str) -> None:
     print(f"✅ VPC {vpc_id}: DNS support and DNS hostnames enabled")
 
 
-def ensure_db_security_group() -> str:
-    """
-    Get or create a security group that allows PostgreSQL inbound (port 5432).
+def _db_security_group_name(project_id: str) -> str:
+    """Per-project SG name to keep DB access policy isolated."""
+    return f"{DB_SECURITY_GROUP_NAME}-{project_id[:12]}"
 
-    Idempotent: looks up by group name first, creates only if missing.
-    One shared SG for all database projects.
+
+def ensure_db_security_group(project_id: str) -> str:
+    """
+    Get or create a per-project security group for PostgreSQL access.
+
+    Idempotent: looks up by project SG name first, creates only if missing.
 
     Returns:
         The security group ID.
     """
     ec2 = get_ec2_client()
     vpc_id = _get_default_vpc_id()
+    sg_name = _db_security_group_name(project_id)
 
     # Check if SG already exists
     try:
         response = ec2.describe_security_groups(
             Filters=[
-                {"Name": "group-name", "Values": [DB_SECURITY_GROUP_NAME]},
+                {"Name": "group-name", "Values": [sg_name]},
                 {"Name": "vpc-id", "Values": [vpc_id]},
             ]
         )
@@ -90,11 +95,22 @@ def ensure_db_security_group() -> str:
         pass
 
     # Create security group
-    print(f"🔐 Creating database security group: {DB_SECURITY_GROUP_NAME}")
+    print(f"🔐 Creating database security group: {sg_name}")
     response = ec2.create_security_group(
-        GroupName=DB_SECURITY_GROUP_NAME,
-        Description="Shorlabs - Allow PostgreSQL inbound (port 5432)",
+        GroupName=sg_name,
+        Description=f"Shorlabs - DB access for project {project_id[:12]}",
         VpcId=vpc_id,
+        TagSpecifications=[
+            {
+                "ResourceType": "security-group",
+                "Tags": [
+                    {"Key": "Name", "Value": sg_name},
+                    {"Key": "managed-by", "Value": "shorlabs"},
+                    {"Key": "resource-type", "Value": "database-security-group"},
+                    {"Key": "project-id", "Value": project_id},
+                ],
+            }
+        ],
     )
     sg_id = response["GroupId"]
 
@@ -113,6 +129,45 @@ def ensure_db_security_group() -> str:
 
     print(f"✅ Security group created: {sg_id}")
     return sg_id
+
+
+def delete_db_security_group(project_id: str) -> bool:
+    """
+    Delete the project's DB security group.
+
+    Returns:
+        True if deleted, False if not found.
+    """
+    ec2 = get_ec2_client()
+    vpc_id = _get_default_vpc_id()
+    sg_name = _db_security_group_name(project_id)
+
+    response = ec2.describe_security_groups(
+        Filters=[
+            {"Name": "group-name", "Values": [sg_name]},
+            {"Name": "vpc-id", "Values": [vpc_id]},
+        ]
+    )
+    groups = response.get("SecurityGroups", [])
+    if not groups:
+        print(f"   Security group {sg_name} not found (already deleted)")
+        return False
+
+    sg_id = groups[0]["GroupId"]
+
+    for attempt in range(8):
+        try:
+            ec2.delete_security_group(GroupId=sg_id)
+            print(f"✅ Security group deleted: {sg_id}")
+            return True
+        except Exception as e:
+            # RDS can take a short time to detach SGs after cluster deletion.
+            if "DependencyViolation" in str(e) and attempt < 7:
+                time.sleep(5)
+                continue
+            raise
+
+    return False
 
 
 def get_cluster_security_group_ids(cluster_identifier: str) -> list[str]:
@@ -157,6 +212,7 @@ def get_security_group_rules(sg_id: str) -> dict:
     for rule in response.get("SecurityGroupRules", []):
         parsed = {
             "rule_id": rule["SecurityGroupRuleId"],
+            "security_group_id": rule.get("GroupId", sg_id),
             "protocol": rule.get("IpProtocol", "-1"),
             "from_port": rule.get("FromPort"),
             "to_port": rule.get("ToPort"),

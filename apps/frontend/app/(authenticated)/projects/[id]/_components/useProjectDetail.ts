@@ -394,10 +394,10 @@ export function useProjectDetail(id: string) {
         rule => rule.cidr_ipv4 !== "0.0.0.0/0" && rule.protocol === "tcp" && rule.from_port === 5432
     ) ?? []
 
-    // Find the 0.0.0.0/0 rule ID (for toggling)
-    const openAccessRule = securityRules?.inbound?.find(
+    // Find all 0.0.0.0/0 rules (for toggling)
+    const openAccessRules = securityRules?.inbound?.filter(
         rule => rule.cidr_ipv4 === "0.0.0.0/0" && rule.protocol === "tcp" && rule.from_port === 5432
-    )
+    ) ?? []
 
     const handleToggleAccessMode = async (mode: "open" | "restricted") => {
         if (!data?.project?.project_id || !orgId) return
@@ -415,8 +415,10 @@ export function useProjectDetail(id: string) {
                     cidr: "0.0.0.0/0",
                     description: "PostgreSQL public access",
                 })
-            } else if (mode === "restricted" && isOpenAccess && openAccessRule) {
-                await deleteSecurityRule(token, data.project.project_id, orgId, openAccessRule.rule_id, "inbound")
+            } else if (mode === "restricted" && isOpenAccess && openAccessRules.length > 0) {
+                for (const rule of openAccessRules) {
+                    await deleteSecurityRule(token, data.project.project_id, orgId, rule.rule_id, "inbound")
+                }
             }
             await loadSecurityRules()
         } catch (err: unknown) {

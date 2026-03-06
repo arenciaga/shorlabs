@@ -990,14 +990,19 @@ def _security_debug_context(org_id: str, project_id: str, project: Optional[dict
     return ctx
 
 
-def _get_sg_id_for_project(project: dict) -> str:
-    """Get the first VPC security group ID attached to the project's cluster."""
+def _get_sg_ids_for_project(project: dict) -> list[str]:
+    """Get all VPC security group IDs attached to the project's cluster."""
     print(f"🔎 SG LOOKUP: cluster={project.get('db_cluster_identifier')} project_id={project.get('project_id')}")
     sg_ids = get_cluster_security_group_ids(project["db_cluster_identifier"])
     print(f"🔎 SG LOOKUP RESULT: cluster={project.get('db_cluster_identifier')} sg_ids={sg_ids}")
     if not sg_ids:
         raise HTTPException(status_code=404, detail="No security group found for this database")
-    return sg_ids[0]
+    return sg_ids
+
+
+def _get_primary_sg_id_for_project(project: dict) -> str:
+    """Primary SG for add operations."""
+    return _get_sg_ids_for_project(project)[0]
 
 
 @router.get("/{project_id}/database/security-rules")
@@ -1011,9 +1016,19 @@ async def get_database_security_rules(
     debug_ctx = _security_debug_context(org_id, project_id, project=project)
     print(f"🛡️ SECURITY RULES GET START: {debug_ctx}")
     try:
-        sg_id = _get_sg_id_for_project(project)
-        debug_ctx = _security_debug_context(org_id, project_id, project=project, sg_id=sg_id)
-        rules = get_security_group_rules(sg_id)
+        sg_ids = _get_sg_ids_for_project(project)
+        inbound = []
+        outbound = []
+        for sg_id in sg_ids:
+            rules = get_security_group_rules(sg_id)
+            inbound.extend(rules.get("inbound", []))
+            outbound.extend(rules.get("outbound", []))
+        debug_ctx = _security_debug_context(org_id, project_id, project=project, sg_id=sg_ids[0])
+        rules = {
+            "security_group_id": sg_ids[0],
+            "inbound": inbound,
+            "outbound": outbound,
+        }
         print(
             "🛡️ SECURITY RULES GET SUCCESS: "
             f"{debug_ctx} inbound={len(rules.get('inbound', []))} outbound={len(rules.get('outbound', []))}"
@@ -1049,7 +1064,7 @@ async def add_database_security_rule(
     from deployer.clients import get_ec2_client
 
     project = _get_live_database_project(org_id, project_id)
-    sg_id = _get_sg_id_for_project(project)
+    sg_id = _get_primary_sg_id_for_project(project)
     debug_ctx = _security_debug_context(org_id, project_id, project=project, sg_id=sg_id)
     print(
         "🛡️ SECURITY RULES ADD START: "
@@ -1117,26 +1132,34 @@ async def delete_database_security_rule(
     from deployer.clients import get_ec2_client
 
     project = _get_live_database_project(org_id, project_id)
-    sg_id = _get_sg_id_for_project(project)
-    debug_ctx = _security_debug_context(org_id, project_id, project=project, sg_id=sg_id)
-    print(f"🛡️ SECURITY RULES DELETE START: {debug_ctx} rule_id={rule_id} direction={direction}")
+    sg_ids = _get_sg_ids_for_project(project)
+    debug_ctx = _security_debug_context(org_id, project_id, project=project, sg_id=sg_ids[0])
+    print(f"🛡️ SECURITY RULES DELETE START: {debug_ctx} rule_id={rule_id} direction={direction} sg_ids={sg_ids}")
 
     if direction not in ("inbound", "outbound"):
         raise HTTPException(status_code=400, detail="direction must be 'inbound' or 'outbound'")
 
-    # Verify rule belongs to this SG
-    rules_data = get_security_group_rules(sg_id)
-    rule_list = rules_data["inbound"] if direction == "inbound" else rules_data["outbound"]
-    if not any(r["rule_id"] == rule_id for r in rule_list):
-        raise HTTPException(status_code=404, detail="Rule not found in this security group")
+    # Find which attached SG actually owns this rule.
+    owner_sg_id = None
+    for sg_id in sg_ids:
+        rules_data = get_security_group_rules(sg_id)
+        rule_list = rules_data["inbound"] if direction == "inbound" else rules_data["outbound"]
+        if any(r["rule_id"] == rule_id for r in rule_list):
+            owner_sg_id = sg_id
+            break
+    if not owner_sg_id:
+        raise HTTPException(status_code=404, detail="Rule not found in this database security groups")
 
     ec2 = get_ec2_client()
     try:
         if direction == "inbound":
-            ec2.revoke_security_group_ingress(GroupId=sg_id, SecurityGroupRuleIds=[rule_id])
+            ec2.revoke_security_group_ingress(GroupId=owner_sg_id, SecurityGroupRuleIds=[rule_id])
         else:
-            ec2.revoke_security_group_egress(GroupId=sg_id, SecurityGroupRuleIds=[rule_id])
-        print(f"🛡️ SECURITY RULES DELETE SUCCESS: {debug_ctx} rule_id={rule_id} direction={direction}")
+            ec2.revoke_security_group_egress(GroupId=owner_sg_id, SecurityGroupRuleIds=[rule_id])
+        print(
+            f"🛡️ SECURITY RULES DELETE SUCCESS: {debug_ctx} rule_id={rule_id} "
+            f"direction={direction} owner_sg_id={owner_sg_id}"
+        )
         return {"status": "deleted"}
     except ClientError as e:
         err = e.response.get("Error", {})

@@ -9,6 +9,7 @@ from typing import Optional
 
 from .aws.rds import (
     ensure_db_security_group,
+    delete_db_security_group,
     ensure_db_subnet_group,
     create_aurora_cluster,
     wait_for_cluster_available,
@@ -28,7 +29,7 @@ def provision_database(
     Provision an Aurora Serverless v2 PostgreSQL database.
 
     Steps:
-    1. Ensure shared security group exists (port 5432 open)
+    1. Ensure project security group exists (port 5432 open)
     2. Create Aurora cluster + serverless instance
     3. Wait for cluster to become available
     4. Return connection details
@@ -47,8 +48,8 @@ def provision_database(
     print(f"   Database: {db_name}")
     print(f"   Capacity: {min_acu} - {max_acu} ACU\n")
 
-    # Step 1: Ensure security group + public subnet group
-    sg_id = ensure_db_security_group()
+    # Step 1: Ensure project security group + public subnet group
+    sg_id = ensure_db_security_group(project_id)
     print(f"✅ Security group ready: {sg_id}")
 
     subnet_group = ensure_db_subnet_group()
@@ -84,7 +85,7 @@ def delete_database_resources(project_id: str) -> dict:
     """
     Delete Aurora cluster resources for a project.
 
-    Does NOT delete the shared security group (reused across projects).
+    Deletes the project security group after cluster teardown.
 
     Args:
         project_id: The project identifier
@@ -98,8 +99,11 @@ def delete_database_resources(project_id: str) -> dict:
 
     cluster_deleted = delete_aurora_cluster(cluster_id)
 
-    print(f"🗑️ Deletion complete - Cluster: {cluster_deleted}")
+    sg_deleted = delete_db_security_group(project_id)
+
+    print(f"🗑️ Deletion complete - Cluster: {cluster_deleted}, Security Group: {sg_deleted}")
 
     return {
         "cluster_deleted": cluster_deleted,
+        "security_group_deleted": sg_deleted,
     }

@@ -100,18 +100,38 @@ def _handle_sqs_event(event: dict) -> dict:
 
     for record in records:
         message_id = record.get("messageId", "unknown")
+        handled_with_error = False
         try:
+            print(
+                f"📦 SQS RECORD: message_id={message_id} "
+                f"event_source={record.get('eventSource')} "
+                f"event_source_arn={record.get('eventSourceARN')}"
+            )
             body = json.loads(record.get("body", "{}"))
             message_type = body.get("message_type", "deployment")
-            print(f"📦 Processing message {message_id} (type: {message_type})")
+            print(f"📦 Processing message {message_id} (type: {message_type}) body={body}")
 
             if message_type == "database_provision":
-                _run_database_provision_sync(
+                result = _run_database_provision_sync(
                     project_id=body["project_id"],
                     db_name=body.get("db_name", "shorlabs"),
                     min_acu=body.get("min_acu", 0),
                     max_acu=body.get("max_acu", 2),
                 )
+                if isinstance(result, dict) and not result.get("ok", True):
+                    handled_with_error = True
+                    print(
+                        f"[DB-TRACE] SQS DB PROVISION RESULT message_id={message_id} "
+                        f"project_id={body.get('project_id')} status=FAILED "
+                        f"trace_id={result.get('trace_id')} error_type={result.get('error_type')} "
+                        f"error={result.get('error')}"
+                    )
+                else:
+                    print(
+                        f"[DB-TRACE] SQS DB PROVISION RESULT message_id={message_id} "
+                        f"project_id={body.get('project_id')} status=SUCCESS "
+                        f"trace_id={result.get('trace_id') if isinstance(result, dict) else None}"
+                    )
             elif message_type == "database_delete":
                 _run_database_delete_sync(
                     project_id=body["project_id"],
@@ -135,7 +155,10 @@ def _handle_sqs_event(event: dict) -> dict:
                     org_id=body.get("org_id"),
                 )
 
-            print(f"✅ Message {message_id} processed successfully")
+            if handled_with_error:
+                print(f"⚠️ Message {message_id} acknowledged but underlying DB task failed (see [DB-TRACE] logs)")
+            else:
+                print(f"✅ Message {message_id} processed successfully")
 
         except Exception as e:
             print(f"❌ Failed to process message {message_id}: {e}")

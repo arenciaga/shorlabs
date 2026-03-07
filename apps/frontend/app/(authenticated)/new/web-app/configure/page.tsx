@@ -74,6 +74,8 @@ function ConfigureProjectContent() {
 
     const repoFullName = searchParams.get("repo") || ""
     const isPrivateRepo = searchParams.get("private") === "true"
+    const existingProjectId = searchParams.get("project_id")
+    const isAddService = !!existingProjectId
     const [, repoName] = repoFullName.split("/")
 
     const [projectName, setProjectName] = useState(repoName || "")
@@ -289,26 +291,39 @@ function ConfigureProjectContent() {
         setError(null)
         try {
             const token = await getToken()
-            const response = await fetch(`${API_BASE_URL}/api/projects`, {
+
+            // Determine API endpoint: add service to existing project vs create new
+            const apiUrl = existingProjectId
+                ? `${API_BASE_URL}/api/projects/${existingProjectId}/services`
+                : `${API_BASE_URL}/api/projects`
+
+            const bodyPayload: Record<string, unknown> = {
+                organization_id: orgId || "",
+                name: projectName.trim(),
+                github_repo: repoFullName,
+                root_directory: rootDirectory,
+                env_vars: envVars.reduce((acc, { key, value }) => {
+                    if (key.trim()) acc[key.trim()] = value
+                    return acc
+                }, {} as Record<string, string>),
+                start_command: startCommand.trim(),
+                memory,
+                timeout,
+                ephemeral_storage: ephemeralStorage,
+            }
+
+            // When adding to existing project, include service_type
+            if (existingProjectId) {
+                bodyPayload.service_type = "web-app"
+            }
+
+            const response = await fetch(apiUrl, {
                 method: "POST",
                 headers: {
                     Authorization: `Bearer ${token}`,
                     "Content-Type": "application/json",
                 },
-                body: JSON.stringify({
-                    organization_id: orgId || "",
-                    name: projectName.trim(),
-                    github_repo: repoFullName,
-                    root_directory: rootDirectory,
-                    env_vars: envVars.reduce((acc, { key, value }) => {
-                        if (key.trim()) acc[key.trim()] = value
-                        return acc
-                    }, {} as Record<string, string>),
-                    start_command: startCommand.trim(),
-                    memory,
-                    timeout,
-                    ephemeral_storage: ephemeralStorage,
-                }),
+                body: JSON.stringify(bodyPayload),
             })
 
             if (!response.ok) {
@@ -317,10 +332,11 @@ function ConfigureProjectContent() {
             }
 
             const data = await response.json()
+            const projectId = existingProjectId || data.project_id
 
             // Track successful project creation
-            trackEvent('Project Created', {
-                project_id: data.project_id,
+            trackEvent(existingProjectId ? 'Service Added' : 'Project Created', {
+                project_id: projectId,
                 project_name: projectName.trim(),
                 github_repo: repoFullName,
                 memory_mb: memory,
@@ -330,7 +346,7 @@ function ConfigureProjectContent() {
                 user_tier: isPro ? 'pro' : 'hobby'
             })
 
-            router.push(`/projects/${data.project_id}`)
+            router.push(`/projects/${projectId}`)
         } catch (err) {
             console.error("Failed to create project:", err)
             setError(err instanceof Error ? err.message : "Failed to create project")
@@ -437,7 +453,7 @@ function ConfigureProjectContent() {
             <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
                 {/* Navigation */}
                 <Link
-                    href="/new/web-app"
+                    href={existingProjectId ? `/new/web-app?project_id=${existingProjectId}` : "/new/web-app"}
                     className="inline-flex items-center gap-1.5 text-sm text-zinc-500 hover:text-zinc-900 transition-colors mb-8 group"
                 >
                     <ArrowLeft className="h-4 w-4 transition-transform group-hover:-translate-x-1" />

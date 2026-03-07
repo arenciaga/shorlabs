@@ -22,8 +22,18 @@ interface DatabaseProjectViewProps {
 
 export function DatabaseProjectView({ hook }: DatabaseProjectViewProps) {
     const project = hook.data!.project
-    const statusConfig = STATUS_CONFIG[project.status] || STATUS_CONFIG.PENDING
-    const isBuilding = !["LIVE", "FAILED"].includes(project.status)
+    const service = hook.data!.services[0]
+    if (!service) return null
+
+    const statusConfig = STATUS_CONFIG[service.status] || STATUS_CONFIG.PENDING
+    const isBuilding = !["LIVE", "FAILED"].includes(service.status)
+
+    // Build a compat object for child components that still expect the old project shape
+    const serviceCompat = {
+        ...project,
+        ...service,
+        project_id: project.project_id,
+    }
 
     return (
         <>
@@ -45,7 +55,7 @@ export function DatabaseProjectView({ hook }: DatabaseProjectViewProps) {
                     </div>
 
                     {/* Deleting Banner */}
-                    {project.status === "DELETING" && (
+                    {service.status === "DELETING" && (
                         <div className="bg-red-50 border border-red-200 rounded-none p-4 mb-6 sm:mb-8">
                             <div className="flex items-center gap-3">
                                 <Loader2 className="h-5 w-5 text-red-500 animate-spin shrink-0" />
@@ -58,9 +68,9 @@ export function DatabaseProjectView({ hook }: DatabaseProjectViewProps) {
                     )}
 
                     {/* Connection Details Card */}
-                    {project.status !== "DELETING" && (
+                    {service.status !== "DELETING" && (
                         <DatabaseConnectionDetails
-                            project={project}
+                            project={serviceCompat}
                             isBuilding={isBuilding}
                             dbConnection={hook.dbConnection}
                             showPassword={hook.showPassword}
@@ -72,7 +82,7 @@ export function DatabaseProjectView({ hook }: DatabaseProjectViewProps) {
                     )}
 
                     {/* Provisioning Progress — not shown during deletion */}
-                    {isBuilding && project.status !== "DELETING" && (
+                    {isBuilding && service.status !== "DELETING" && (
                         <div className="bg-zinc-50 rounded-none border border-zinc-200 p-6 mb-8 overflow-hidden">
                             <div className="flex items-center gap-3">
                                 <div className="w-10 h-10 rounded-none bg-blue-900 flex items-center justify-center">
@@ -88,7 +98,7 @@ export function DatabaseProjectView({ hook }: DatabaseProjectViewProps) {
                     )}
 
                     {/* Tabs + Content — hidden while deleting */}
-                    {project.status !== "DELETING" && (<>
+                    {service.status !== "DELETING" && (<>
                         <TabNavigation
                             tabs={DB_TABS}
                             activeTab={hook.dbActiveTab}
@@ -106,7 +116,7 @@ export function DatabaseProjectView({ hook }: DatabaseProjectViewProps) {
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                         <div>
                                             <span className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Cluster</span>
-                                            <p className="text-sm text-zinc-900 font-mono mt-1">{project.db_cluster_identifier || "—"}</p>
+                                            <p className="text-sm text-zinc-900 font-mono mt-1">{service.db_cluster_identifier || "—"}</p>
                                         </div>
                                         <div>
                                             <span className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Engine</span>
@@ -114,11 +124,11 @@ export function DatabaseProjectView({ hook }: DatabaseProjectViewProps) {
                                         </div>
                                         <div>
                                             <span className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Min ACU</span>
-                                            <p className="text-sm text-zinc-900 mt-1">{project.min_acu ?? "—"}</p>
+                                            <p className="text-sm text-zinc-900 mt-1">{service.min_acu ?? "—"}</p>
                                         </div>
                                         <div>
                                             <span className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Max ACU</span>
-                                            <p className="text-sm text-zinc-900 mt-1">{project.max_acu ?? "—"}</p>
+                                            <p className="text-sm text-zinc-900 mt-1">{service.max_acu ?? "—"}</p>
                                         </div>
                                     </div>
                                 </div>
@@ -129,7 +139,7 @@ export function DatabaseProjectView({ hook }: DatabaseProjectViewProps) {
                                 <DatabaseExplorer
                                     projectId={project.project_id}
                                     orgId={hook.orgId ?? null}
-                                    projectStatus={project.status}
+                                    projectStatus={service.status}
                                 />
                             )}
 

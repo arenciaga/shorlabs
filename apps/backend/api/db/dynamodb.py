@@ -150,6 +150,11 @@ def generate_project_id() -> str:
     return uuid.uuid4().hex[:12]
 
 
+def generate_service_id() -> str:
+    """Generate a unique service ID."""
+    return uuid.uuid4().hex[:12]
+
+
 def generate_deploy_id() -> str:
     """Generate a unique deployment ID (Vercel-style)."""
     chars = string.ascii_letters + string.digits
@@ -238,73 +243,32 @@ def create_project(
     user_id: str,
     organization_id: str,
     name: str,
-    github_url: str = None,
-    github_repo: str = None,
-    env_vars: dict = None,
-    root_directory: str = "./",
-    start_command: str = "uvicorn main:app --host 0.0.0.0 --port 8080",
-    subdomain: str = None,
-    memory: int = 1024,
-    timeout: int = 30,
-    ephemeral_storage: int = 512,
-    project_type: str = "web-app",
-    db_name: str = None,
-    min_acu: float = None,
-    max_acu: float = None,
+    description: str = "",
 ) -> dict:
     """
-    Create a new project owned by an organization.
+    Create a new project container owned by an organization.
 
-    Projects use PK=ORG#{org_id} following Vercel's model where
-    organizations own projects, not individual users.
+    A project is a container that groups related services (web apps,
+    databases, etc.) together — following the Railway/Render model.
 
-    Supports two project types:
-    - "web-app": Lambda deployment from GitHub repo (default)
-    - "database": Aurora Serverless v2 PostgreSQL database
+    Services are added separately via create_service().
     """
     table = get_or_create_table()
     project_id = generate_project_id()
     now = datetime.utcnow().isoformat()
 
-    # Use ORG# for PK - organizations own projects (Vercel-like model)
     item = {
         "PK": f"ORG#{organization_id}",
         "SK": f"PROJECT#{project_id}",
         "project_id": project_id,
         "organization_id": organization_id,
         "created_by": user_id,
+        "entity_type": "project",
         "name": name,
-        "project_type": project_type,
-        "status": "PENDING",
+        "description": description,
         "created_at": now,
         "updated_at": now,
     }
-
-    if project_type == "database":
-        # Database-specific fields
-        item["db_name"] = db_name
-        item["min_acu"] = Decimal(str(min_acu))
-        item["max_acu"] = Decimal(str(max_acu))
-    else:
-        # Web-app-specific fields
-        if not subdomain:
-            subdomain = generate_unique_subdomain(name)
-        custom_url = f"https://{subdomain}.{SHORLABS_DOMAIN}"
-
-        item.update({
-            "github_url": github_url,
-            "github_repo": github_repo,
-            "function_url": None,
-            "ecr_repo": None,
-            "env_vars": env_vars or {},
-            "root_directory": root_directory,
-            "start_command": start_command,
-            "subdomain": subdomain,
-            "custom_url": custom_url,
-            "memory": memory,
-            "timeout": timeout,
-            "ephemeral_storage": ephemeral_storage,
-        })
 
     table.put_item(Item=item)
     return item
@@ -318,8 +282,12 @@ def get_project(project_id: str) -> Optional[dict]:
         KeyConditionExpression=Key("project_id").eq(project_id),
     )
     items = response.get("Items", [])
-    # Filter for project items (SK starts with PROJECT#)
-    project_items = [i for i in items if i.get("SK", "").startswith("PROJECT#")]
+    # Filter for project container items (SK = PROJECT#<id>, NOT PROJECT#<id>#SERVICE#...)
+    project_items = [
+        i for i in items
+        if i.get("SK", "").startswith("PROJECT#")
+        and "#SERVICE#" not in i.get("SK", "")
+    ]
     return project_items[0] if project_items else None
 
 
@@ -343,18 +311,23 @@ def get_project_by_key(org_id: str, project_id: str) -> Optional[dict]:
 
 def list_projects(org_id: str) -> list:
     """
-    List all projects for an organization.
-    
-    Projects are stored with PK=ORG#{org_id} (org-owned model).
-    No filtering needed - just query by org partition key.
+    List all projects (containers) for an organization.
+
+    Returns only project container items (entity_type="project").
+    Service items nested under projects are excluded.
     """
     table = get_or_create_table()
-    
+
     response = table.query(
         KeyConditionExpression=Key("PK").eq(f"ORG#{org_id}")
         & Key("SK").begins_with("PROJECT#"),
     )
-    return response.get("Items", [])
+    # Filter to container items only (SK = PROJECT#<id>, not PROJECT#<id>#SERVICE#...)
+    items = response.get("Items", [])
+    return [
+        i for i in items
+        if "#SERVICE#" not in i.get("SK", "")
+    ]
 
 
 def update_project(project_id: str, updates: dict) -> Optional[dict]:
@@ -381,7 +354,11 @@ def update_project(project_id: str, updates: dict) -> Optional[dict]:
 
 
 def delete_project(project_id: str) -> bool:
-    """Delete a project, its deployments, and any custom domain items."""
+    """
+    Delete a project container, all its services, deployments, and domains.
+
+    Cascades: project → services → per-service deployments & domains.
+    """
     project = get_project(project_id)
     if not project:
         return False
@@ -389,21 +366,285 @@ def delete_project(project_id: str) -> bool:
     projects_table = get_or_create_table()
     deployments_table = get_or_create_deployments_table()
 
-    # Delete all custom domain items for this project
-    domains = list_project_domains(project_id)
-    with projects_table.batch_writer() as batch:
-        for d in domains:
-            batch.delete_item(Key={"PK": d["PK"], "SK": d["SK"]})
+    # Delete all services under this project (and their associated resources)
+    services = list_services(project_id)
+    for svc in services:
+        sid = svc["service_id"]
+        # Delete domains for the service
+        svc_domains = list_project_domains(sid)
+        if svc_domains:
+            domains_table = get_or_create_domains_table()
+            with domains_table.batch_writer() as batch:
+                for d in svc_domains:
+                    batch.delete_item(Key={"domain": d["domain"], "SK": d["SK"]})
+        # Delete deployments for the service
+        svc_deployments = list_deployments(sid)
+        if svc_deployments:
+            with deployments_table.batch_writer() as batch:
+                for d in svc_deployments:
+                    batch.delete_item(Key={"project_id": d["project_id"], "SK": d["SK"]})
+        # Delete the service item itself
+        projects_table.delete_item(Key={"PK": svc["PK"], "SK": svc["SK"]})
 
-    # Delete all deployments for this project from the deployments table
-    deployments = list_deployments(project_id)
-    with deployments_table.batch_writer() as batch:
-        for d in deployments:
-            batch.delete_item(Key={"project_id": d["project_id"], "SK": d["SK"]})
+    # Also delete any legacy domains/deployments keyed by project_id itself
+    legacy_domains = list_project_domains(project_id)
+    if legacy_domains:
+        domains_table = get_or_create_domains_table()
+        with domains_table.batch_writer() as batch:
+            for d in legacy_domains:
+                batch.delete_item(Key={"domain": d["domain"], "SK": d["SK"]})
+    legacy_deployments = list_deployments(project_id)
+    if legacy_deployments:
+        with deployments_table.batch_writer() as batch:
+            for d in legacy_deployments:
+                batch.delete_item(Key={"project_id": d["project_id"], "SK": d["SK"]})
 
-    # Delete project from projects table
+    # Delete the project container itself
     projects_table.delete_item(Key={"PK": project["PK"], "SK": project["SK"]})
     return True
+
+
+# ─────────────────────────────────────────────────────────────
+# SERVICE OPERATIONS (resources within a project)
+# ─────────────────────────────────────────────────────────────
+
+
+def create_service(
+    user_id: str,
+    organization_id: str,
+    project_id: str,
+    name: str,
+    service_type: str = "web-app",
+    # Web-app fields
+    github_url: str = None,
+    github_repo: str = None,
+    env_vars: dict = None,
+    root_directory: str = "./",
+    start_command: str = "uvicorn main:app --host 0.0.0.0 --port 8080",
+    subdomain: str = None,
+    memory: int = 1024,
+    timeout: int = 30,
+    ephemeral_storage: int = 512,
+    # Database fields
+    db_name: str = None,
+    min_acu: float = None,
+    max_acu: float = None,
+) -> dict:
+    """
+    Create a new service (resource) inside a project.
+
+    Services are stored with:
+        PK = ORG#{org_id}
+        SK = PROJECT#{project_id}#SERVICE#{service_id}
+
+    This allows fetching a project + all services in a single query
+    using begins_with(SK, "PROJECT#{project_id}").
+
+    Supports two service types:
+    - "web-app": Lambda deployment from GitHub repo
+    - "database": Aurora Serverless v2 PostgreSQL database
+    """
+    table = get_or_create_table()
+    service_id = generate_service_id()
+    now = datetime.utcnow().isoformat()
+
+    item = {
+        "PK": f"ORG#{organization_id}",
+        "SK": f"PROJECT#{project_id}#SERVICE#{service_id}",
+        "project_id": project_id,
+        "service_id": service_id,
+        "organization_id": organization_id,
+        "created_by": user_id,
+        "entity_type": "service",
+        "name": name,
+        "service_type": service_type,
+        "status": "PENDING",
+        "created_at": now,
+        "updated_at": now,
+    }
+
+    if service_type == "database":
+        item["db_name"] = db_name
+        item["min_acu"] = Decimal(str(min_acu)) if min_acu is not None else Decimal("0")
+        item["max_acu"] = Decimal(str(max_acu)) if max_acu is not None else Decimal("2")
+    else:
+        if not subdomain:
+            subdomain = generate_unique_subdomain(name)
+        custom_url = f"https://{subdomain}.{SHORLABS_DOMAIN}"
+
+        item.update({
+            "github_url": github_url,
+            "github_repo": github_repo,
+            "function_url": None,
+            "ecr_repo": None,
+            "env_vars": env_vars or {},
+            "root_directory": root_directory,
+            "start_command": start_command,
+            "subdomain": subdomain,
+            "custom_url": custom_url,
+            "memory": memory,
+            "timeout": timeout,
+            "ephemeral_storage": ephemeral_storage,
+        })
+
+    table.put_item(Item=item)
+    return item
+
+
+def list_services(project_id: str, org_id: str = None) -> list:
+    """
+    List all services under a project.
+
+    If org_id is provided, uses direct query (efficient).
+    Otherwise falls back to GSI lookup to find the org first.
+    """
+    table = get_or_create_table()
+
+    if org_id:
+        response = table.query(
+            KeyConditionExpression=(
+                Key("PK").eq(f"ORG#{org_id}")
+                & Key("SK").begins_with(f"PROJECT#{project_id}#SERVICE#")
+            ),
+        )
+        return response.get("Items", [])
+
+    # Fallback: find org via the project container
+    project = get_project(project_id)
+    if not project:
+        return []
+    return list_services(project_id, org_id=project["organization_id"])
+
+
+def get_service(service_id: str) -> Optional[dict]:
+    """
+    Get a service by its service_id using the project-id-index GSI.
+
+    NOTE: Services also have project_id indexed in the GSI, but their
+    SK contains #SERVICE#, which distinguishes them from project containers.
+    We search by service_id instead, which is also stored as a top-level attribute.
+    """
+    table = get_or_create_table()
+    # Scan with filter — works for now; add a GSI on service_id if this becomes a bottleneck
+    response = table.scan(
+        FilterExpression="service_id = :sid AND entity_type = :et",
+        ExpressionAttributeValues={
+            ":sid": service_id,
+            ":et": "service",
+        },
+    )
+    items = response.get("Items", [])
+    return items[0] if items else None
+
+
+def get_service_by_key(org_id: str, project_id: str, service_id: str) -> Optional[dict]:
+    """
+    Get a service by its composite key (efficient O(1) GetItem).
+    """
+    table = get_or_create_table()
+    response = table.get_item(
+        Key={
+            "PK": f"ORG#{org_id}",
+            "SK": f"PROJECT#{project_id}#SERVICE#{service_id}",
+        },
+        ConsistentRead=True,
+    )
+    return response.get("Item")
+
+
+def update_service(service_id: str, updates: dict) -> Optional[dict]:
+    """Update a service."""
+    service = get_service(service_id)
+    if not service:
+        return None
+
+    table = get_or_create_table()
+    updates["updated_at"] = datetime.utcnow().isoformat()
+
+    update_expr = "SET " + ", ".join(f"#{k} = :{k}" for k in updates.keys())
+    expr_names = {f"#{k}": k for k in updates.keys()}
+    expr_values = {f":{k}": v for k, v in updates.items()}
+
+    response = table.update_item(
+        Key={"PK": service["PK"], "SK": service["SK"]},
+        UpdateExpression=update_expr,
+        ExpressionAttributeNames=expr_names,
+        ExpressionAttributeValues=expr_values,
+        ReturnValues="ALL_NEW",
+    )
+    return response.get("Attributes")
+
+
+def delete_service(service_id: str) -> bool:
+    """
+    Delete a single service and its associated deployments and domains.
+    """
+    service = get_service(service_id)
+    if not service:
+        return False
+
+    projects_table = get_or_create_table()
+    deployments_table = get_or_create_deployments_table()
+
+    # Delete domains
+    domains = list_project_domains(service_id)
+    if domains:
+        domains_table = get_or_create_domains_table()
+        with domains_table.batch_writer() as batch:
+            for d in domains:
+                batch.delete_item(Key={"domain": d["domain"], "SK": d["SK"]})
+
+    # Delete deployments
+    deployments = list_deployments(service_id)
+    if deployments:
+        with deployments_table.batch_writer() as batch:
+            for d in deployments:
+                batch.delete_item(Key={"project_id": d["project_id"], "SK": d["SK"]})
+
+    # Delete the service item
+    projects_table.delete_item(Key={"PK": service["PK"], "SK": service["SK"]})
+    return True
+
+
+def get_project_with_services(project_id: str, org_id: str = None) -> Optional[dict]:
+    """
+    Get a project container plus all its services in a single query.
+
+    Returns: {"project": {...}, "services": [{...}, ...]}
+    """
+    if not org_id:
+        project = get_project(project_id)
+        if not project:
+            return None
+        org_id = project["organization_id"]
+
+    table = get_or_create_table()
+    response = table.query(
+        KeyConditionExpression=(
+            Key("PK").eq(f"ORG#{org_id}")
+            & Key("SK").begins_with(f"PROJECT#{project_id}")
+        ),
+    )
+    items = response.get("Items", [])
+    if not items:
+        return None
+
+    project_item = None
+    service_items = []
+    for item in items:
+        sk = item.get("SK", "")
+        if "#SERVICE#" in sk:
+            service_items.append(item)
+        elif sk == f"PROJECT#{project_id}":
+            project_item = item
+
+    if not project_item:
+        return None
+
+    return {
+        "project": project_item,
+        "services": service_items,
+    }
 
 
 # ─────────────────────────────────────────────────────────────

@@ -1,5 +1,5 @@
 """
-Projects API routes - CRUD operations for projects.
+Projects API routes - CRUD operations for projects and services.
 """
 import os
 import json
@@ -21,6 +21,13 @@ from api.db.dynamodb import (
     list_projects,
     update_project,
     delete_project,
+    create_service,
+    get_service,
+    get_service_by_key,
+    list_services,
+    update_service,
+    delete_service,
+    get_project_with_services,
     create_deployment,
     list_deployments,
     update_deployment,
@@ -49,20 +56,41 @@ AUTUMN_BASE_URL = os.environ.get("AUTUMN_BASE_URL", "https://api.useautumn.com/v
 
 
 class CreateProjectRequest(BaseModel):
+    """Create a project container with an initial service."""
     name: str
     organization_id: str
-    github_repo: str  # e.g., "aryankashyap0/amber-backend"
-    root_directory: Optional[str] = "./"  # Root directory for monorepos
-    env_vars: Optional[dict] = None  # Environment variables
-    start_command: str  # Required: e.g., "uvicorn main:app --host 0.0.0.0 --port 8080"
-    memory: Optional[int] = 1024  # Memory in MB (1024, 2048, 4096)
-    timeout: Optional[int] = 30  # Timeout in seconds
-    ephemeral_storage: Optional[int] = 512  # Ephemeral storage in MB (512, 1024, 2048)
-
+    description: Optional[str] = ""
+    # Web-app service fields (used when creating initial service)
+    github_repo: str
+    root_directory: Optional[str] = "./"
+    env_vars: Optional[dict] = None
+    start_command: str
+    memory: Optional[int] = 1024
+    timeout: Optional[int] = 30
+    ephemeral_storage: Optional[int] = 512
 
 class CreateDatabaseProjectRequest(BaseModel):
+    """Create a project container with an initial database service."""
     name: str
     organization_id: str
+    description: Optional[str] = ""
+    db_name: Optional[str] = "shorlabs"
+    min_acu: Optional[float] = 0
+    max_acu: Optional[float] = 2
+
+class AddServiceRequest(BaseModel):
+    """Add a new service to an existing project."""
+    name: str
+    service_type: str  # "web-app" or "database"
+    # Web-app fields
+    github_repo: Optional[str] = None
+    root_directory: Optional[str] = "./"
+    env_vars: Optional[dict] = None
+    start_command: Optional[str] = "uvicorn main:app --host 0.0.0.0 --port 8080"
+    memory: Optional[int] = 1024
+    timeout: Optional[int] = 30
+    ephemeral_storage: Optional[int] = 512
+    # Database fields
     db_name: Optional[str] = "shorlabs"
     min_acu: Optional[float] = 0
     max_acu: Optional[float] = 2
@@ -89,7 +117,7 @@ class ProjectResponse(BaseModel):
 
 
 def _run_deployment_sync(
-    project_id: str,
+    service_id: str,
     github_url: str,
     github_token: Optional[str],
     root_directory: str = "./",
@@ -116,7 +144,7 @@ def _run_deployment_sync(
         nonlocal deployment
         build_id_holder[0] = build_id
         deployment = create_deployment(
-            project_id, build_id,
+            service_id, build_id,
             commit_sha=commit_sha,
             commit_message=commit_message,
             commit_author_name=commit_author_name,
@@ -127,7 +155,7 @@ def _run_deployment_sync(
     
     try:
         # Update status to building
-        update_project(project_id, {"status": "BUILDING"})
+        update_service(service_id, {"status": "BUILDING"})
 
         # Determine CodeBuild compute type based on org plan:
         #   Hobby/Free → BUILD_GENERAL1_SMALL
@@ -153,7 +181,7 @@ def _run_deployment_sync(
             timeout=timeout,
             ephemeral_storage=ephemeral_storage,
             on_build_start=on_build_start,  # Create deployment record immediately
-            project_id=project_id,  # Pass project_id for unique Lambda naming
+            project_id=service_id,  # Pass service_id for unique Lambda naming
             codebuild_compute_type=codebuild_compute_type,
         )
         
@@ -162,13 +190,13 @@ def _run_deployment_sync(
         
         # Update deployment as successful
         if deployment:
-            update_deployment(project_id, deployment["deploy_id"], {
+            update_deployment(service_id, deployment["deploy_id"], {
                 "status": "SUCCEEDED",
                 "finished_at": datetime.utcnow().isoformat(),
             })
         
-        # Update project as complete, including the function_name for usage tracking
-        update_project(project_id, {
+        # Update service as complete, including the function_name for usage tracking
+        update_service(service_id, {
             "status": "LIVE",
             "function_url": function_url,
             "function_name": function_name,  # Store for usage aggregation
@@ -178,7 +206,7 @@ def _run_deployment_sync(
         # Lambda@Edge reads function_url from DOMAIN items, so they must stay in sync
         try:
             from api.db.dynamodb import list_project_domains, update_domain
-            custom_domains = list_project_domains(project_id)
+            custom_domains = list_project_domains(service_id)
             for domain_item in custom_domains:
                 if domain_item.get("status") == "ACTIVE":
                     update_domain(domain_item["domain"], {
@@ -189,9 +217,9 @@ def _run_deployment_sync(
             print(f"⚠️ Failed to propagate function_url to domains: {domain_err}")
 
         # If the org is throttled, immediately throttle this new function too
-        project_data = get_project(project_id)
-        if project_data:
-            org_id = project_data.get("organization_id")
+        service_data = get_service(service_id)
+        if service_data:
+            org_id = service_data.get("organization_id")
 
             # Post-deploy warming: pre-warm the new Lambda (paid plans only)
             if org_id:
@@ -222,12 +250,12 @@ def _run_deployment_sync(
     except Exception as e:
         # Update deployment as failed if it was created
         if deployment:
-            update_deployment(project_id, deployment["deploy_id"], {
+            update_deployment(service_id, deployment["deploy_id"], {
                 "status": "FAILED",
                 "finished_at": datetime.utcnow().isoformat(),
             })
         
-        update_project(project_id, {"status": "FAILED"})
+        update_service(service_id, {"status": "FAILED"})
         print(f"❌ Deployment failed: {e}")
         import traceback
         traceback.print_exc()
@@ -361,7 +389,7 @@ def _normalize_serverless_v2_capacity(min_acu: float, max_acu: float) -> tuple[f
 
 
 def _run_database_provision_sync(
-    project_id: str,
+    service_id: str,
     db_name: str = "shorlabs",
     min_acu: float = 0,
     max_acu: float = 2,
@@ -369,16 +397,16 @@ def _run_database_provision_sync(
     """Synchronous database provisioning - runs in thread pool or via SQS."""
     try:
         normalized_min_acu, normalized_max_acu = _normalize_serverless_v2_capacity(min_acu, max_acu)
-        update_project(project_id, {"status": "PROVISIONING"})
+        update_service(service_id, {"status": "PROVISIONING"})
 
         result = provision_database(
-            project_id=project_id,
+            project_id=service_id,
             db_name=db_name,
             min_acu=normalized_min_acu,
             max_acu=normalized_max_acu,
         )
 
-        update_project(project_id, {
+        update_service(service_id, {
             "status": "LIVE",
             "db_cluster_identifier": result["cluster_identifier"],
             "db_endpoint": result["endpoint"],
@@ -391,14 +419,14 @@ def _run_database_provision_sync(
         print(f"✅ Database provisioned: {result['endpoint']}:{result['port']}")
 
     except Exception as e:
-        update_project(project_id, {"status": "FAILED"})
+        update_service(service_id, {"status": "FAILED"})
         print(f"❌ Database provisioning failed: {e}")
         import traceback
         traceback.print_exc()
 
 
 def send_database_provision_to_sqs(
-    project_id: str,
+    service_id: str,
     db_name: str = "shorlabs",
     min_acu: float = 0,
     max_acu: float = 2,
@@ -411,10 +439,10 @@ def send_database_provision_to_sqs(
     if not os.environ.get("AWS_LAMBDA_FUNCTION_NAME"):
         # Running locally - use thread pool fallback
         def run_in_thread():
-            _run_database_provision_sync(project_id, db_name, normalized_min_acu, normalized_max_acu)
+            _run_database_provision_sync(service_id, db_name, normalized_min_acu, normalized_max_acu)
         thread = threading.Thread(target=run_in_thread)
         thread.start()
-        print(f"📤 Local: Database provisioning started in background thread for project {project_id}")
+        print(f"📤 Local: Database provisioning started in background thread for service {service_id}")
         return
 
     # Running on Lambda - send message to SQS queue
@@ -424,14 +452,14 @@ def send_database_provision_to_sqs(
     if not queue_url:
         print("⚠️ DEPLOY_QUEUE_URL not set, falling back to thread-based execution")
         def run_in_thread():
-            _run_database_provision_sync(project_id, db_name, normalized_min_acu, normalized_max_acu)
+            _run_database_provision_sync(service_id, db_name, normalized_min_acu, normalized_max_acu)
         thread = threading.Thread(target=run_in_thread)
         thread.start()
         return
 
     message_body = {
         "message_type": "database_provision",
-        "project_id": project_id,
+        "project_id": service_id,
         "db_name": db_name,
         "min_acu": normalized_min_acu,
         "max_acu": normalized_max_acu,
@@ -440,11 +468,11 @@ def send_database_provision_to_sqs(
     response = sqs_client.send_message(
         QueueUrl=queue_url,
         MessageBody=json.dumps(message_body),
-        MessageGroupId=project_id,
-        MessageDeduplicationId=f"{project_id}-db-{int(time.time())}",
+        MessageGroupId=service_id,
+        MessageDeduplicationId=f"{service_id}-db-{int(time.time())}",
     )
 
-    print(f"📤 Database provisioning queued for project {project_id}, MessageId: {response['MessageId']}")
+    print(f"📤 Database provisioning queued for service {service_id}, MessageId: {response['MessageId']}")
 
 
 # ─────────────────────────────────────────────────────────────
@@ -452,20 +480,20 @@ def send_database_provision_to_sqs(
 # ─────────────────────────────────────────────────────────────
 
 
-def _run_database_delete_sync(project_id: str):
+def _run_database_delete_sync(service_id: str):
     """Synchronous database deletion - runs in thread pool or via SQS."""
     try:
-        result = delete_database_resources(project_id)
-        print(f"✅ Database resources deleted for project {project_id}: {result}")
+        result = delete_database_resources(service_id)
+        print(f"✅ Database resources deleted for service {service_id}: {result}")
 
-        # Now remove the DynamoDB record
-        delete_project(project_id)
-        print(f"✅ Project record deleted for {project_id}")
+        # Now remove the DynamoDB record (service item)
+        delete_service(service_id)
+        print(f"✅ Service record deleted for {service_id}")
 
     except Exception as e:
         # Mark as FAILED so the user knows something went wrong
-        update_project(project_id, {"status": "FAILED"})
-        print(f"❌ Database deletion failed for {project_id}: {e}")
+        update_service(service_id, {"status": "FAILED"})
+        print(f"❌ Database deletion failed for {service_id}: {e}")
         import traceback
         traceback.print_exc()
 
@@ -530,7 +558,7 @@ async def create_new_project(
     request: CreateProjectRequest,
     user_id: str = Depends(get_current_user_id),
 ):
-    """Create a new project and start deployment."""
+    """Create a new project container with an initial web-app service."""
     from api.routes.github import get_or_refresh_token, fetch_latest_commit
 
     github_url = f"https://github.com/{request.github_repo}"
@@ -555,11 +583,21 @@ async def create_new_project(
     timeout = request.timeout or 30
     ephemeral_storage = request.ephemeral_storage or 512
 
-    # Create project in DynamoDB
+    # 1. Create project container
     project = create_project(
         user_id=user_id,
         organization_id=request.organization_id,
         name=request.name,
+        description=request.description or "",
+    )
+
+    # 2. Create web-app service inside the project
+    service = create_service(
+        user_id=user_id,
+        organization_id=request.organization_id,
+        project_id=project["project_id"],
+        name=request.name,
+        service_type="web-app",
         github_url=github_url,
         github_repo=request.github_repo,
         env_vars=request.env_vars,
@@ -570,14 +608,14 @@ async def create_new_project(
         ephemeral_storage=ephemeral_storage,
     )
 
-    # Start deployment via SQS queue (industry-standard background task pattern)
+    # 3. Start deployment via SQS queue
     send_deployment_to_sqs(
-        project["project_id"],
+        service["service_id"],
         github_url,
         github_token,
         root_directory,
         request.start_command,
-        request.env_vars,  # Pass env_vars to deployment
+        request.env_vars,
         memory,
         timeout,
         ephemeral_storage,
@@ -587,12 +625,13 @@ async def create_new_project(
     
     return {
         "project_id": project["project_id"],
+        "service_id": service["service_id"],
         "organization_id": project.get("organization_id"),
         "name": project["name"],
-        "github_url": project["github_url"],
-        "status": project["status"],
-        "subdomain": project.get("subdomain"),
-        "custom_url": project.get("custom_url"),
+        "service_type": "web-app",
+        "status": service["status"],
+        "subdomain": service.get("subdomain"),
+        "custom_url": service.get("custom_url"),
     }
 
 
@@ -601,7 +640,7 @@ async def create_database_project(
     request: CreateDatabaseProjectRequest,
     user_id: str = Depends(get_current_user_id),
 ):
-    """Create a new database project and start provisioning."""
+    """Create a new project container with an initial database service."""
     if not request.organization_id or not request.organization_id.strip():
         raise HTTPException(status_code=400, detail="organization_id is required")
 
@@ -610,18 +649,29 @@ async def create_database_project(
         request.max_acu if request.max_acu is not None else 2,
     )
 
+    # 1. Create project container
     project = create_project(
         user_id=user_id,
         organization_id=request.organization_id,
         name=request.name,
-        project_type="database",
+        description=request.description or "",
+    )
+
+    # 2. Create database service inside the project
+    service = create_service(
+        user_id=user_id,
+        organization_id=request.organization_id,
+        project_id=project["project_id"],
+        name=request.name,
+        service_type="database",
         db_name=request.db_name,
         min_acu=normalized_min_acu,
         max_acu=normalized_max_acu,
     )
 
+    # 3. Start provisioning via SQS queue
     send_database_provision_to_sqs(
-        project["project_id"],
+        service["service_id"],
         request.db_name,
         normalized_min_acu,
         normalized_max_acu,
@@ -629,19 +679,101 @@ async def create_database_project(
 
     return {
         "project_id": project["project_id"],
+        "service_id": service["service_id"],
         "organization_id": project.get("organization_id"),
         "name": project["name"],
-        "project_type": "database",
-        "status": project["status"],
+        "service_type": "database",
+        "status": service["status"],
+    }
+
+
+@router.post("/{project_id}/services")
+async def add_service_to_project(
+    project_id: str,
+    request: AddServiceRequest,
+    user_id: str = Depends(get_current_user_id),
+    org_id: str = Query(...),
+):
+    """Add a new service (web-app or database) to an existing project."""
+    project = get_project_by_key(org_id, project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    if request.service_type == "database":
+        normalized_min_acu, normalized_max_acu = _normalize_serverless_v2_capacity(
+            request.min_acu if request.min_acu is not None else 0,
+            request.max_acu if request.max_acu is not None else 2,
+        )
+        service = create_service(
+            user_id=user_id,
+            organization_id=org_id,
+            project_id=project_id,
+            name=request.name,
+            service_type="database",
+            db_name=request.db_name,
+            min_acu=normalized_min_acu,
+            max_acu=normalized_max_acu,
+        )
+        send_database_provision_to_sqs(
+            service["service_id"],
+            request.db_name,
+            normalized_min_acu,
+            normalized_max_acu,
+        )
+    else:
+        from api.routes.github import get_or_refresh_token, fetch_latest_commit
+        if not request.github_repo:
+            raise HTTPException(status_code=400, detail="github_repo is required for web-app services")
+        github_url = f"https://github.com/{request.github_repo}"
+        github_token = await get_or_refresh_token(org_id, user_id)
+        commit_info = {}
+        if github_token:
+            commit_info = await fetch_latest_commit(github_token, request.github_repo)
+
+        service = create_service(
+            user_id=user_id,
+            organization_id=org_id,
+            project_id=project_id,
+            name=request.name,
+            service_type="web-app",
+            github_url=github_url,
+            github_repo=request.github_repo,
+            env_vars=request.env_vars,
+            root_directory=request.root_directory or "./",
+            start_command=request.start_command,
+            memory=request.memory or 1024,
+            timeout=request.timeout or 30,
+            ephemeral_storage=request.ephemeral_storage or 512,
+        )
+        send_deployment_to_sqs(
+            service["service_id"],
+            github_url,
+            github_token,
+            request.root_directory or "./",
+            request.start_command,
+            request.env_vars,
+            request.memory or 1024,
+            request.timeout or 30,
+            request.ephemeral_storage or 512,
+            **commit_info,
+            org_id=org_id,
+        )
+
+    return {
+        "project_id": project_id,
+        "service_id": service["service_id"],
+        "name": service["name"],
+        "service_type": service["service_type"],
+        "status": service["status"],
     }
 
 
 @router.get("")
 async def get_projects(
-    user_id: str = Depends(get_current_user_id),  # For auth
+    user_id: str = Depends(get_current_user_id),
     org_id: str = Query(...),
 ):
-    """List all projects for the organization."""
+    """List all projects for the organization, each with its services."""
     projects = list_projects(org_id)
 
     # Check org-level throttle state (single lookup for all projects)
@@ -651,39 +783,49 @@ async def get_projects(
 
     result = []
     for p in projects:
-        # Find first active custom domain for this project
-        domains = list_project_domains(p["project_id"])
-        active_domain = next(
-            (d["domain"] for d in domains if d.get("status") == "ACTIVE"),
-            None,
-        )
+        pid = p["project_id"]
+        services = list_services(pid, org_id=org_id)
+
+        services_summary = []
+        for svc in services:
+            svc_data = {
+                "service_id": svc["service_id"],
+                "name": svc["name"],
+                "service_type": svc.get("service_type", "web-app"),
+                "status": svc["status"],
+            }
+            if svc.get("service_type", "web-app") != "database":
+                # Find active custom domain for the service
+                svc_domains = list_project_domains(svc["service_id"])
+                active_domain = next(
+                    (d["domain"] for d in svc_domains if d.get("status") == "ACTIVE"),
+                    None,
+                )
+                svc_data.update({
+                    "subdomain": svc.get("subdomain"),
+                    "custom_url": svc.get("custom_url"),
+                    "function_url": svc.get("function_url"),
+                    "active_custom_domain": active_domain,
+                    "github_repo": svc.get("github_repo"),
+                })
+            else:
+                svc_data.update({
+                    "db_endpoint": svc.get("db_endpoint"),
+                    "db_port": svc.get("db_port"),
+                    "db_name": svc.get("db_name"),
+                })
+            services_summary.append(svc_data)
 
         project_data = {
-            "project_id": p["project_id"],
+            "project_id": pid,
             "organization_id": p.get("organization_id"),
             "name": p["name"],
-            "project_type": p.get("project_type", "web-app"),
-            "status": p["status"],
+            "description": p.get("description", ""),
             "created_at": p["created_at"],
             "updated_at": p["updated_at"],
             "is_throttled": is_throttled,
+            "services": services_summary,
         }
-
-        if p.get("project_type", "web-app") == "database":
-            project_data.update({
-                "db_endpoint": p.get("db_endpoint"),
-                "db_port": p.get("db_port"),
-                "db_name": p.get("db_name"),
-            })
-        else:
-            project_data.update({
-                "github_url": p.get("github_url"),
-                "github_repo": p.get("github_repo"),
-                "function_url": p.get("function_url"),
-                "subdomain": p.get("subdomain"),
-                "custom_url": p.get("custom_url"),
-                "active_custom_domain": active_domain,
-            })
 
         result.append(project_data)
 
@@ -696,96 +838,127 @@ async def get_project_details(
     user_id: str = Depends(get_current_user_id),
     org_id: str = Query(...),
 ):
-    """Get project details with deployment history."""
+    """Get project container with all its services and their details."""
 
     project = get_project_by_key(org_id, project_id)
 
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    project_type = project.get("project_type", "web-app")
-
-    # Build base project response
-    project_response = {
-        "project_id": project["project_id"],
-        "organization_id": project.get("organization_id"),
-        "name": project["name"],
-        "project_type": project_type,
-        "status": project["status"],
-        "created_at": project["created_at"],
-        "updated_at": project["updated_at"],
-    }
-
-    if project_type == "database":
-        # Database-specific fields
-        project_response.update({
-            "db_cluster_identifier": project.get("db_cluster_identifier"),
-            "db_endpoint": project.get("db_endpoint"),
-            "db_port": project.get("db_port"),
-            "db_name": project.get("db_name"),
-            "db_master_username": project.get("db_master_username"),
-            "min_acu": project.get("min_acu"),
-            "max_acu": project.get("max_acu"),
-        })
-
-        return {
-            "project": project_response,
-            "deployments": [],
-            "custom_domains": [],
-        }
-
-    # Web-app-specific fields
     from api.db.dynamodb import get_throttle_state, list_project_domains
     throttle_state = get_throttle_state(org_id)
     is_throttled = bool(throttle_state and throttle_state.get("is_throttled"))
 
-    project_response.update({
-        "github_url": project.get("github_url"),
-        "github_repo": project.get("github_repo"),
-        "function_url": project.get("function_url"),
-        "subdomain": project.get("subdomain"),
-        "custom_url": project.get("custom_url"),
-        "ecr_repo": project.get("ecr_repo"),
-        "env_vars": project.get("env_vars", {}),
-        "start_command": project.get("start_command", ""),
-        "root_directory": project.get("root_directory", "./"),
-        "memory": project.get("memory", 1024),
-        "timeout": project.get("timeout", 30),
-        "ephemeral_storage": project.get("ephemeral_storage", 512),
-        "is_throttled": is_throttled,
-    })
+    # Get all services for this project
+    services = list_services(project_id, org_id=org_id)
 
-    deployments = list_deployments(project_id)
-    custom_domains = list_project_domains(project_id)
+    services_response = []
+    for svc in services:
+        sid = svc["service_id"]
+        svc_type = svc.get("service_type", "web-app")
+
+        svc_response = {
+            "service_id": sid,
+            "project_id": project_id,
+            "name": svc["name"],
+            "service_type": svc_type,
+            "status": svc["status"],
+            "created_at": svc["created_at"],
+            "updated_at": svc["updated_at"],
+        }
+
+        if svc_type == "database":
+            svc_response.update({
+                "db_cluster_identifier": svc.get("db_cluster_identifier"),
+                "db_endpoint": svc.get("db_endpoint"),
+                "db_port": svc.get("db_port"),
+                "db_name": svc.get("db_name"),
+                "db_master_username": svc.get("db_master_username"),
+                "min_acu": svc.get("min_acu"),
+                "max_acu": svc.get("max_acu"),
+            })
+            svc_response["deployments"] = []
+            svc_response["custom_domains"] = []
+        else:
+            svc_response.update({
+                "github_url": svc.get("github_url"),
+                "github_repo": svc.get("github_repo"),
+                "function_url": svc.get("function_url"),
+                "subdomain": svc.get("subdomain"),
+                "custom_url": svc.get("custom_url"),
+                "ecr_repo": svc.get("ecr_repo"),
+                "env_vars": svc.get("env_vars", {}),
+                "start_command": svc.get("start_command", ""),
+                "root_directory": svc.get("root_directory", "./"),
+                "memory": svc.get("memory", 1024),
+                "timeout": svc.get("timeout", 30),
+                "ephemeral_storage": svc.get("ephemeral_storage", 512),
+                "is_throttled": is_throttled,
+            })
+
+            deployments = list_deployments(sid)
+            custom_domains = list_project_domains(sid)
+
+            svc_response["deployments"] = [
+                {
+                    "deploy_id": d["deploy_id"],
+                    "build_id": d["build_id"],
+                    "status": d["status"],
+                    "started_at": d["started_at"],
+                    "finished_at": d.get("finished_at"),
+                    "commit_sha": d.get("commit_sha"),
+                    "commit_message": d.get("commit_message"),
+                    "commit_author_name": d.get("commit_author_name"),
+                    "commit_author_username": d.get("commit_author_username"),
+                    "branch": d.get("branch"),
+                }
+                for d in deployments
+            ]
+            svc_response["custom_domains"] = [
+                {
+                    "domain": d.get("domain"),
+                    "status": d.get("status"),
+                    "is_active": d.get("status") == "ACTIVE",
+                    "tenant_id": d.get("tenant_id"),
+                    "created_at": d.get("created_at"),
+                }
+                for d in custom_domains
+            ]
+
+        services_response.append(svc_response)
 
     return {
-        "project": project_response,
-        "deployments": [
-            {
-                "deploy_id": d["deploy_id"],
-                "build_id": d["build_id"],
-                "status": d["status"],
-                "started_at": d["started_at"],
-                "finished_at": d.get("finished_at"),
-                "commit_sha": d.get("commit_sha"),
-                "commit_message": d.get("commit_message"),
-                "commit_author_name": d.get("commit_author_name"),
-                "commit_author_username": d.get("commit_author_username"),
-                "branch": d.get("branch"),
-            }
-            for d in deployments
-        ],
-        "custom_domains": [
-            {
-                "domain": d.get("domain"),
-                "status": d.get("status"),
-                "is_active": d.get("status") == "ACTIVE",
-                "tenant_id": d.get("tenant_id"),
-                "created_at": d.get("created_at"),
-            }
-            for d in custom_domains
-        ],
+        "project": {
+            "project_id": project["project_id"],
+            "organization_id": project.get("organization_id"),
+            "name": project["name"],
+            "description": project.get("description", ""),
+            "created_at": project["created_at"],
+            "updated_at": project["updated_at"],
+            "is_throttled": is_throttled,
+        },
+        "services": services_response,
     }
+
+
+def _resolve_service(org_id: str, project_id: str, service_id: str = None, service_type: str = None) -> dict:
+    """Resolve a service from project_id and optional service_id.
+
+    For backward compatibility: if no service_id is given, returns the first
+    (or only) service under the project, optionally filtered by type.
+    """
+    if service_id:
+        svc = get_service_by_key(org_id, project_id, service_id)
+        if not svc:
+            raise HTTPException(status_code=404, detail="Service not found")
+        return svc
+
+    services = list_services(project_id, org_id=org_id)
+    if service_type:
+        services = [s for s in services if s.get("service_type") == service_type]
+    if not services:
+        raise HTTPException(status_code=404, detail="No matching service found")
+    return services[0]
 
 
 @router.get("/{project_id}/status")
@@ -793,21 +966,20 @@ async def get_project_status(
     project_id: str,
     user_id: str = Depends(get_current_user_id),
     org_id: str = Query(...),
+    service_id: Optional[str] = Query(None),
 ):
-    """Get current project status (for polling)."""
-    project = get_project(project_id)
-    
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
-    
-    # Auth check: organization matches (Clerk ensures user belongs to org)
-    if project.get("organization_id") != org_id:
-        raise HTTPException(status_code=403, detail="Not authorized")
-    
+    """Get current service status (for polling)."""
+    if service_id:
+        svc = _resolve_service(org_id, project_id, service_id)
+    else:
+        # Backward compat: return first service status
+        svc = _resolve_service(org_id, project_id)
+
     return {
-        "project_id": project["project_id"],
-        "status": project["status"],
-        "function_url": project.get("function_url"),
+        "project_id": project_id,
+        "service_id": svc.get("service_id"),
+        "status": svc["status"],
+        "function_url": svc.get("function_url"),
     }
 
 
@@ -816,25 +988,20 @@ async def get_database_connection(
     project_id: str,
     user_id: str = Depends(get_current_user_id),
     org_id: str = Query(...),
+    service_id: Optional[str] = Query(None),
 ):
-    """Get connection details for a database project."""
-    project = get_project_by_key(org_id, project_id)
+    """Get connection details for a database service."""
+    svc = _resolve_service(org_id, project_id, service_id, service_type="database")
 
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
-
-    if project.get("project_type", "web-app") != "database":
-        raise HTTPException(status_code=400, detail="Not a database project")
-
-    cluster_id = project.get("db_cluster_identifier")
+    cluster_id = svc.get("db_cluster_identifier")
     if not cluster_id:
         raise HTTPException(status_code=404, detail="Database not yet provisioned")
 
     credentials = get_cluster_secret(cluster_id)
 
-    endpoint = project["db_endpoint"]
-    port = int(project.get("db_port", 5432))
-    db_name = project["db_name"]
+    endpoint = svc["db_endpoint"]
+    port = int(svc.get("db_port", 5432))
+    db_name = svc["db_name"]
     username = credentials["username"]
     password = credentials["password"]
 
@@ -853,17 +1020,13 @@ async def get_database_connection(
 # ─────────────────────────────────────────────────────────────
 
 
-def _get_live_database_project(org_id: str, project_id: str) -> dict:
+def _get_live_database_service(org_id: str, project_id: str, service_id: str = None) -> dict:
     """Shared validation for explorer endpoints."""
-    project = get_project_by_key(org_id, project_id)
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
-    if project.get("project_type", "web-app") != "database":
-        raise HTTPException(status_code=400, detail="Not a database project")
-    cluster_id = project.get("db_cluster_identifier")
-    if not cluster_id or project.get("status") != "LIVE":
+    svc = _resolve_service(org_id, project_id, service_id, service_type="database")
+    cluster_id = svc.get("db_cluster_identifier")
+    if not cluster_id or svc.get("status") != "LIVE":
         raise HTTPException(status_code=400, detail="Database not available")
-    return project
+    return svc
 
 
 @router.get("/{project_id}/database/schemas")
@@ -873,13 +1036,13 @@ async def get_database_schemas(
     org_id: str = Query(...),
 ):
     """List all schemas in the user's database."""
-    project = _get_live_database_project(org_id, project_id)
+    svc = _get_live_database_service(org_id, project_id)
     try:
         schemas = pg_list_schemas(
-            cluster_identifier=project["db_cluster_identifier"],
-            db_name=project["db_name"],
-            port=int(project.get("db_port", 5432)),
-            endpoint=project["db_endpoint"],
+            cluster_identifier=svc["db_cluster_identifier"],
+            db_name=svc["db_name"],
+            port=int(svc.get("db_port", 5432)),
+            endpoint=svc["db_endpoint"],
         )
         return {"schemas": schemas}
     except Exception as e:
@@ -894,13 +1057,13 @@ async def get_database_tables(
     schema: str = Query(default="public"),
 ):
     """List all tables in a schema."""
-    project = _get_live_database_project(org_id, project_id)
+    svc = _get_live_database_service(org_id, project_id)
     try:
         tables = pg_list_tables(
-            cluster_identifier=project["db_cluster_identifier"],
-            db_name=project["db_name"],
-            port=int(project.get("db_port", 5432)),
-            endpoint=project["db_endpoint"],
+            cluster_identifier=svc["db_cluster_identifier"],
+            db_name=svc["db_name"],
+            port=int(svc.get("db_port", 5432)),
+            endpoint=svc["db_endpoint"],
             schema=schema,
         )
         return {"tables": tables, "schema": schema}
@@ -919,13 +1082,13 @@ async def get_database_table_columns(
     schema: str = Query(default="public"),
 ):
     """Get column definitions for a table."""
-    project = _get_live_database_project(org_id, project_id)
+    svc = _get_live_database_service(org_id, project_id)
     try:
         columns = pg_get_columns(
-            cluster_identifier=project["db_cluster_identifier"],
-            db_name=project["db_name"],
-            port=int(project.get("db_port", 5432)),
-            endpoint=project["db_endpoint"],
+            cluster_identifier=svc["db_cluster_identifier"],
+            db_name=svc["db_name"],
+            port=int(svc.get("db_port", 5432)),
+            endpoint=svc["db_endpoint"],
             schema=schema,
             table_name=table_name,
         )
@@ -947,13 +1110,13 @@ async def get_database_table_data(
     page_size: int = Query(default=50, ge=1, le=100),
 ):
     """Get paginated data rows from a table."""
-    project = _get_live_database_project(org_id, project_id)
+    svc = _get_live_database_service(org_id, project_id)
     try:
         result = pg_get_table_data(
-            cluster_identifier=project["db_cluster_identifier"],
-            db_name=project["db_name"],
-            port=int(project.get("db_port", 5432)),
-            endpoint=project["db_endpoint"],
+            cluster_identifier=svc["db_cluster_identifier"],
+            db_name=svc["db_name"],
+            port=int(svc.get("db_port", 5432)),
+            endpoint=svc["db_endpoint"],
             schema=schema,
             table_name=table_name,
             page=page,
@@ -990,19 +1153,19 @@ def _security_debug_context(org_id: str, project_id: str, project: Optional[dict
     return ctx
 
 
-def _get_sg_ids_for_project(project: dict) -> list[str]:
-    """Get all VPC security group IDs attached to the project's cluster."""
-    print(f"🔎 SG LOOKUP: cluster={project.get('db_cluster_identifier')} project_id={project.get('project_id')}")
-    sg_ids = get_cluster_security_group_ids(project["db_cluster_identifier"])
-    print(f"🔎 SG LOOKUP RESULT: cluster={project.get('db_cluster_identifier')} sg_ids={sg_ids}")
+def _get_sg_ids_for_service(svc: dict) -> list[str]:
+    """Get all VPC security group IDs attached to the service's cluster."""
+    print(f"🔎 SG LOOKUP: cluster={svc.get('db_cluster_identifier')} service_id={svc.get('service_id')}")
+    sg_ids = get_cluster_security_group_ids(svc["db_cluster_identifier"])
+    print(f"🔎 SG LOOKUP RESULT: cluster={svc.get('db_cluster_identifier')} sg_ids={sg_ids}")
     if not sg_ids:
         raise HTTPException(status_code=404, detail="No security group found for this database")
     return sg_ids
 
 
-def _get_primary_sg_id_for_project(project: dict) -> str:
+def _get_primary_sg_id_for_service(svc: dict) -> str:
     """Primary SG for add operations."""
-    return _get_sg_ids_for_project(project)[0]
+    return _get_sg_ids_for_service(svc)[0]
 
 
 @router.get("/{project_id}/database/security-rules")
@@ -1012,18 +1175,18 @@ async def get_database_security_rules(
     org_id: str = Query(...),
 ):
     """Get inbound and outbound security group rules for this database."""
-    project = _get_live_database_project(org_id, project_id)
-    debug_ctx = _security_debug_context(org_id, project_id, project=project)
+    svc = _get_live_database_service(org_id, project_id)
+    debug_ctx = _security_debug_context(org_id, project_id, project=svc)
     print(f"🛡️ SECURITY RULES GET START: {debug_ctx}")
     try:
-        sg_ids = _get_sg_ids_for_project(project)
+        sg_ids = _get_sg_ids_for_service(svc)
         inbound = []
         outbound = []
         for sg_id in sg_ids:
             rules = get_security_group_rules(sg_id)
             inbound.extend(rules.get("inbound", []))
             outbound.extend(rules.get("outbound", []))
-        debug_ctx = _security_debug_context(org_id, project_id, project=project, sg_id=sg_ids[0])
+        debug_ctx = _security_debug_context(org_id, project_id, project=svc, sg_id=sg_ids[0])
         rules = {
             "security_group_id": sg_ids[0],
             "inbound": inbound,
@@ -1063,9 +1226,9 @@ async def add_database_security_rule(
     from botocore.exceptions import ClientError
     from deployer.clients import get_ec2_client
 
-    project = _get_live_database_project(org_id, project_id)
-    sg_id = _get_primary_sg_id_for_project(project)
-    debug_ctx = _security_debug_context(org_id, project_id, project=project, sg_id=sg_id)
+    svc = _get_live_database_service(org_id, project_id)
+    sg_id = _get_primary_sg_id_for_service(svc)
+    debug_ctx = _security_debug_context(org_id, project_id, project=svc, sg_id=sg_id)
     print(
         "🛡️ SECURITY RULES ADD START: "
         f"{debug_ctx} direction={request.direction} protocol={request.protocol} "
@@ -1131,9 +1294,9 @@ async def delete_database_security_rule(
     from botocore.exceptions import ClientError
     from deployer.clients import get_ec2_client
 
-    project = _get_live_database_project(org_id, project_id)
-    sg_ids = _get_sg_ids_for_project(project)
-    debug_ctx = _security_debug_context(org_id, project_id, project=project, sg_id=sg_ids[0])
+    svc = _get_live_database_service(org_id, project_id)
+    sg_ids = _get_sg_ids_for_service(svc)
+    debug_ctx = _security_debug_context(org_id, project_id, project=svc, sg_id=sg_ids[0])
     print(f"🛡️ SECURITY RULES DELETE START: {debug_ctx} rule_id={rule_id} direction={direction} sg_ids={sg_ids}")
 
     if direction not in ("inbound", "outbound"):
@@ -1181,31 +1344,24 @@ async def get_runtime_logs(
     project_id: str,
     user_id: str = Depends(get_current_user_id),
     org_id: str = Query(...),
+    service_id: Optional[str] = Query(None),
 ):
-    """Fetch runtime logs for a project's Lambda function."""
-    project = get_project(project_id)
+    """Fetch runtime logs for a service's Lambda function."""
+    svc = _resolve_service(org_id, project_id, service_id, service_type="web-app")
     
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
-    
-    # Auth check: organization matches (Clerk ensures user belongs to org)
-    if project.get("organization_id") != org_id:
-        raise HTTPException(status_code=403, detail="Not authorized")
-    
-    # Use stored function_name if available (new deployments), otherwise derive from github_url (old deployments)
-    project_name = project.get("function_name")
-    print(f"🔍 RUNTIME LOGS: project_id={project_id}")
-    print(f"🔍 RUNTIME LOGS: function_name from DB = '{project_name}'")
-    print(f"🔍 RUNTIME LOGS: github_url = '{project.get('github_url')}'")
-    if not project_name:
-        project_name = extract_project_name(project["github_url"])
-        print(f"🔍 RUNTIME LOGS: derived project_name = '{project_name}'")
-    logs = get_lambda_logs(project_name)
+    # Use stored function_name if available, otherwise derive from github_url
+    function_name = svc.get("function_name")
+    print(f"🔍 RUNTIME LOGS: service_id={svc.get('service_id')}")
+    print(f"🔍 RUNTIME LOGS: function_name from DB = '{function_name}'")
+    if not function_name:
+        function_name = extract_project_name(svc["github_url"])
+        print(f"🔍 RUNTIME LOGS: derived function_name = '{function_name}'")
+    logs = get_lambda_logs(function_name)
     print(f"🔍 RUNTIME LOGS: got {len(logs)} log entries")
 
     return {
         "logs": logs,
-        "function_name": project_name,
+        "function_name": function_name,
     }
 
 
@@ -1219,23 +1375,22 @@ async def update_project_env_vars(
     request: UpdateEnvVarsRequest,
     user_id: str = Depends(get_current_user_id),
     org_id: str = Query(...),
+    service_id: Optional[str] = Query(None),
 ):
-    """Update project environment variables."""
-    project = get_project_by_key(org_id, project_id)
+    """Update service environment variables."""
+    svc = _resolve_service(org_id, project_id, service_id, service_type="web-app")
     
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
-    
-    updated = update_project(project_id, {"env_vars": request.env_vars})
+    updated = update_service(svc["service_id"], {"env_vars": request.env_vars})
     
     return {
         "project_id": project_id,
+        "service_id": svc["service_id"],
         "env_vars": updated.get("env_vars", {}),
         "message": "Environment variables updated. Redeploy to apply changes.",
     }
 
 
-class UpdateProjectRequest(BaseModel):
+class UpdateServiceRequest(BaseModel):
     start_command: Optional[str] = None
     root_directory: Optional[str] = None
     name: Optional[str] = None
@@ -1247,16 +1402,13 @@ class UpdateProjectRequest(BaseModel):
 @router.patch("/{project_id}")
 async def update_project_fields(
     project_id: str,
-    request: UpdateProjectRequest,
+    request: UpdateServiceRequest,
     user_id: str = Depends(get_current_user_id),
     org_id: str = Query(...),
+    service_id: Optional[str] = Query(None),
 ):
-    """Update project fields like start_command, root_directory, name."""
-
-    project = get_project_by_key(org_id, project_id)
-    
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+    """Update service fields like start_command, root_directory, name."""
+    svc = _resolve_service(org_id, project_id, service_id)
     
     # Build updates dict from non-None fields
     updates = {}
@@ -1276,12 +1428,13 @@ async def update_project_fields(
     if not updates:
         raise HTTPException(status_code=400, detail="No fields to update")
     
-    updated = update_project(project_id, updates)
+    updated = update_service(svc["service_id"], updates)
     
     return {
         "project_id": project_id,
+        "service_id": svc["service_id"],
         "updated_fields": list(updates.keys()),
-        "message": "Project updated. Redeploy to apply changes.",
+        "message": "Service updated. Redeploy to apply changes.",
     }
 
 
@@ -1290,20 +1443,16 @@ async def redeploy_project(
     project_id: str,
     user_id: str = Depends(get_current_user_id),
     org_id: str = Query(...),
+    service_id: Optional[str] = Query(None),
 ):
-    """Trigger a redeployment of the project."""
+    """Trigger a redeployment of a web-app service."""
     from api.routes.github import get_or_refresh_token, fetch_latest_commit
 
-    # Use get_project_by_key for strong consistency to ensure we get the latest
-    # compute settings (memory, timeout) if they were just updated.
-    project = get_project_by_key(org_id, project_id)
+    svc = _resolve_service(org_id, project_id, service_id, service_type="web-app")
+    sid = svc["service_id"]
 
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
-
-    # Immediately mark project as queued so the UI can reflect that a
-    # redeployment has been scheduled, even if the actual build hasn't started yet.
-    update_project(project_id, {"status": "PENDING"})
+    # Mark as queued so the UI can reflect it immediately
+    update_service(sid, {"status": "PENDING"})
 
     # Get GitHub token for private repos
     github_token = await get_or_refresh_token(org_id, user_id)
@@ -1311,21 +1460,20 @@ async def redeploy_project(
     # Fetch latest commit info from GitHub API
     commit_info = {}
     if github_token:
-        commit_info = await fetch_latest_commit(github_token, project.get("github_repo", ""))
+        commit_info = await fetch_latest_commit(github_token, svc.get("github_repo", ""))
 
-    # Get root_directory and start_command from stored project
-    root_directory = project.get("root_directory", "./")
-    start_command = project.get("start_command", "uvicorn main:app --host 0.0.0.0 --port 8080")
-    env_vars = project.get("env_vars", {})
-    # Convert Decimal to int (DynamoDB returns Decimal which isn't JSON serializable)
-    memory = int(project.get("memory", 1024))
-    timeout = int(project.get("timeout", 30))
-    ephemeral_storage = int(project.get("ephemeral_storage", 512))
+    # Get settings from stored service
+    root_directory = svc.get("root_directory", "./")
+    start_command = svc.get("start_command", "uvicorn main:app --host 0.0.0.0 --port 8080")
+    env_vars = svc.get("env_vars", {})
+    memory = int(svc.get("memory", 1024))
+    timeout = int(svc.get("timeout", 30))
+    ephemeral_storage = int(svc.get("ephemeral_storage", 512))
 
     # Start redeployment via SQS queue
     send_deployment_to_sqs(
-        project_id,
-        project["github_url"],
+        sid,
+        svc["github_url"],
         github_token,
         root_directory,
         start_command,
@@ -1339,6 +1487,7 @@ async def redeploy_project(
     
     return {
         "project_id": project_id,
+        "service_id": sid,
         "message": "Redeployment started",
         "status": "PENDING",
     }
@@ -1350,52 +1499,50 @@ async def delete_project_endpoint(
     user_id: str = Depends(get_current_user_id),
     org_id: str = Query(...),
 ):
-    """Delete a project and all associated AWS resources."""
+    """Delete a project and all its services + associated AWS resources."""
 
     project = get_project_by_key(org_id, project_id)
-
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    project_type = project.get("project_type", "web-app")
+    print(f"🗑️ DELETE PROJECT: project_id={project_id}")
 
-    print(f"🗑️ DELETE PROJECT: project_id={project_id}, type={project_type}")
+    # Delete all services and their AWS resources
+    services = list_services(project_id, org_id=org_id)
+    for svc in services:
+        sid = svc["service_id"]
+        svc_type = svc.get("service_type", "web-app")
 
-    if project_type == "database":
-        # Mark as DELETING immediately, then process deletion asynchronously via SQS
-        update_project(project_id, {"status": "DELETING"})
-        send_database_delete_to_sqs(project_id)
+        if svc_type == "database":
+            # Mark as DELETING and process asynchronously
+            update_service(sid, {"status": "DELETING"})
+            send_database_delete_to_sqs(sid)
+        else:
+            # Web-app deletion
+            function_name = svc.get("function_name")
+            print(f"🗑️ DELETE SERVICE: service_id={sid}, function_name='{function_name}'")
 
-        from fastapi.responses import JSONResponse
-        return JSONResponse(
-            status_code=202,
-            content={"status": "DELETING", "message": "Database deletion initiated"},
-        )
+            # Clean up custom domain resources
+            from api.db.dynamodb import list_project_domains
+            from api.services.domain_service import delete_domain_tenant
+            custom_domains = list_project_domains(sid)
+            for d in custom_domains:
+                tenant_id = d.get("tenant_id")
+                if tenant_id:
+                    delete_domain_tenant(tenant_id)
 
-    # Web-app deletion (existing logic)
-    function_name = project.get("function_name")
+            # Delete AWS resources (Lambda, ECR, CloudWatch)
+            delete_project_resources(svc.get("github_url", ""), function_name=function_name)
 
-    print(f"🗑️ DELETE PROJECT: function_name from DB = '{function_name}'")
-    print(f"🗑️ DELETE PROJECT: github_url = '{project.get('github_url')}'")
+            # Delete the service DynamoDB record (deployments + domains cascade)
+            delete_service(sid)
 
-    # Clean up custom domain resources (CloudFront distribution tenants)
-    from api.db.dynamodb import list_project_domains
-    from api.services.domain_service import delete_domain_tenant
-    custom_domains = list_project_domains(project_id)
-    for d in custom_domains:
-        tenant_id = d.get("tenant_id")
-        if tenant_id:
-            delete_domain_tenant(tenant_id)
-
-    # Delete AWS resources (Lambda, ECR, and CloudWatch log group)
-    result = delete_project_resources(project.get("github_url", ""), function_name=function_name)
-
-    # Delete from DynamoDB (includes deployments + domain items)
+    # Delete the project container itself
     delete_project(project_id)
 
     return {
         "deleted": True,
-        "lambda_deleted": result["lambda_deleted"],
-        "ecr_deleted": result["ecr_deleted"],
-        "logs_deleted": result["logs_deleted"],
+        "project_id": project_id,
+        "services_deleted": len(services),
     }
+

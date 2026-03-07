@@ -266,7 +266,9 @@ function ImportRepositoryPageInner() {
     }
 
     const handleImport = (repo: GitHubRepo) => {
-        router.push(`/new/web-app/configure?repo=${encodeURIComponent(repo.full_name)}&private=${repo.private}`)
+        const base = `/new/web-app/configure?repo=${encodeURIComponent(repo.full_name)}&private=${repo.private}`
+        const existingProjectId = searchParams.get("project_id")
+        router.push(existingProjectId ? `${base}&project_id=${existingProjectId}` : base)
     }
 
     // Derive values from state for rendering
@@ -294,7 +296,7 @@ function ImportRepositoryPageInner() {
             <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
                 {/* Navigation */}
                 <Link
-                    href="/new"
+                    href={searchParams.get("project_id") ? `/new?project_id=${searchParams.get("project_id")}` : "/new"}
                     className="inline-flex items-center gap-1.5 text-sm text-zinc-500 hover:text-zinc-900 transition-colors mb-8 group"
                 >
                     <ArrowLeft className="h-4 w-4 transition-transform group-hover:-translate-x-1" />

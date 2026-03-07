@@ -1,42 +1,54 @@
 "use client"
 
+import { Suspense } from "react"
 import Link from "next/link"
-import { ArrowLeft, ArrowRight, Globe, Database } from "lucide-react"
+import { useSearchParams } from "next/navigation"
+import { ArrowLeft, ArrowRight, Globe, Database, Loader2 } from "lucide-react"
 
-const PROJECT_TYPES = [
-    {
-        id: "web-app",
-        name: "Web App",
-        description: "Deploy a web application from a Git repository",
-        icon: Globe,
-        href: "/new/web-app",
-    },
-    {
-        id: "database",
-        name: "Database",
-        description: "Provision a PostgreSQL database with scale-to-zero",
-        icon: Database,
-        href: "/new/database",
-    },
-]
+function NewProjectPageInner() {
+    const searchParams = useSearchParams()
+    const projectId = searchParams.get("project_id")
+    const isAddService = !!projectId
 
-export default function NewProjectPage() {
+    const PROJECT_TYPES = [
+        {
+            id: "web-app",
+            name: "Web App",
+            description: "Deploy a web application from a Git repository",
+            icon: Globe,
+            href: projectId ? `/new/web-app?project_id=${projectId}` : "/new/web-app",
+        },
+        {
+            id: "database",
+            name: "Database",
+            description: "Provision a PostgreSQL database with scale-to-zero",
+            icon: Database,
+            href: projectId ? `/new/database?project_id=${projectId}` : "/new/database",
+        },
+    ]
+
     return (
         <div className="min-h-screen bg-white">
             <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
                 {/* Navigation */}
                 <Link
-                    href="/projects"
+                    href={isAddService ? `/projects/${projectId}` : "/projects"}
                     className="inline-flex items-center gap-1.5 text-sm text-zinc-500 hover:text-zinc-900 transition-colors mb-8 group"
                 >
                     <ArrowLeft className="h-4 w-4 transition-transform group-hover:-translate-x-1" />
-                    <span>Back to Projects</span>
+                    <span>{isAddService ? "Back to Project" : "Back to Projects"}</span>
                 </Link>
 
                 {/* Header */}
                 <div className="mb-8">
-                    <h1 className="text-2xl font-bold text-zinc-900 tracking-tight">New Project</h1>
-                    <p className="text-sm text-zinc-500 mt-1">Choose a project type to get started</p>
+                    <h1 className="text-2xl font-bold text-zinc-900 tracking-tight">
+                        {isAddService ? "Add Service" : "New Project"}
+                    </h1>
+                    <p className="text-sm text-zinc-500 mt-1">
+                        {isAddService
+                            ? "Choose a service type to add to your project"
+                            : "Choose a project type to get started"}
+                    </p>
                 </div>
 
                 {/* Project Type List */}
@@ -67,5 +79,17 @@ export default function NewProjectPage() {
                 </div>
             </div>
         </div>
+    )
+}
+
+export default function NewProjectPage() {
+    return (
+        <Suspense fallback={
+            <div className="min-h-screen bg-white flex items-center justify-center">
+                <Loader2 className="h-6 w-6 animate-spin text-zinc-400" />
+            </div>
+        }>
+            <NewProjectPageInner />
+        </Suspense>
     )
 }

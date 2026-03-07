@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { useAuth } from "@clerk/nextjs"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import {
     ArrowLeft,
     Database,
@@ -31,6 +31,8 @@ const ACU_OPTIONS = [
 export default function NewDatabasePage() {
     const { getToken, orgId } = useAuth()
     const router = useRouter()
+    const searchParams = useSearchParams()
+    const existingProjectId = searchParams.get("project_id")
 
     const [projectName, setProjectName] = useState("")
     const [dbName, setDbName] = useState("shorlabs")
@@ -53,16 +55,46 @@ export default function NewDatabasePage() {
                 return
             }
 
-            const result = await createDatabaseProject(token, orgId, {
-                name: projectName.trim(),
-                db_name: dbName.trim(),
-                min_acu: 0,
-                max_acu: maxAcu,
-            })
+            let result: { project_id: string }
+
+            if (existingProjectId) {
+                // Add database service to existing project
+                const url = new URL(`${API_BASE_URL}/api/projects/${existingProjectId}/services`)
+                url.searchParams.append("org_id", orgId)
+                const response = await fetch(url.toString(), {
+                    method: "POST",
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        organization_id: orgId,
+                        name: projectName.trim(),
+                        service_type: "database",
+                        db_name: dbName.trim(),
+                        min_acu: 0,
+                        max_acu: maxAcu,
+                    }),
+                })
+                if (!response.ok) {
+                    const errData = await response.json().catch(() => ({ detail: "Unknown error" }))
+                    throw new Error(errData.detail || `HTTP ${response.status}`)
+                }
+                result = { project_id: existingProjectId }
+            } else {
+                // Create a new project with database service
+                result = await createDatabaseProject(token, orgId, {
+                    name: projectName.trim(),
+                    db_name: dbName.trim(),
+                    min_acu: 0,
+                    max_acu: maxAcu,
+                })
+            }
 
             trackEvent("database_project_created", {
                 project_id: result.project_id,
                 max_acu: maxAcu,
+                added_to_existing: !!existingProjectId,
             })
 
             router.push(`/projects/${result.project_id}`)
@@ -77,7 +109,7 @@ export default function NewDatabasePage() {
             <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
                 {/* Navigation */}
                 <Link
-                    href="/new"
+                    href={existingProjectId ? `/new?project_id=${existingProjectId}` : "/new"}
                     className="inline-flex items-center gap-1.5 text-sm text-zinc-500 hover:text-zinc-900 transition-colors mb-6 sm:mb-8 group"
                 >
                     <ArrowLeft className="h-4 w-4 transition-transform group-hover:-translate-x-1" />
@@ -149,11 +181,10 @@ export default function NewDatabasePage() {
                                 <button
                                     key={option.value}
                                     onClick={() => setMaxAcu(option.value)}
-                                    className={`px-2 py-2.5 sm:px-3 sm:py-3 border text-center transition-colors ${
-                                        maxAcu === option.value
+                                    className={`px-2 py-2.5 sm:px-3 sm:py-3 border text-center transition-colors ${maxAcu === option.value
                                             ? "border-zinc-900 bg-zinc-900 text-white"
                                             : "border-zinc-200 hover:border-zinc-400 text-zinc-700"
-                                    }`}
+                                        }`}
                                 >
                                     <div className="text-sm font-medium">{option.label}</div>
                                     <div className={`text-xs mt-0.5 ${maxAcu === option.value ? "text-zinc-300" : "text-zinc-400"}`}>

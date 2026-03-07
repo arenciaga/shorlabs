@@ -1,7 +1,8 @@
 "use client"
 
 import { use } from "react"
-import { AlertCircle, Loader2 } from "lucide-react"
+import { AlertCircle, Loader2, Plus } from "lucide-react"
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { UpgradeModal } from "@/components/upgrade-modal"
 import { CustomDomains } from "@/components/CustomDomains"
@@ -75,14 +76,35 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     }
 
     // ── Web-app project ──────────────────────────────────────────
-    const { project, deployments } = hook.data
-    const isBuilding = !["LIVE", "FAILED"].includes(project.status)
+    const { project } = hook.data
+    const service = hook.data.services[0]
+    if (!service) {
+        return (
+            <div className="min-h-screen bg-white flex items-center justify-center">
+                <div className="text-center">
+                    <AlertCircle className="h-8 w-8 text-zinc-400 mx-auto mb-4" />
+                    <h2 className="text-xl font-semibold text-zinc-900 mb-2">No services</h2>
+                    <p className="text-zinc-500">This project has no services yet.</p>
+                </div>
+            </div>
+        )
+    }
+
+    const deployments = service.deployments || []
+    const isBuilding = !["LIVE", "FAILED"].includes(service.status)
 
     // Prefer active custom domain over the default shorlabs URL
-    const activeCustomDomain = hook.data.custom_domains?.find(d => d.is_active)
+    const activeCustomDomain = service.custom_domains?.find(d => d.is_active)
     const displayUrl = activeCustomDomain
         ? `https://${activeCustomDomain.domain}`
-        : (project.custom_url || project.function_url)
+        : (service.custom_url || service.function_url || null)
+
+    // Build a project-like object for child components that still expect the old shape
+    const projectCompat = {
+        ...project,
+        ...service,
+        project_id: project.project_id,
+    }
 
     return (
         <>
@@ -91,25 +113,35 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                     <ProjectBreadcrumb projectName={project.name} />
 
                     <ProjectHeader
-                        project={project}
+                        project={projectCompat}
                         isBuilding={isBuilding}
                         redeploying={hook.redeploying}
                         onRedeploy={hook.handleRedeploy}
                     />
 
-                    {project.is_throttled && (
+                    {/* Add Service button */}
+                    <div className="flex items-center gap-2 mb-4">
+                        <Link href={`/new?project_id=${project.project_id}`}>
+                            <Button variant="outline" className="rounded-full h-8 px-4 text-xs border-zinc-200 hover:bg-zinc-50 text-zinc-600">
+                                <Plus className="h-3.5 w-3.5 mr-1.5" />
+                                Add Service
+                            </Button>
+                        </Link>
+                    </div>
+
+                    {service.is_throttled && (
                         <ThrottleBanner onUpgradeClick={hook.openUpgradeModal} />
                     )}
 
                     <StatsCards
-                        project={project}
+                        project={projectCompat}
                         displayUrl={displayUrl}
                         latestDeployment={deployments[0]}
                         copied={hook.copied}
                         onCopy={hook.copyToClipboard}
                     />
 
-                    {isBuilding && <BuildProgress currentStatus={project.status} />}
+                    {isBuilding && <BuildProgress currentStatus={service.status} />}
 
                     <TabNavigation
                         tabs={WEB_APP_TABS}
@@ -120,7 +152,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                     <div className="py-6">
                         {hook.activeTab === "deployments" && (
                             <DeploymentsTab
-                                project={project}
+                                project={projectCompat}
                                 deployments={deployments}
                                 expandedDeployId={hook.expandedDeployId}
                                 onToggleExpand={hook.setExpandedDeployId}
@@ -133,8 +165,8 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                             <CustomDomains
                                 projectId={id}
                                 orgId={hook.orgId ?? null}
-                                subdomain={project.subdomain ?? null}
-                                customDomains={hook.data?.custom_domains}
+                                subdomain={service.subdomain ?? null}
+                                customDomains={service.custom_domains}
                                 onRefetch={hook.fetchProject}
                             />
                         )}
@@ -149,7 +181,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
 
                         {hook.activeTab === "compute" && (
                             <ComputeTab
-                                project={project}
+                                project={projectCompat}
                                 editingCompute={hook.editingCompute}
                                 memoryValue={hook.memoryValue}
                                 timeoutValue={hook.timeoutValue}
@@ -168,7 +200,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
 
                         {hook.activeTab === "settings" && (
                             <SettingsTab
-                                project={project}
+                                project={projectCompat}
                                 editingStartCommand={hook.editingStartCommand}
                                 startCommandValue={hook.startCommandValue}
                                 savingStartCommand={hook.savingStartCommand}
@@ -197,3 +229,4 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
         </>
     )
 }
+

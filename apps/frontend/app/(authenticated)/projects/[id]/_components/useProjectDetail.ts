@@ -8,7 +8,7 @@ import { useUpgradeModal } from "@/components/upgrade-modal"
 import { trackEvent } from "@/lib/amplitude"
 import { fetchDatabaseConnection, DatabaseConnection, fetchSecurityRules, addSecurityRule, deleteSecurityRule, SecurityRulesResponse } from "@/lib/api"
 import { API_BASE_URL } from "./constants"
-import type { ProjectDetails, ActiveTab } from "./types"
+import type { ProjectDetails, Service, ActiveTab } from "./types"
 
 export function useProjectDetail(id: string) {
     const router = useRouter()
@@ -101,7 +101,8 @@ export function useProjectDetail(id: string) {
 
             if (!response.ok) {
                 // Project was deleted (async deletion completed) — redirect to projects list
-                if (response.status === 404 && data?.project?.status === "DELETING") {
+                const activeService = data?.services?.[0]
+                if (response.status === 404 && activeService?.status === "DELETING") {
                     router.push("/projects")
                     return
                 }
@@ -134,12 +135,13 @@ export function useProjectDetail(id: string) {
                 const projectAge = data.project.created_at
                     ? Math.floor((Date.now() - new Date(data.project.created_at).getTime()) / (1000 * 60 * 60 * 24))
                     : 0
+                const svc = data.services?.[0]
 
                 trackEvent('Project Deleted', {
                     project_id: id,
                     project_name: data.project.name,
                     project_age_days: projectAge,
-                    deployment_count: data.deployments?.length || 0
+                    deployment_count: svc?.deployments?.length || 0
                 })
             }
 
@@ -165,7 +167,10 @@ export function useProjectDetail(id: string) {
                 setConfirmPhrase("")
                 setDeleting(false)
                 // Optimistic update: set status to DELETING instantly so UI reflects it without waiting for a re-fetch
-                setData(prev => prev ? { ...prev, project: { ...prev.project, status: "DELETING" } } : prev)
+                setData(prev => prev ? {
+                    ...prev,
+                    services: prev.services.map((s, i) => i === 0 ? { ...s, status: "DELETING" } : s)
+                } : prev)
                 return
             }
 
@@ -207,8 +212,9 @@ export function useProjectDetail(id: string) {
     }
 
     const startEditingEnvVars = () => {
-        if (!data?.project) return
-        const vars = Object.entries(data.project.env_vars || {}).map(([key, value]) => ({ key, value, visible: false }))
+        const svc = data?.services?.[0]
+        if (!svc) return
+        const vars = Object.entries(svc.env_vars || {}).map(([key, value]) => ({ key, value, visible: false }))
         setEnvVarsList(vars.length > 0 ? vars : [{ key: "", value: "", visible: true }])
         setEditingEnvVars(true)
     }
@@ -248,8 +254,9 @@ export function useProjectDetail(id: string) {
     }
 
     const startEditingStartCommand = () => {
-        if (!data?.project) return
-        setStartCommandValue(data.project.start_command || "")
+        const svc = data?.services?.[0]
+        if (!svc) return
+        setStartCommandValue(svc.start_command || "")
         setEditingStartCommand(true)
     }
 
@@ -283,10 +290,11 @@ export function useProjectDetail(id: string) {
     }
 
     const startEditingCompute = (overrides?: { memory?: number, timeout?: number, ephemeral_storage?: number }) => {
-        if (!data?.project) return
-        setMemoryValue(overrides?.memory ?? data.project.memory ?? 1024)
-        setTimeoutValue(overrides?.timeout ?? data.project.timeout ?? 30)
-        setEphemeralStorageValue(overrides?.ephemeral_storage ?? data.project.ephemeral_storage ?? 512)
+        const svc = data?.services?.[0]
+        if (!svc) return
+        setMemoryValue(overrides?.memory ?? svc.memory ?? 1024)
+        setTimeoutValue(overrides?.timeout ?? svc.timeout ?? 30)
+        setEphemeralStorageValue(overrides?.ephemeral_storage ?? svc.ephemeral_storage ?? 512)
         setEditingCompute(true)
     }
 
@@ -485,7 +493,9 @@ export function useProjectDetail(id: string) {
     // Poll while build is in progress
     useEffect(() => {
         if (!data) return
-        const isInProgress = !["LIVE", "FAILED"].includes(data.project.status)
+        const svc = data.services?.[0]
+        if (!svc) return
+        const isInProgress = !["LIVE", "FAILED"].includes(svc.status)
         if (!isInProgress) return
 
         const interval = setInterval(fetchProject, 3000)
@@ -494,12 +504,13 @@ export function useProjectDetail(id: string) {
 
     // Auto-expand the latest IN_PROGRESS deployment to show logs
     useEffect(() => {
-        if (!data?.deployments) return
-        const inProgressDeployment = data.deployments.find(d => d.status === "IN_PROGRESS")
+        const deployments = data?.services?.[0]?.deployments
+        if (!deployments) return
+        const inProgressDeployment = deployments.find(d => d.status === "IN_PROGRESS")
         if (inProgressDeployment && !expandedDeployId) {
             setExpandedDeployId(inProgressDeployment.deploy_id)
         }
-    }, [data?.deployments, expandedDeployId])
+    }, [data?.services, expandedDeployId])
 
     // Fetch logs when logs tab is selected
     useEffect(() => {
@@ -509,9 +520,10 @@ export function useProjectDetail(id: string) {
     }, [activeTab, fetchLogs])
 
     // Load security rules when security tab selected (only when DB is LIVE — no rules exist while provisioning)
-    const isDatabaseProject = data?.project?.project_type === "database"
+    const activeService = data?.services?.[0] as Service | undefined
+    const isDatabaseProject = activeService?.service_type === "database"
     const dbActiveTab = activeTab === "configuration" || activeTab === "settings" || activeTab === "explorer" || activeTab === "security" ? activeTab : "configuration"
-    const isDbLive = data?.project?.status === "LIVE"
+    const isDbLive = activeService?.status === "LIVE"
 
     useEffect(() => {
         if (isDatabaseProject && dbActiveTab === "security" && isDbLive && !securityRules && !loadingRules) {

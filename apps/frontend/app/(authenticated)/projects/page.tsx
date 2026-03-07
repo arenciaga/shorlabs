@@ -15,23 +15,31 @@ import { trackEvent } from "@/lib/amplitude"
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 
-interface Project {
-    project_id: string
+interface ServiceSummary {
+    service_id: string
     name: string
-    project_type?: "web-app" | "database"
-    github_url?: string
-    github_repo?: string
+    service_type: "web-app" | "database"
     status: string
-    function_url?: string | null
-    custom_url?: string | null
+    // Web-app fields
     subdomain?: string | null
+    custom_url?: string | null
+    function_url?: string | null
     active_custom_domain?: string | null
+    github_repo?: string
+    // Database fields
     db_endpoint?: string | null
     db_port?: number | null
     db_name?: string | null
+}
+
+interface Project {
+    project_id: string
+    name: string
+    description?: string
     created_at: string
     updated_at: string
     is_throttled?: boolean
+    services: ServiceSummary[]
 }
 
 const STATUS_CONFIG: Record<string, { dot: string; label: string; bg: string }> = {
@@ -188,7 +196,7 @@ export default function ProjectsPage() {
 
     useEffect(() => {
         const hasInProgress = projects.some(p =>
-            !["LIVE", "FAILED"].includes(p.status)
+            p.services?.some(s => !["LIVE", "FAILED"].includes(s.status))
         )
         if (!hasInProgress) return
         const interval = setInterval(fetchProjects, 5000)
@@ -314,16 +322,18 @@ export default function ProjectsPage() {
                         ) : filteredProjects.length > 0 ? (
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                                 {filteredProjects.map((project) => {
-                                    const status = STATUS_CONFIG[project.status] || STATUS_CONFIG.PENDING
-                                    const isDatabase = project.project_type === "database"
+                                    const primaryService = project.services?.[0]
+                                    const isDatabase = primaryService?.service_type === "database"
+                                    const serviceStatus = primaryService?.status || "PENDING"
+                                    const status = STATUS_CONFIG[serviceStatus] || STATUS_CONFIG.PENDING
                                     const displayUrl = isDatabase
                                         ? null
-                                        : (project.active_custom_domain
-                                            ? `https://${project.active_custom_domain}`
-                                            : (project.custom_url || project.function_url))
+                                        : (primaryService?.active_custom_domain
+                                            ? `https://${primaryService.active_custom_domain}`
+                                            : (primaryService?.custom_url || primaryService?.function_url))
                                     const normalizedDisplayUrl = displayUrl ? normalizeUrl(displayUrl) : null
                                     const projectHost = isDatabase
-                                        ? project.db_endpoint
+                                        ? primaryService?.db_endpoint
                                         : getProjectHost(displayUrl ?? null)
                                     return (
                                         <Link
@@ -366,19 +376,21 @@ export default function ProjectsPage() {
                                                     </div>
                                                 </div>
 
-                                                {/* Type badge */}
-                                                <div className="flex items-center gap-1.5 mb-4">
-                                                    {isDatabase ? (
-                                                        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-blue-50 border border-blue-200 rounded-full">
-                                                            <Database className="h-3 w-3 text-blue-500" />
-                                                            <span className="text-xs text-blue-600">PostgreSQL</span>
-                                                        </div>
-                                                    ) : (
-                                                        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-zinc-100 border border-zinc-200 rounded-full">
-                                                            <Github className="h-3 w-3 text-zinc-500" />
-                                                            <span className="text-xs text-zinc-600 truncate max-w-[200px]">{project.github_repo}</span>
-                                                        </div>
-                                                    )}
+                                                {/* Service badges */}
+                                                <div className="flex items-center gap-1.5 mb-4 flex-wrap">
+                                                    {project.services?.map((svc) => (
+                                                        svc.service_type === "database" ? (
+                                                            <div key={svc.service_id} className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-blue-50 border border-blue-200 rounded-full">
+                                                                <Database className="h-3 w-3 text-blue-500" />
+                                                                <span className="text-xs text-blue-600">PostgreSQL</span>
+                                                            </div>
+                                                        ) : (
+                                                            <div key={svc.service_id} className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-zinc-100 border border-zinc-200 rounded-full">
+                                                                <Github className="h-3 w-3 text-zinc-500" />
+                                                                <span className="text-xs text-zinc-600 truncate max-w-[200px]">{svc.github_repo || svc.name}</span>
+                                                            </div>
+                                                        )
+                                                    ))}
                                                 </div>
 
                                                 {/* Bottom: Date + Action icons */}
@@ -391,12 +403,12 @@ export default function ProjectsPage() {
                                                         })}
                                                     </span>
                                                     <div className="flex items-center gap-0.5">
-                                                        {!isDatabase && project.github_repo && (
+                                                        {!isDatabase && primaryService?.github_repo && (
                                                             <button
                                                                 onClick={(e) => {
                                                                     e.preventDefault()
                                                                     e.stopPropagation()
-                                                                    window.open(`https://github.com/${project.github_repo}`, "_blank")
+                                                                    window.open(`https://github.com/${primaryService.github_repo}`, "_blank")
                                                                 }}
                                                                 className="p-1.5 rounded-md text-zinc-300 hover:text-zinc-600 hover:bg-zinc-50 transition-colors cursor-pointer"
                                                             >

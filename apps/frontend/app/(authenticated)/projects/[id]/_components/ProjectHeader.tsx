@@ -1,17 +1,17 @@
 import { Github, ExternalLink, RotateCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { STATUS_CONFIG } from "./constants"
-import type { Project } from "./types"
+import type { ProjectCompat } from "./types"
 
 interface ProjectHeaderProps {
-    project: Project
+    project: ProjectCompat
     isBuilding: boolean
     redeploying: boolean
     onRedeploy: () => void
 }
 
 export function ProjectHeader({ project, isBuilding, redeploying, onRedeploy }: ProjectHeaderProps) {
-    const statusConfig = STATUS_CONFIG[project.status] || STATUS_CONFIG.PENDING
+    const statusConfig = STATUS_CONFIG[project.status ?? ""] || STATUS_CONFIG.PENDING
 
     return (
         <div className="flex items-center gap-3 py-3 mb-4">

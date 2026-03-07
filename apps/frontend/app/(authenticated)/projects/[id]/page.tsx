@@ -1,9 +1,10 @@
 "use client"
 
 import { use } from "react"
-import { AlertCircle, Loader2, Plus } from "lucide-react"
+import { AlertCircle, Plus, Globe, Database } from "lucide-react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { UpgradeModal } from "@/components/upgrade-modal"
 import { CustomDomains } from "@/components/CustomDomains"
 
@@ -18,7 +19,9 @@ import { DeploymentsTab } from "./_components/DeploymentsTab"
 import { RuntimeLogsTab } from "./_components/RuntimeLogsTab"
 import { ComputeTab } from "./_components/ComputeTab"
 import { SettingsTab } from "./_components/SettingsTab"
-import { DatabaseProjectView } from "./_components/DatabaseProjectView"
+import { DatabaseServiceView } from "./_components/DatabaseServiceView"
+import { STATUS_CONFIG } from "./_components/constants"
+import type { Service } from "./_components/types"
 
 const WEB_APP_TABS = [
     { key: "deployments", label: "Deployments" },
@@ -70,57 +73,40 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
         )
     }
 
-    // ── Database project branch ──────────────────────────────────
-    if (hook.isDatabaseProject) {
-        return <DatabaseProjectView hook={hook} />
-    }
+    const { project, services } = hook.data
+    const hasMultipleServices = services.length > 1
 
-    // ── Web-app project ──────────────────────────────────────────
-    const { project } = hook.data
-    const service = hook.data.services[0]
-    if (!service) {
+    if (services.length === 0) {
         return (
             <div className="min-h-screen bg-white flex items-center justify-center">
                 <div className="text-center">
                     <AlertCircle className="h-8 w-8 text-zinc-400 mx-auto mb-4" />
                     <h2 className="text-xl font-semibold text-zinc-900 mb-2">No services</h2>
-                    <p className="text-zinc-500">This project has no services yet.</p>
+                    <p className="text-zinc-500 mb-4">This project has no services yet.</p>
+                    <Link href={`/new?project_id=${project.project_id}`}>
+                        <Button variant="outline" className="rounded-full">
+                            <Plus className="h-3.5 w-3.5 mr-1.5" />
+                            Add Service
+                        </Button>
+                    </Link>
                 </div>
             </div>
         )
     }
 
-    const deployments = service.deployments || []
-    const isBuilding = !["LIVE", "FAILED"].includes(service.status)
-
-    // Prefer active custom domain over the default shorlabs URL
-    const activeCustomDomain = service.custom_domains?.find(d => d.is_active)
-    const displayUrl = activeCustomDomain
-        ? `https://${activeCustomDomain.domain}`
-        : (service.custom_url || service.function_url || null)
-
-    // Build a project-like object for child components that still expect the old shape
-    const projectCompat = {
-        ...project,
-        ...service,
-        project_id: project.project_id,
-    }
+    // Resolve the active service for the header (used for single-service web-app header)
+    const activeService = hook.activeService || services[0]
+    const defaultServiceId = activeService.service_id
 
     return (
         <>
             <div className="min-h-screen bg-white">
                 <div className="px-4 sm:px-6 lg:px-8">
-                    <ProjectBreadcrumb projectName={project.name} />
+                    <ProjectBreadcrumb projectName={project.name} isDatabase={activeService.service_type === "database" && !hasMultipleServices} />
 
-                    <ProjectHeader
-                        project={projectCompat}
-                        isBuilding={isBuilding}
-                        redeploying={hook.redeploying}
-                        onRedeploy={hook.handleRedeploy}
-                    />
-
-                    {/* Add Service button */}
-                    <div className="flex items-center gap-2 mb-4">
+                    {/* Project name + Add Service */}
+                    <div className="flex items-center justify-between py-3 mb-2">
+                        <h1 className="text-xl font-semibold text-zinc-900 tracking-tight truncate">{project.name}</h1>
                         <Link href={`/new?project_id=${project.project_id}`}>
                             <Button variant="outline" className="rounded-full h-8 px-4 text-xs border-zinc-200 hover:bg-zinc-50 text-zinc-600">
                                 <Plus className="h-3.5 w-3.5 mr-1.5" />
@@ -129,103 +115,183 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                         </Link>
                     </div>
 
-                    {service.is_throttled && (
-                        <ThrottleBanner onUpgradeClick={hook.openUpgradeModal} />
-                    )}
-
-                    <StatsCards
-                        project={projectCompat}
-                        displayUrl={displayUrl}
-                        latestDeployment={deployments[0]}
-                        copied={hook.copied}
-                        onCopy={hook.copyToClipboard}
-                    />
-
-                    {isBuilding && <BuildProgress currentStatus={service.status} />}
-
-                    <TabNavigation
-                        tabs={WEB_APP_TABS}
-                        activeTab={hook.activeTab}
-                        onTabChange={(tab) => hook.setActiveTab(tab as "deployments" | "domains" | "logs" | "compute" | "settings")}
-                    />
-
-                    <div className="py-6">
-                        {hook.activeTab === "deployments" && (
-                            <DeploymentsTab
-                                project={projectCompat}
-                                deployments={deployments}
-                                expandedDeployId={hook.expandedDeployId}
-                                onToggleExpand={hook.setExpandedDeployId}
-                                orgId={hook.orgId!}
-                                onDeployComplete={hook.fetchProject}
-                            />
+                    {/* ── Service Tabs ─────────────────────────────── */}
+                    <Tabs
+                        value={defaultServiceId}
+                        onValueChange={(val) => {
+                            hook.setActiveServiceId(val)
+                            hook.resetServiceState()
+                            // Reset sub-tab when switching services
+                            const svc = services.find(s => s.service_id === val)
+                            if (svc?.service_type === "database") {
+                                hook.setActiveTab("configuration")
+                            } else {
+                                hook.setActiveTab("deployments")
+                            }
+                        }}
+                    >
+                        {hasMultipleServices && (
+                            <TabsList variant="line" className="mb-4 border-b border-zinc-200 w-full justify-start">
+                                {services.map((svc) => {
+                                    const svcStatus = STATUS_CONFIG[svc.status] || STATUS_CONFIG.PENDING
+                                    const isDb = svc.service_type === "database"
+                                    return (
+                                        <TabsTrigger key={svc.service_id} value={svc.service_id} className="gap-2 px-4 py-2.5 text-sm">
+                                            {isDb ? <Database className="h-3.5 w-3.5" /> : <Globe className="h-3.5 w-3.5" />}
+                                            <span>{svc.name || (isDb ? "Database" : "Web App")}</span>
+                                            <span className={`w-1.5 h-1.5 rounded-full ${svcStatus.dot} ${!["LIVE", "FAILED"].includes(svc.status) ? 'animate-pulse' : ''}`} />
+                                        </TabsTrigger>
+                                    )
+                                })}
+                            </TabsList>
                         )}
 
-                        {hook.activeTab === "domains" && (
-                            <CustomDomains
-                                projectId={id}
-                                orgId={hook.orgId ?? null}
-                                subdomain={service.subdomain ?? null}
-                                customDomains={service.custom_domains}
-                                onRefetch={hook.fetchProject}
-                            />
-                        )}
-
-                        {hook.activeTab === "logs" && (
-                            <RuntimeLogsTab
-                                logs={hook.logs}
-                                logsLoading={hook.logsLoading}
-                                onRefresh={hook.fetchLogs}
-                            />
-                        )}
-
-                        {hook.activeTab === "compute" && (
-                            <ComputeTab
-                                project={projectCompat}
-                                editingCompute={hook.editingCompute}
-                                memoryValue={hook.memoryValue}
-                                timeoutValue={hook.timeoutValue}
-                                ephemeralStorageValue={hook.ephemeralStorageValue}
-                                savingCompute={hook.savingCompute}
-                                currentPlan={hook.currentPlan ?? null}
-                                onMemoryChange={hook.setMemoryValue}
-                                onTimeoutChange={hook.setTimeoutValue}
-                                onEphemeralStorageChange={hook.setEphemeralStorageValue}
-                                onStartEditing={hook.startEditingCompute}
-                                onSave={hook.saveCompute}
-                                onCancel={() => hook.setEditingCompute(false)}
-                                onUpgradeClick={hook.openUpgradeModal}
-                            />
-                        )}
-
-                        {hook.activeTab === "settings" && (
-                            <SettingsTab
-                                project={projectCompat}
-                                editingStartCommand={hook.editingStartCommand}
-                                startCommandValue={hook.startCommandValue}
-                                savingStartCommand={hook.savingStartCommand}
-                                onStartCommandChange={hook.setStartCommandValue}
-                                onStartEditStartCommand={hook.startEditingStartCommand}
-                                onSaveStartCommand={hook.saveStartCommand}
-                                onCancelStartCommand={() => hook.setEditingStartCommand(false)}
-                                editingEnvVars={hook.editingEnvVars}
-                                envVarsList={hook.envVarsList}
-                                savingEnvVars={hook.savingEnvVars}
-                                onEnvVarsChange={hook.setEnvVarsList}
-                                onStartEditEnvVars={hook.startEditingEnvVars}
-                                onSaveEnvVars={hook.saveEnvVars}
-                                onCancelEnvVars={() => hook.setEditingEnvVars(false)}
-                                deleting={hook.deleting}
-                                deleteDialogOpen={hook.deleteDialogOpen}
-                                onDeleteDialogOpenChange={hook.setDeleteDialogOpen}
-                                onDelete={hook.handleDeleteProject}
-                            />
-                        )}
-                    </div>
+                        {services.map((svc) => (
+                            <TabsContent key={svc.service_id} value={svc.service_id} className="mt-0">
+                                {svc.service_type === "database" ? (
+                                    <DatabaseServiceView service={svc} hook={hook} />
+                                ) : (
+                                    <WebAppServiceView service={svc} project={project} hook={hook} projectId={id} />
+                                )}
+                            </TabsContent>
+                        ))}
+                    </Tabs>
                 </div>
             </div>
 
             <UpgradeModal isOpen={hook.upgradeModalOpen} onClose={hook.closeUpgradeModal} />
+        </>
+    )
+}
+
+// ── Web App Service View ────────────────────────────────────────
+function WebAppServiceView({
+    service,
+    project,
+    hook,
+    projectId,
+}: {
+    service: Service
+    project: { project_id: string; name: string }
+    hook: ReturnType<typeof useProjectDetail>
+    projectId: string
+}) {
+    const deployments = service.deployments || []
+    const isBuilding = !["LIVE", "FAILED"].includes(service.status)
+
+    const activeCustomDomain = service.custom_domains?.find(d => d.is_active)
+    const displayUrl = activeCustomDomain
+        ? `https://${activeCustomDomain.domain}`
+        : (service.custom_url || service.function_url || null)
+
+    const projectCompat = {
+        ...project,
+        ...service,
+        project_id: project.project_id,
+    }
+
+    return (
+        <>
+            <ProjectHeader
+                project={projectCompat}
+                isBuilding={isBuilding}
+                redeploying={hook.redeploying}
+                onRedeploy={hook.handleRedeploy}
+            />
+
+            {service.is_throttled && (
+                <ThrottleBanner onUpgradeClick={hook.openUpgradeModal} />
+            )}
+
+            <StatsCards
+                project={projectCompat}
+                displayUrl={displayUrl}
+                latestDeployment={deployments[0]}
+                copied={hook.copied}
+                onCopy={hook.copyToClipboard}
+            />
+
+            {isBuilding && <BuildProgress currentStatus={service.status} />}
+
+            <TabNavigation
+                tabs={WEB_APP_TABS}
+                activeTab={hook.activeTab}
+                onTabChange={(tab) => hook.setActiveTab(tab as "deployments" | "domains" | "logs" | "compute" | "settings")}
+            />
+
+            <div className="py-6">
+                {hook.activeTab === "deployments" && (
+                    <DeploymentsTab
+                        project={projectCompat}
+                        deployments={deployments}
+                        expandedDeployId={hook.expandedDeployId}
+                        onToggleExpand={hook.setExpandedDeployId}
+                        orgId={hook.orgId!}
+                        onDeployComplete={hook.fetchProject}
+                    />
+                )}
+
+                {hook.activeTab === "domains" && (
+                    <CustomDomains
+                        projectId={projectId}
+                        orgId={hook.orgId ?? null}
+                        subdomain={service.subdomain ?? null}
+                        customDomains={service.custom_domains}
+                        onRefetch={hook.fetchProject}
+                    />
+                )}
+
+                {hook.activeTab === "logs" && (
+                    <RuntimeLogsTab
+                        logs={hook.logs}
+                        logsLoading={hook.logsLoading}
+                        onRefresh={hook.fetchLogs}
+                    />
+                )}
+
+                {hook.activeTab === "compute" && (
+                    <ComputeTab
+                        project={projectCompat}
+                        editingCompute={hook.editingCompute}
+                        memoryValue={hook.memoryValue}
+                        timeoutValue={hook.timeoutValue}
+                        ephemeralStorageValue={hook.ephemeralStorageValue}
+                        savingCompute={hook.savingCompute}
+                        currentPlan={hook.currentPlan ?? null}
+                        onMemoryChange={hook.setMemoryValue}
+                        onTimeoutChange={hook.setTimeoutValue}
+                        onEphemeralStorageChange={hook.setEphemeralStorageValue}
+                        onStartEditing={hook.startEditingCompute}
+                        onSave={hook.saveCompute}
+                        onCancel={() => hook.setEditingCompute(false)}
+                        onUpgradeClick={hook.openUpgradeModal}
+                    />
+                )}
+
+                {hook.activeTab === "settings" && (
+                    <SettingsTab
+                        project={projectCompat}
+                        editingStartCommand={hook.editingStartCommand}
+                        startCommandValue={hook.startCommandValue}
+                        savingStartCommand={hook.savingStartCommand}
+                        onStartCommandChange={hook.setStartCommandValue}
+                        onStartEditStartCommand={hook.startEditingStartCommand}
+                        onSaveStartCommand={hook.saveStartCommand}
+                        onCancelStartCommand={() => hook.setEditingStartCommand(false)}
+                        editingEnvVars={hook.editingEnvVars}
+                        envVarsList={hook.envVarsList}
+                        savingEnvVars={hook.savingEnvVars}
+                        onEnvVarsChange={hook.setEnvVarsList}
+                        onStartEditEnvVars={hook.startEditingEnvVars}
+                        onSaveEnvVars={hook.saveEnvVars}
+                        onCancelEnvVars={() => hook.setEditingEnvVars(false)}
+                        deleting={hook.deleting}
+                        deleteDialogOpen={hook.deleteDialogOpen}
+                        onDeleteDialogOpenChange={hook.setDeleteDialogOpen}
+                        onDelete={() => hook.handleDeleteService(service.service_id)}
+                    />
+                )}
+            </div>
         </>
     )
 }

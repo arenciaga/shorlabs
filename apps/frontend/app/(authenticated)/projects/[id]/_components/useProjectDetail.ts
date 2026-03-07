@@ -25,6 +25,7 @@ export function useProjectDetail(id: string) {
     const [copied, setCopied] = useState(false)
     const [redeploying, setRedeploying] = useState(false)
     const [activeTab, setActiveTab] = useState<ActiveTab>("deployments")
+    const [activeServiceId, setActiveServiceId] = useState<string | null>(null)
 
     // Database project state
     const [dbConnection, setDbConnection] = useState<DatabaseConnection | null>(null)
@@ -69,6 +70,19 @@ export function useProjectDetail(id: string) {
 
     // Deployment logs expansion state
     const [expandedDeployId, setExpandedDeployId] = useState<string | null>(null)
+
+    // Reset all service-specific editing state (called when switching service tabs)
+    const resetServiceState = useCallback(() => {
+        setEditingEnvVars(false)
+        setEditingStartCommand(false)
+        setEditingCompute(false)
+        setExpandedDeployId(null)
+        setLogs([])
+        setDbConnection(null)
+        setShowPassword(false)
+        setSecurityRules(null)
+        setCopiedField(null)
+    }, [])
 
     const copyToClipboard = (text: string) => {
         navigator.clipboard.writeText(text)
@@ -130,18 +144,16 @@ export function useProjectDetail(id: string) {
         try {
             const token = await getToken()
 
-            // Track before deletion
             if (data?.project) {
                 const projectAge = data.project.created_at
                     ? Math.floor((Date.now() - new Date(data.project.created_at).getTime()) / (1000 * 60 * 60 * 24))
                     : 0
-                const svc = data.services?.[0]
 
                 trackEvent('Project Deleted', {
                     project_id: id,
                     project_name: data.project.name,
                     project_age_days: projectAge,
-                    deployment_count: svc?.deployments?.length || 0
+                    services_count: data.services?.length || 0,
                 })
             }
 
@@ -150,31 +162,14 @@ export function useProjectDetail(id: string) {
 
             const response = await fetch(url.toString(), {
                 method: "DELETE",
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                },
+                headers: { Authorization: `Bearer ${token}` },
             })
 
             if (!response.ok) {
-                const data = await response.json()
-                throw new Error(data.detail || "Failed to delete project")
+                const errData = await response.json()
+                throw new Error(errData.detail || "Failed to delete project")
             }
 
-            // 202 = async deletion (database projects) — optimistically show DELETING status immediately
-            if (response.status === 202) {
-                setDeleteDialogOpen(false)
-                setConfirmProjectName("")
-                setConfirmPhrase("")
-                setDeleting(false)
-                // Optimistic update: set status to DELETING instantly so UI reflects it without waiting for a re-fetch
-                setData(prev => prev ? {
-                    ...prev,
-                    services: prev.services.map((s, i) => i === 0 ? { ...s, status: "DELETING" } : s)
-                } : prev)
-                return
-            }
-
-            // 200 = synchronous deletion (web-app projects) — redirect immediately
             router.push("/projects")
         } catch (err) {
             console.error("Failed to delete project:", err)
@@ -185,6 +180,72 @@ export function useProjectDetail(id: string) {
                 error_message: err instanceof Error ? err.message : 'Unknown error',
                 context: 'project_deletion',
                 project_id: id
+            })
+
+            setDeleting(false)
+            setDeleteDialogOpen(false)
+        }
+    }
+
+    const handleDeleteService = async (serviceId: string) => {
+        setDeleting(true)
+        try {
+            const token = await getToken()
+
+            const url = new URL(`${API_BASE_URL}/api/projects/${id}/services/${serviceId}`)
+            if (orgId) url.searchParams.append("org_id", orgId)
+
+            const response = await fetch(url.toString(), {
+                method: "DELETE",
+                headers: { Authorization: `Bearer ${token}` },
+            })
+
+            if (!response.ok) {
+                const errData = await response.json()
+                throw new Error(errData.detail || "Failed to delete service")
+            }
+
+            setDeleteDialogOpen(false)
+            setConfirmProjectName("")
+            setConfirmPhrase("")
+            setDeleting(false)
+
+            // 202 = async DB deletion — mark service as DELETING optimistically
+            if (response.status === 202) {
+                setData(prev => prev ? {
+                    ...prev,
+                    services: prev.services.map(s =>
+                        s.service_id === serviceId ? { ...s, status: "DELETING" } : s
+                    ),
+                } : prev)
+                return
+            }
+
+            // 200 = sync deletion complete — remove the service from local state
+            setData(prev => {
+                if (!prev) return prev
+                const remaining = prev.services.filter(s => s.service_id !== serviceId)
+                if (remaining.length === 0) {
+                    // Last service deleted — redirect to projects list
+                    router.push("/projects")
+                    return prev
+                }
+                return { ...prev, services: remaining }
+            })
+
+            // Switch to the first remaining service
+            resetServiceState()
+            setActiveServiceId(null)
+        } catch (err) {
+            console.error("Failed to delete service:", err)
+            setError(err instanceof Error ? err.message : "Failed to delete service")
+
+            trackEvent('Error Occurred', {
+                error_type: 'service_deletion_failed',
+                error_message: err instanceof Error ? err.message : 'Unknown error',
+                context: 'service_deletion',
+                project_id: id,
+                service_id: serviceId,
             })
 
             setDeleting(false)
@@ -520,7 +581,11 @@ export function useProjectDetail(id: string) {
     }, [activeTab, fetchLogs])
 
     // Load security rules when security tab selected (only when DB is LIVE — no rules exist while provisioning)
-    const activeService = data?.services?.[0] as Service | undefined
+    // Resolve the active service based on activeServiceId (fall back to first service)
+    const activeService = (activeServiceId
+        ? data?.services?.find(s => s.service_id === activeServiceId)
+        : data?.services?.[0]
+    ) as Service | undefined
     const isDatabaseProject = activeService?.service_type === "database"
     const dbActiveTab = activeTab === "configuration" || activeTab === "settings" || activeTab === "explorer" || activeTab === "security" ? activeTab : "configuration"
     const isDbLive = activeService?.status === "LIVE"
@@ -557,11 +622,18 @@ export function useProjectDetail(id: string) {
         isDatabaseProject,
         dbActiveTab,
 
+        // Service switcher
+        activeServiceId,
+        setActiveServiceId,
+        activeService,
+        resetServiceState,
+
         // Project actions
         fetchProject,
         handleRedeploy,
         redeploying,
         handleDeleteProject,
+        handleDeleteService,
         deleting,
         deleteDialogOpen,
         setDeleteDialogOpen,

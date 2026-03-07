@@ -6,11 +6,11 @@ import {
     EyeOff,
     Loader2,
 } from "lucide-react"
-import type { Project } from "./types"
+import type { ProjectCompat } from "./types"
 import type { DatabaseConnection } from "@/lib/api"
 
 interface DatabaseConnectionDetailsProps {
-    project: Project
+    project: ProjectCompat
     isBuilding: boolean
     dbConnection: DatabaseConnection | null
     showPassword: boolean

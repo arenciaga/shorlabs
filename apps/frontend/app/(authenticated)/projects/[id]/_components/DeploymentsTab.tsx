@@ -6,10 +6,10 @@ import {
     Loader2,
 } from "lucide-react"
 import { DeploymentLogs } from "@/components/DeploymentLogs"
-import type { Deployment, Project } from "./types"
+import type { Deployment, ProjectCompat } from "./types"
 
 interface DeploymentsTabProps {
-    project: Project
+    project: ProjectCompat
     deployments: Deployment[]
     expandedDeployId: string | null
     onToggleExpand: (deployId: string | null) => void

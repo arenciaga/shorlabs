@@ -9,10 +9,10 @@ import {
     Loader2,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import type { Deployment, Project } from "./types"
+import type { Deployment, ProjectCompat } from "./types"
 
 interface StatsCardsProps {
-    project: Project
+    project: ProjectCompat
     displayUrl: string | null
     latestDeployment: Deployment | undefined
     copied: boolean

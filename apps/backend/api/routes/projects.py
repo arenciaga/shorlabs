@@ -1493,6 +1493,68 @@ async def redeploy_project(
     }
 
 
+def _delete_single_service(svc: dict):
+    """Shared helper: delete one service and its AWS resources."""
+    sid = svc["service_id"]
+    svc_type = svc.get("service_type", "web-app")
+
+    if svc_type == "database":
+        update_service(sid, {"status": "DELETING"})
+        send_database_delete_to_sqs(sid)
+        return "async"
+    else:
+        function_name = svc.get("function_name")
+        print(f"🗑️ DELETE SERVICE: service_id={sid}, function_name='{function_name}'")
+
+        from api.db.dynamodb import list_project_domains
+        from api.services.domain_service import delete_domain_tenant
+        custom_domains = list_project_domains(sid)
+        for d in custom_domains:
+            tenant_id = d.get("tenant_id")
+            if tenant_id:
+                delete_domain_tenant(tenant_id)
+
+        delete_project_resources(svc.get("github_url", ""), function_name=function_name)
+        delete_service(sid)
+        return "sync"
+
+
+@router.delete("/{project_id}/services/{service_id}")
+async def delete_service_endpoint(
+    project_id: str,
+    service_id: str,
+    user_id: str = Depends(get_current_user_id),
+    org_id: str = Query(...),
+):
+    """Delete a single service from a project (without deleting the project itself)."""
+    from fastapi.responses import JSONResponse
+
+    svc = get_service_by_key(org_id, project_id, service_id)
+    if not svc:
+        raise HTTPException(status_code=404, detail="Service not found")
+
+    print(f"🗑️ DELETE SERVICE: project_id={project_id}, service_id={service_id}")
+
+    mode = _delete_single_service(svc)
+
+    if mode == "async":
+        return JSONResponse(
+            status_code=202,
+            content={
+                "deleted": False,
+                "status": "DELETING",
+                "service_id": service_id,
+                "message": "Database deletion initiated",
+            },
+        )
+
+    return {
+        "deleted": True,
+        "service_id": service_id,
+        "project_id": project_id,
+    }
+
+
 @router.delete("/{project_id}")
 async def delete_project_endpoint(
     project_id: str,
@@ -1507,35 +1569,9 @@ async def delete_project_endpoint(
 
     print(f"🗑️ DELETE PROJECT: project_id={project_id}")
 
-    # Delete all services and their AWS resources
     services = list_services(project_id, org_id=org_id)
     for svc in services:
-        sid = svc["service_id"]
-        svc_type = svc.get("service_type", "web-app")
-
-        if svc_type == "database":
-            # Mark as DELETING and process asynchronously
-            update_service(sid, {"status": "DELETING"})
-            send_database_delete_to_sqs(sid)
-        else:
-            # Web-app deletion
-            function_name = svc.get("function_name")
-            print(f"🗑️ DELETE SERVICE: service_id={sid}, function_name='{function_name}'")
-
-            # Clean up custom domain resources
-            from api.db.dynamodb import list_project_domains
-            from api.services.domain_service import delete_domain_tenant
-            custom_domains = list_project_domains(sid)
-            for d in custom_domains:
-                tenant_id = d.get("tenant_id")
-                if tenant_id:
-                    delete_domain_tenant(tenant_id)
-
-            # Delete AWS resources (Lambda, ECR, CloudWatch)
-            delete_project_resources(svc.get("github_url", ""), function_name=function_name)
-
-            # Delete the service DynamoDB record (deployments + domains cascade)
-            delete_service(sid)
+        _delete_single_service(svc)
 
     # Delete the project container itself
     delete_project(project_id)

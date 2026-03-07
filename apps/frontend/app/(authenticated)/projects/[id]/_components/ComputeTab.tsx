@@ -1,10 +1,10 @@
 import { Loader2, Cpu } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ComputeSettings } from "@/components/ComputeSettings"
-import type { Project } from "./types"
+import type { ProjectCompat } from "./types"
 
 interface ComputeTabProps {
-    project: Project
+    project: ProjectCompat
     editingCompute: boolean
     memoryValue: number
     timeoutValue: number

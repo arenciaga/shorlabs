@@ -1,10 +1,11 @@
+import React from "react"
 import { StartCommandInput } from "@/components/StartCommandInput"
 import { EnvironmentVariablesEditor } from "@/components/EnvironmentVariablesEditor"
 import { DeleteProjectDialog } from "./DeleteProjectDialog"
-import type { Project } from "./types"
+import type { ProjectCompat } from "./types"
 
 interface SettingsTabProps {
-    project: Project
+    project: ProjectCompat
     // Start command
     editingStartCommand: boolean
     startCommandValue: string
@@ -26,6 +27,8 @@ interface SettingsTabProps {
     deleteDialogOpen: boolean
     onDeleteDialogOpenChange: (open: boolean) => void
     onDelete: () => void
+    deleteEntityLabel?: string
+    deleteDescription?: React.ReactNode
 }
 
 export function SettingsTab({
@@ -48,6 +51,8 @@ export function SettingsTab({
     deleteDialogOpen,
     onDeleteDialogOpenChange,
     onDelete,
+    deleteEntityLabel,
+    deleteDescription,
 }: SettingsTabProps) {
     return (
         <div className="space-y-6">
@@ -85,8 +90,8 @@ export function SettingsTab({
                 <div className="p-4 sm:p-6">
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                         <div>
-                            <p className="font-medium text-zinc-900">Delete this project</p>
-                            <p className="text-sm text-zinc-500">Once deleted, this cannot be undone.</p>
+                            <p className="font-medium text-zinc-900">Delete this service</p>
+                            <p className="text-sm text-zinc-500">Once deleted, this cannot be undone. All deployments will be removed.</p>
                         </div>
                         <DeleteProjectDialog
                             projectName={project.name}
@@ -94,6 +99,8 @@ export function SettingsTab({
                             open={deleteDialogOpen}
                             onOpenChange={onDeleteDialogOpenChange}
                             onDelete={onDelete}
+                            entityLabel={deleteEntityLabel || "Delete Service"}
+                            description={deleteDescription || <>This will permanently delete <strong>{project.name}</strong> and all its deployments.</>}
                         />
                     </div>
                 </div>

@@ -69,6 +69,9 @@ export interface ProjectDetails {
     services: Service[]
 }
 
+// Compat type for child components that receive { ...project, ...service }
+export type ProjectCompat = Project & Partial<Service>
+
 export type WebAppTab = "deployments" | "domains" | "logs" | "compute" | "settings"
 export type DatabaseTab = "configuration" | "explorer" | "security" | "settings"
 export type ActiveTab = WebAppTab | DatabaseTab

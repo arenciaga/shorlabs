@@ -22,8 +22,9 @@ interface DatabaseServiceViewProps {
 
 export function DatabaseServiceView({ service, hook }: DatabaseServiceViewProps) {
     const project = hook.data!.project
-    const statusConfig = STATUS_CONFIG[service.status] || STATUS_CONFIG.PENDING
-    const isBuilding = !["LIVE", "FAILED"].includes(service.status)
+    const isDeleted = ["DELETING", "DELETED"].includes(service.status)
+    const statusConfig = STATUS_CONFIG[service.status] || (isDeleted ? STATUS_CONFIG.DELETING : STATUS_CONFIG.PENDING)
+    const isBuilding = !["LIVE", "FAILED", "DELETING", "DELETED"].includes(service.status)
 
     // Build a compat object for child components that still expect the old project shape
     const serviceCompat = {
@@ -47,7 +48,7 @@ export function DatabaseServiceView({ service, hook }: DatabaseServiceViewProps)
             </div>
 
             {/* Deleting Banner */}
-            {service.status === "DELETING" && (
+            {isDeleted && (
                 <div className="bg-red-50 border border-red-200 rounded-none p-4 mb-6 sm:mb-8">
                     <div className="flex items-center gap-3">
                         <Loader2 className="h-5 w-5 text-red-500 animate-spin shrink-0" />
@@ -60,7 +61,7 @@ export function DatabaseServiceView({ service, hook }: DatabaseServiceViewProps)
             )}
 
             {/* Connection Details Card */}
-            {service.status !== "DELETING" && (
+            {!isDeleted && service.status !== "FAILED" && (
                 <DatabaseConnectionDetails
                     project={serviceCompat}
                     isBuilding={isBuilding}
@@ -73,8 +74,30 @@ export function DatabaseServiceView({ service, hook }: DatabaseServiceViewProps)
                 />
             )}
 
+            {/* Failed Banner */}
+            {service.status === "FAILED" && (
+                <div className="bg-red-50 border border-red-200 rounded-none p-4 mb-6 sm:mb-8">
+                    <div className="flex items-start gap-3">
+                        <Database className="h-5 w-5 text-red-500 shrink-0 mt-0.5" />
+                        <div className="flex-1">
+                            <p className="font-medium text-red-900">Database operation failed</p>
+                            <p className="text-sm text-red-600 mt-0.5">Something went wrong. Delete this service and try again.</p>
+                        </div>
+                        <DeleteProjectDialog
+                            projectName={service.name || "Database"}
+                            deleting={hook.deleting}
+                            open={hook.deleteDialogOpen}
+                            onOpenChange={hook.setDeleteDialogOpen}
+                            onDelete={() => hook.handleDeleteService(service.service_id)}
+                            entityLabel="Delete Database"
+                            description={<>This will permanently delete the database <strong>{service.name || "Database"}</strong> and all its data.</>}
+                        />
+                    </div>
+                </div>
+            )}
+
             {/* Provisioning Progress — not shown during deletion */}
-            {isBuilding && service.status !== "DELETING" && (
+            {isBuilding && !isDeleted && (
                 <div className="bg-zinc-50 rounded-none border border-zinc-200 p-6 mb-8 overflow-hidden">
                     <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-none bg-blue-900 flex items-center justify-center">
@@ -90,7 +113,7 @@ export function DatabaseServiceView({ service, hook }: DatabaseServiceViewProps)
             )}
 
             {/* Tabs + Content — hidden while deleting */}
-            {service.status !== "DELETING" && (<>
+            {!isDeleted && (<>
                 <TabNavigation
                     tabs={DB_TABS}
                     activeTab={hook.dbActiveTab}

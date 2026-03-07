@@ -1,10 +1,9 @@
 "use client"
 
-import { use } from "react"
-import { AlertCircle, Plus, Globe, Database } from "lucide-react"
+import { use, useState } from "react"
+import { AlertCircle, Plus } from "lucide-react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { UpgradeModal } from "@/components/upgrade-modal"
 import { CustomDomains } from "@/components/CustomDomains"
 
@@ -20,7 +19,7 @@ import { RuntimeLogsTab } from "./_components/RuntimeLogsTab"
 import { ComputeTab } from "./_components/ComputeTab"
 import { SettingsTab } from "./_components/SettingsTab"
 import { DatabaseServiceView } from "./_components/DatabaseServiceView"
-import { STATUS_CONFIG } from "./_components/constants"
+import { ServiceSidebar, MobileSidebarTrigger } from "./_components/ServiceSidebar"
 import type { Service } from "./_components/types"
 
 const WEB_APP_TABS = [
@@ -34,22 +33,39 @@ const WEB_APP_TABS = [
 export default function ProjectDetailPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params)
     const hook = useProjectDetail(id)
+    const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
 
-    // Loading skeleton
+    // Loading skeleton — sidebar + detail shimmer
     if (hook.loading) {
         return (
             <div className="min-h-screen bg-white">
                 <div className="px-4 sm:px-6 lg:px-8 py-6">
                     <div className="animate-pulse">
-                        <div className="h-4 w-20 bg-zinc-200 rounded mb-8" />
-                        <div className="h-10 w-64 bg-zinc-200 rounded-none mb-2" />
-                        <div className="h-5 w-48 bg-zinc-100 rounded mb-8" />
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                        <div className="h-4 w-20 bg-zinc-200 rounded mb-6" />
+                        <div className="h-8 w-48 bg-zinc-200 rounded mb-6" />
+                    </div>
+                </div>
+                <div className="flex border-t border-zinc-200">
+                    {/* Sidebar skeleton */}
+                    <div className="hidden md:block w-[240px] shrink-0 border-r border-zinc-200 p-4">
+                        <div className="animate-pulse space-y-3">
+                            <div className="h-3 w-16 bg-zinc-200 rounded" />
                             {[1, 2, 3].map(i => (
-                                <div key={i} className="h-24 bg-zinc-50 rounded-none border border-zinc-200" />
+                                <div key={i} className="h-10 bg-zinc-100 rounded-md" />
                             ))}
                         </div>
-                        <div className="h-64 bg-zinc-50 rounded-none border border-zinc-200" />
+                    </div>
+                    {/* Detail skeleton */}
+                    <div className="flex-1 p-6">
+                        <div className="animate-pulse">
+                            <div className="h-10 w-64 bg-zinc-200 rounded mb-4" />
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                                {[1, 2, 3].map(i => (
+                                    <div key={i} className="h-24 bg-zinc-50 rounded-none border border-zinc-200" />
+                                ))}
+                            </div>
+                            <div className="h-64 bg-zinc-50 rounded-none border border-zinc-200" />
+                        </div>
                     </div>
                 </div>
             </div>
@@ -74,7 +90,6 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     }
 
     const { project, services } = hook.data
-    const hasMultipleServices = services.length > 1
 
     if (services.length === 0) {
         return (
@@ -94,68 +109,56 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
         )
     }
 
-    // Resolve the active service for the header (used for single-service web-app header)
     const activeService = hook.activeService || services[0]
     const defaultServiceId = activeService.service_id
 
+    const handleSelectService = (serviceId: string) => {
+        hook.setActiveServiceId(serviceId)
+        hook.resetServiceState()
+        const svc = services.find(s => s.service_id === serviceId)
+        if (svc?.service_type === "database") {
+            hook.setActiveTab("configuration")
+        } else {
+            hook.setActiveTab("deployments")
+        }
+    }
+
     return (
         <>
-            <div className="min-h-screen bg-white">
-                <div className="px-4 sm:px-6 lg:px-8">
-                    <ProjectBreadcrumb projectName={project.name} isDatabase={activeService.service_type === "database" && !hasMultipleServices} />
+            <div className="min-h-screen bg-white flex flex-col">
+                {/* Top bar: breadcrumb + project name */}
+                <div className="px-4 sm:px-6 lg:px-8 border-b border-zinc-200">
+                    <ProjectBreadcrumb projectName={project.name} isDatabase={activeService.service_type === "database" && services.length === 1} />
 
-                    {/* Project name + Add Service */}
-                    <div className="flex items-center justify-between py-3 mb-2">
+                    <div className="flex items-center gap-2 pb-4">
+                        <MobileSidebarTrigger onClick={() => setMobileSidebarOpen(true)} />
                         <h1 className="text-xl font-semibold text-zinc-900 tracking-tight truncate">{project.name}</h1>
-                        <Link href={`/new?project_id=${project.project_id}`}>
-                            <Button variant="outline" className="rounded-full h-8 px-4 text-xs border-zinc-200 hover:bg-zinc-50 text-zinc-600">
-                                <Plus className="h-3.5 w-3.5 mr-1.5" />
-                                Add Service
-                            </Button>
-                        </Link>
                     </div>
+                </div>
 
-                    {/* ── Service Tabs ─────────────────────────────── */}
-                    <Tabs
-                        value={defaultServiceId}
-                        onValueChange={(val) => {
-                            hook.setActiveServiceId(val)
-                            hook.resetServiceState()
-                            // Reset sub-tab when switching services
-                            const svc = services.find(s => s.service_id === val)
-                            if (svc?.service_type === "database") {
-                                hook.setActiveTab("configuration")
-                            } else {
-                                hook.setActiveTab("deployments")
-                            }
-                        }}
-                    >
-                        {hasMultipleServices && (
-                            <TabsList variant="line" className="mb-4 border-b border-zinc-200 w-full justify-start">
-                                {services.map((svc) => {
-                                    const svcStatus = STATUS_CONFIG[svc.status] || STATUS_CONFIG.PENDING
-                                    const isDb = svc.service_type === "database"
-                                    return (
-                                        <TabsTrigger key={svc.service_id} value={svc.service_id} className="gap-2 px-4 py-2.5 text-sm">
-                                            {isDb ? <Database className="h-3.5 w-3.5" /> : <Globe className="h-3.5 w-3.5" />}
-                                            <span>{svc.name || (isDb ? "Database" : "Web App")}</span>
-                                            <span className={`w-1.5 h-1.5 rounded-full ${svcStatus.dot} ${!["LIVE", "FAILED"].includes(svc.status) ? 'animate-pulse' : ''}`} />
-                                        </TabsTrigger>
-                                    )
-                                })}
-                            </TabsList>
-                        )}
+                {/* ── Sidebar + Detail ─────────────────────────── */}
+                <div className="flex flex-1 min-h-0">
+                    {/* Sidebar — hidden on mobile, shown on md+ */}
+                    <ServiceSidebar
+                        services={services}
+                        activeServiceId={defaultServiceId}
+                        projectId={project.project_id}
+                        projectName={project.name}
+                        onSelectService={handleSelectService}
+                        mobileOpen={mobileSidebarOpen}
+                        onMobileOpenChange={setMobileSidebarOpen}
+                    />
 
-                        {services.map((svc) => (
-                            <TabsContent key={svc.service_id} value={svc.service_id} className="mt-0">
-                                {svc.service_type === "database" ? (
-                                    <DatabaseServiceView service={svc} hook={hook} />
-                                ) : (
-                                    <WebAppServiceView service={svc} project={project} hook={hook} projectId={id} />
-                                )}
-                            </TabsContent>
-                        ))}
-                    </Tabs>
+                    {/* Detail panel */}
+                    <main className="flex-1 min-w-0 overflow-y-auto">
+                        <div className="px-4 sm:px-6 lg:px-8">
+                            {activeService.service_type === "database" ? (
+                                <DatabaseServiceView service={activeService} hook={hook} />
+                            ) : (
+                                <WebAppServiceView service={activeService} project={project} hook={hook} projectId={id} />
+                            )}
+                        </div>
+                    </main>
                 </div>
             </div>
 

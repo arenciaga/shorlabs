@@ -11,7 +11,7 @@ interface TabNavigationProps {
 
 export function TabNavigation({ tabs, activeTab, onTabChange }: TabNavigationProps) {
     return (
-        <div className="sticky top-14 z-40 bg-white -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8">
+        <div className="sticky top-0 z-40 bg-white -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8">
             <div className="flex items-center gap-1 border-b border-zinc-200 overflow-x-auto">
                 {tabs.map((tab) => (
                     <button

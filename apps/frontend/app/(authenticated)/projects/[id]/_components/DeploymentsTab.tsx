@@ -10,6 +10,7 @@ import type { Deployment, ProjectCompat } from "./types"
 
 interface DeploymentsTabProps {
     project: ProjectCompat
+    serviceId: string
     deployments: Deployment[]
     expandedDeployId: string | null
     onToggleExpand: (deployId: string | null) => void
@@ -19,6 +20,7 @@ interface DeploymentsTabProps {
 
 export function DeploymentsTab({
     project,
+    serviceId,
     deployments,
     expandedDeployId,
     onToggleExpand,
@@ -112,6 +114,7 @@ export function DeploymentsTab({
                                 {isExpanded && (
                                     <DeploymentLogs
                                         projectId={project.project_id}
+                                        serviceId={serviceId}
                                         deployId={deployment.deploy_id}
                                         buildId={deployment.build_id}
                                         orgId={orgId}

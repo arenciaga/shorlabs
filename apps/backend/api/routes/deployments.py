@@ -18,6 +18,7 @@ async def get_deployment_logs(
     project_id: str,
     deploy_id: str,
     org_id: str = Query(...),
+    service_id: str = Query(None),
 ):
     """
     Fetch all logs for a deployment.
@@ -32,7 +33,9 @@ async def get_deployment_logs(
         raise HTTPException(status_code=403, detail="Not authorized")
     
     # Get the deployment to find the build_id
-    deployment = get_deployment(project_id, deploy_id)
+    # Deployments are keyed by service_id, so prefer service_id if provided
+    lookup_id = service_id or project_id
+    deployment = get_deployment(lookup_id, deploy_id)
     if not deployment:
         raise HTTPException(status_code=404, detail="Deployment not found")
     
@@ -60,6 +63,7 @@ async def stream_deployment_logs(
     project_id: str,
     deploy_id: str,
     org_id: str = Query(...),
+    service_id: str = Query(None),
 ):
     """
     Server-Sent Events endpoint for real-time log streaming during active builds.
@@ -73,8 +77,9 @@ async def stream_deployment_logs(
     if project.get("organization_id") != org_id:
         raise HTTPException(status_code=403, detail="Not authorized")
     
-    # Get the deployment
-    deployment = get_deployment(project_id, deploy_id)
+    # Get the deployment (keyed by service_id)
+    lookup_id = service_id or project_id
+    deployment = get_deployment(lookup_id, deploy_id)
     if not deployment:
         raise HTTPException(status_code=404, detail="Deployment not found")
     

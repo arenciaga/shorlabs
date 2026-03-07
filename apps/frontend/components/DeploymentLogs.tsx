@@ -25,6 +25,7 @@ interface LogEntry {
 
 interface DeploymentLogsProps {
     projectId: string
+    serviceId: string
     deployId: string
     buildId: string
     orgId: string
@@ -88,6 +89,7 @@ function logsToText(logs: LogEntry[]): string {
 
 export function DeploymentLogs({
     projectId,
+    serviceId,
     deployId,
     buildId,
     orgId,
@@ -112,6 +114,7 @@ export function DeploymentLogs({
             const token = await getToken()
             const url = new URL(`${API_BASE_URL}/api/deployments/${projectId}/${deployId}/logs`)
             url.searchParams.append("org_id", orgId)
+            url.searchParams.append("service_id", serviceId)
             const response = await fetch(url.toString(), {
                 headers: { Authorization: `Bearer ${token}` },
             })
@@ -123,7 +126,7 @@ export function DeploymentLogs({
         } finally {
             setLoading(false)
         }
-    }, [getToken, projectId, deployId, orgId])
+    }, [getToken, projectId, serviceId, deployId, orgId])
 
     // Polling (for in-progress builds)
     const startStreaming = useCallback(async () => {
@@ -139,6 +142,7 @@ export function DeploymentLogs({
                     try {
                         const pollUrl = new URL(`${API_BASE_URL}/api/deployments/${projectId}/${deployId}/logs`)
                         pollUrl.searchParams.append("org_id", orgId)
+                        pollUrl.searchParams.append("service_id", serviceId)
                         const response = await fetch(pollUrl.toString(), {
                             headers: { Authorization: `Bearer ${token}` },
                         })
@@ -172,7 +176,7 @@ export function DeploymentLogs({
             setIsStreaming(false)
             streamingRef.current = false
         }
-    }, [getToken, projectId, deployId, orgId, buildId, onComplete])
+    }, [getToken, projectId, serviceId, deployId, orgId, buildId, onComplete])
 
     useEffect(() => {
         if (!isExpanded) return

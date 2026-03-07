@@ -1,7 +1,7 @@
 "use client"
 
 import { use, useState } from "react"
-import { AlertCircle, Plus } from "lucide-react"
+import { AlertCircle, Plus, Trash2 } from "lucide-react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { UpgradeModal } from "@/components/upgrade-modal"
@@ -19,6 +19,7 @@ import { RuntimeLogsTab } from "./_components/RuntimeLogsTab"
 import { ComputeTab } from "./_components/ComputeTab"
 import { SettingsTab } from "./_components/SettingsTab"
 import { DatabaseServiceView } from "./_components/DatabaseServiceView"
+import { DeleteProjectDialog } from "./_components/DeleteProjectDialog"
 import { ServiceSidebar, MobileSidebarTrigger } from "./_components/ServiceSidebar"
 import type { Service } from "./_components/types"
 
@@ -97,13 +98,22 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                 <div className="text-center">
                     <AlertCircle className="h-8 w-8 text-zinc-400 mx-auto mb-4" />
                     <h2 className="text-xl font-semibold text-zinc-900 mb-2">No services</h2>
-                    <p className="text-zinc-500 mb-4">This project has no services yet.</p>
-                    <Link href={`/new?project_id=${project.project_id}`}>
-                        <Button variant="outline" className="rounded-full">
-                            <Plus className="h-3.5 w-3.5 mr-1.5" />
-                            Add Service
-                        </Button>
-                    </Link>
+                    <p className="text-zinc-500 mb-6">This project has no services yet.</p>
+                    <div className="flex items-center justify-center gap-3">
+                        <Link href={`/new?project_id=${project.project_id}`}>
+                            <Button variant="outline" className="rounded-full">
+                                <Plus className="h-3.5 w-3.5 mr-1.5" />
+                                Add Service
+                            </Button>
+                        </Link>
+                        <DeleteProjectDialog
+                            projectName={project.name}
+                            deleting={hook.deleting}
+                            open={hook.deleteDialogOpen}
+                            onOpenChange={hook.setDeleteDialogOpen}
+                            onDelete={hook.handleDeleteProject}
+                        />
+                    </div>
                 </div>
             </div>
         )
@@ -226,6 +236,7 @@ function WebAppServiceView({
                 {hook.activeTab === "deployments" && (
                     <DeploymentsTab
                         project={projectCompat}
+                        serviceId={service.service_id}
                         deployments={deployments}
                         expandedDeployId={hook.expandedDeployId}
                         onToggleExpand={hook.setExpandedDeployId}

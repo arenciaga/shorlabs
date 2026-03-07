@@ -322,19 +322,14 @@ export default function ProjectsPage() {
                         ) : filteredProjects.length > 0 ? (
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                                 {filteredProjects.map((project) => {
-                                    const primaryService = project.services?.[0]
-                                    const isDatabase = primaryService?.service_type === "database"
-                                    const serviceStatus = primaryService?.status || "PENDING"
-                                    const status = STATUS_CONFIG[serviceStatus] || STATUS_CONFIG.PENDING
-                                    const displayUrl = isDatabase
-                                        ? null
-                                        : (primaryService?.active_custom_domain
-                                            ? `https://${primaryService.active_custom_domain}`
-                                            : (primaryService?.custom_url || primaryService?.function_url))
-                                    const normalizedDisplayUrl = displayUrl ? normalizeUrl(displayUrl) : null
-                                    const projectHost = isDatabase
-                                        ? primaryService?.db_endpoint
-                                        : getProjectHost(displayUrl ?? null)
+                                    const services = project.services || []
+                                    const webAppService = services.find(s => s.service_type === "web-app")
+                                    const avatarUrl = webAppService
+                                        ? (webAppService.active_custom_domain
+                                            ? `https://${webAppService.active_custom_domain}`
+                                            : (webAppService.custom_url || webAppService.function_url || null))
+                                        : null
+
                                     return (
                                         <Link
                                             key={project.project_id}
@@ -342,55 +337,45 @@ export default function ProjectsPage() {
                                             className="group block"
                                         >
                                             <div className="bg-zinc-50 border border-zinc-200 rounded-none p-5 transition-all duration-200 hover:border-zinc-300 hover:shadow-lg hover:shadow-zinc-200/50">
-                                                {/* Top: Icon + Name + Status */}
-                                                <div className="flex items-start justify-between mb-4">
-                                                    <div className="flex items-center gap-3 min-w-0">
-                                                        {isDatabase ? (
-                                                            <div className="w-9 h-9 bg-blue-100 border border-blue-200 flex items-center justify-center shrink-0">
-                                                                <Database className="h-4 w-4 text-blue-600" />
-                                                            </div>
-                                                        ) : (
-                                                            <ProjectAvatar
-                                                                key={`avatar-${displayUrl || project.project_id}`}
-                                                                projectId={project.project_id}
-                                                                projectName={project.name}
-                                                                projectUrl={displayUrl ?? null}
-                                                            />
-                                                        )}
-                                                        <div className="min-w-0">
-                                                            <h3 className="font-semibold text-[15px] text-zinc-900 group-hover:text-black transition-colors truncate">
-                                                                {project.name.toLowerCase().replace(/_/g, '-')}
-                                                            </h3>
-                                                            {projectHost && (
-                                                                <p className="text-xs text-zinc-400 truncate mt-0.5">
-                                                                    {projectHost}
-                                                                </p>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                    <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full shrink-0 ml-3 ${status.bg}`}>
-                                                        <span className={`w-1.5 h-1.5 rounded-full ${status.dot}`} />
-                                                        <span className="text-xs font-medium text-zinc-700">
-                                                            {status.label}
-                                                        </span>
-                                                    </div>
+                                                {/* Top: Avatar + Project Name */}
+                                                <div className="flex items-center gap-3 mb-4">
+                                                    <ProjectAvatar
+                                                        key={`avatar-${avatarUrl || project.project_id}`}
+                                                        projectId={project.project_id}
+                                                        projectName={project.name}
+                                                        projectUrl={avatarUrl}
+                                                    />
+                                                    <h3 className="font-semibold text-[15px] text-zinc-900 group-hover:text-black transition-colors truncate min-w-0">
+                                                        {project.name.toLowerCase().replace(/_/g, '-')}
+                                                    </h3>
                                                 </div>
 
-                                                {/* Service badges */}
-                                                <div className="flex items-center gap-1.5 mb-4 flex-wrap">
-                                                    {project.services?.map((svc) => (
-                                                        svc.service_type === "database" ? (
-                                                            <div key={svc.service_id} className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-blue-50 border border-blue-200 rounded-full">
-                                                                <Database className="h-3 w-3 text-blue-500" />
-                                                                <span className="text-xs text-blue-600">PostgreSQL</span>
-                                                            </div>
-                                                        ) : (
-                                                            <div key={svc.service_id} className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-zinc-100 border border-zinc-200 rounded-full">
-                                                                <Github className="h-3 w-3 text-zinc-500" />
-                                                                <span className="text-xs text-zinc-600 truncate max-w-[200px]">{svc.github_repo || svc.name}</span>
+                                                {/* Service rows */}
+                                                <div className="space-y-2 mb-4">
+                                                    {services.map((svc) => {
+                                                        const svcStatus = STATUS_CONFIG[svc.status] || STATUS_CONFIG.PENDING
+                                                        const isDb = svc.service_type === "database"
+                                                        return (
+                                                            <div key={svc.service_id} className="flex items-center justify-between gap-2 px-3 py-2 bg-white border border-zinc-100 rounded-sm">
+                                                                <div className="flex items-center gap-2 min-w-0">
+                                                                    {isDb ? (
+                                                                        <Database className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                                                                    ) : (
+                                                                        <Github className="h-3.5 w-3.5 text-zinc-400 shrink-0" />
+                                                                    )}
+                                                                    <span className="text-xs text-zinc-700 truncate">
+                                                                        {isDb ? (svc.name || "PostgreSQL") : (svc.github_repo || svc.name)}
+                                                                    </span>
+                                                                </div>
+                                                                <div className="flex items-center gap-1.5 shrink-0">
+                                                                    <span className={`w-1.5 h-1.5 rounded-full ${svcStatus.dot}`} />
+                                                                    <span className="text-[11px] font-medium text-zinc-500">
+                                                                        {svcStatus.label}
+                                                                    </span>
+                                                                </div>
                                                             </div>
                                                         )
-                                                    ))}
+                                                    })}
                                                 </div>
 
                                                 {/* Bottom: Date + Action icons */}
@@ -403,30 +388,34 @@ export default function ProjectsPage() {
                                                         })}
                                                     </span>
                                                     <div className="flex items-center gap-0.5">
-                                                        {!isDatabase && primaryService?.github_repo && (
+                                                        {services.filter(s => s.service_type === "web-app" && s.github_repo).map(svc => (
                                                             <button
+                                                                key={`gh-${svc.service_id}`}
                                                                 onClick={(e) => {
                                                                     e.preventDefault()
                                                                     e.stopPropagation()
-                                                                    window.open(`https://github.com/${primaryService.github_repo}`, "_blank")
+                                                                    window.open(`https://github.com/${svc.github_repo}`, "_blank")
                                                                 }}
                                                                 className="p-1.5 rounded-md text-zinc-300 hover:text-zinc-600 hover:bg-zinc-50 transition-colors cursor-pointer"
                                                             >
                                                                 <Github className="h-3.5 w-3.5" />
                                                             </button>
-                                                        )}
-                                                        {normalizedDisplayUrl && (
-                                                            <button
-                                                                onClick={(e) => {
-                                                                    e.preventDefault()
-                                                                    e.stopPropagation()
-                                                                    window.open(normalizedDisplayUrl, "_blank")
-                                                                }}
-                                                                className="p-1.5 rounded-md text-zinc-300 hover:text-zinc-600 hover:bg-zinc-50 transition-colors cursor-pointer"
-                                                            >
-                                                                <ExternalLink className="h-3.5 w-3.5" />
-                                                            </button>
-                                                        )}
+                                                        ))}
+                                                        {webAppService && (() => {
+                                                            const url = normalizeUrl(avatarUrl)
+                                                            return url ? (
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.preventDefault()
+                                                                        e.stopPropagation()
+                                                                        window.open(url, "_blank")
+                                                                    }}
+                                                                    className="p-1.5 rounded-md text-zinc-300 hover:text-zinc-600 hover:bg-zinc-50 transition-colors cursor-pointer"
+                                                                >
+                                                                    <ExternalLink className="h-3.5 w-3.5" />
+                                                                </button>
+                                                            ) : null
+                                                        })()}
                                                     </div>
                                                 </div>
                                             </div>

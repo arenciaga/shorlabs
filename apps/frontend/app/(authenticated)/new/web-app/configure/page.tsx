@@ -293,8 +293,10 @@ function ConfigureProjectContent() {
             const token = await getToken()
 
             // Determine API endpoint: add service to existing project vs create new
+            const serviceUrl = new URL(`${API_BASE_URL}/api/projects/${existingProjectId}/services`)
+            if (orgId) serviceUrl.searchParams.append("org_id", orgId)
             const apiUrl = existingProjectId
-                ? `${API_BASE_URL}/api/projects/${existingProjectId}/services`
+                ? serviceUrl.toString()
                 : `${API_BASE_URL}/api/projects`
 
             const bodyPayload: Record<string, unknown> = {
@@ -328,7 +330,13 @@ function ConfigureProjectContent() {
 
             if (!response.ok) {
                 const data = await response.json()
-                throw new Error(data.detail || "Failed to create project")
+                const detail = data.detail
+                const message = typeof detail === "string"
+                    ? detail
+                    : Array.isArray(detail)
+                        ? detail.map((e: { msg?: string }) => e.msg).join(", ")
+                        : "Failed to create project"
+                throw new Error(message)
             }
 
             const data = await response.json()

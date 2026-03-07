@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, Suspense } from "react"
 import { useAuth } from "@clerk/nextjs"
 import { useRouter, useSearchParams } from "next/navigation"
 import {
@@ -29,6 +29,14 @@ const ACU_OPTIONS = [
 ]
 
 export default function NewDatabasePage() {
+    return (
+        <Suspense fallback={<div className="min-h-screen bg-white" />}>
+            <NewDatabaseContent />
+        </Suspense>
+    )
+}
+
+function NewDatabaseContent() {
     const { getToken, orgId } = useAuth()
     const router = useRouter()
     const searchParams = useSearchParams()

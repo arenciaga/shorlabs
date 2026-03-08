@@ -1,11 +1,5 @@
 """
-GitHub webhook handler for auto-deployment on push.
-
-Industry-standard flow (like Railway/Render):
-1. User configures GitHub App webhook URL in GitHub (or app default).
-2. On push, GitHub sends POST with X-GitHub-Event: push and signed body.
-3. We verify X-Hub-Signature-256 (HMAC-SHA256), then find projects for that repo
-   and trigger deploy via the same SQS pipeline as manual redeploy.
+Webhook handlers for GitHub (auto-deploy on push) and Clerk (user signup).
 """
 import hashlib
 import hmac
@@ -13,6 +7,8 @@ import os
 import json
 from decimal import Decimal
 from fastapi import APIRouter, Request, HTTPException
+from svix.webhooks import Webhook, WebhookVerificationError
+import resend
 
 
 def _json_safe_env_vars(env_vars: dict) -> dict:
@@ -34,6 +30,9 @@ from api.routes.projects import send_deployment_to_sqs
 router = APIRouter(prefix="/webhooks", tags=["webhooks"])
 
 GITHUB_WEBHOOK_SECRET = os.environ.get("GITHUB_WEBHOOK_SECRET", "")
+CLERK_WEBHOOK_SECRET = os.environ.get("CLERK_WEBHOOK_SECRET", "")
+
+resend.api_key = os.environ.get("RESEND_API_KEY", "")
 
 
 def _verify_github_signature(payload_body: bytes, signature_header: str | None, secret: str) -> None:
@@ -175,3 +174,70 @@ async def github_webhook(request: Request):
         "deployments_triggered": triggered,
         "deployments_skipped": skipped,
     }
+
+
+@router.post("/clerk")
+async def clerk_webhook(request: Request):
+    """
+    Handle Clerk webhooks. Clerk uses Svix for delivery.
+    On user.created, sends a welcome email via Resend.
+    """
+    payload = await request.body()
+
+    print(f"[webhook] Clerk webhook received, payload size={len(payload)}")
+    print(f"[webhook] CLERK_WEBHOOK_SECRET configured: {bool(CLERK_WEBHOOK_SECRET)}")
+
+    if not CLERK_WEBHOOK_SECRET:
+        print("[webhook] ERROR: CLERK_WEBHOOK_SECRET env var is not set")
+        raise HTTPException(status_code=500, detail="CLERK_WEBHOOK_SECRET not configured")
+
+    try:
+        wh = Webhook(CLERK_WEBHOOK_SECRET)
+        evt = wh.verify(payload, dict(request.headers))
+    except WebhookVerificationError as e:
+        print(f"[webhook] ERROR: Svix signature verification failed: {e}")
+        raise HTTPException(status_code=400, detail="Invalid webhook signature")
+    except Exception as e:
+        print(f"[webhook] ERROR: Unexpected error during verification: {type(e).__name__}: {e}")
+        raise HTTPException(status_code=500, detail="Webhook verification error")
+
+    event_type = evt.get("type", "")
+    data = evt.get("data", {})
+
+    print(f"[webhook] Clerk event: {event_type}, user_id={data.get('id')}")
+
+    if event_type == "user.created":
+        user_id = data.get("id")
+        first_name = data.get("first_name") or ""
+        last_name = data.get("last_name") or ""
+
+        # Extract primary email
+        primary_email = None
+        primary_email_id = data.get("primary_email_address_id")
+        for email_obj in data.get("email_addresses", []):
+            if email_obj.get("id") == primary_email_id:
+                primary_email = email_obj.get("email_address")
+                break
+
+        if primary_email:
+            display_name = first_name or "there"
+            try:
+                resend.Emails.send({
+                    "from": "Aryan Kashyap <aryan@shorlabs.com>",
+                    "to": [primary_email],
+                    "subject": f"Welcome to Shorlabs, {display_name}!",
+                    "html": (
+                        f"<p>Hi {display_name},</p>"
+                        "<p>Welcome to Shorlabs! We're excited to have you on board.</p>"
+                        "<p>You can get started by creating your first project in the dashboard.</p>"
+                        "<p>If you have any questions, just reply to this email.</p>"
+                        "<p>— Aryan, Founder & CEO of Shorlabs</p>"
+                    ),
+                })
+                print(f"[webhook] Welcome email sent to {primary_email} for user {user_id}")
+            except Exception as e:
+                print(f"[webhook] Failed to send welcome email to {primary_email}: {e}")
+
+        return {"status": "ok", "event": "user.created", "user_id": user_id}
+
+    return {"status": "ok", "event": event_type, "action": "ignored"}

@@ -11,3 +11,4 @@ requests>=2.31.0
 dnspython>=2.5.0
 svix>=1.85.0
 psycopg2-binary>=2.9.9
+resend>=2.23.0

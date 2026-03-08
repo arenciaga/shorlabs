@@ -12,7 +12,7 @@ from pydantic import BaseModel
 
 from api.auth import get_current_user_id
 from api.db.dynamodb import (
-    get_project_by_key,
+    get_service,
     get_domain_item,
     add_custom_domain,
     update_domain,
@@ -37,6 +37,14 @@ class AddDomainRequest(BaseModel):
     domain: str
 
 
+def _resolve_domain_service(org_id: str, service_id: str):
+    """Resolve the service for domain operations. Raises 404 if not found."""
+    service = get_service(service_id)
+    if not service or service.get("organization_id") != org_id:
+        raise HTTPException(status_code=404, detail="Service not found")
+    return service
+
+
 # ─────────────────────────────────────────────────────────────
 # ENDPOINTS
 # ─────────────────────────────────────────────────────────────
@@ -55,10 +63,8 @@ async def add_domain(
     Returns DNS instructions for the user to configure at their registrar.
     The user needs to add a single CNAME record — no separate SSL step needed.
     """
-    # Auth: verify project belongs to org
-    project = get_project_by_key(org_id, project_id)
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+    # Auth: resolve service (project_id may be a service_id)
+    service = _resolve_domain_service(org_id, project_id)
 
     domain = request.domain.lower().strip()
 
@@ -73,12 +79,12 @@ async def add_domain(
             raise HTTPException(status_code=409, detail="Domain already added to this project")
         raise HTTPException(status_code=409, detail="Domain is already in use by another project")
 
-    # Create domain item
+    # Create domain item — store service_id so deployment propagation works
     domain_item = add_custom_domain(
         org_id=org_id,
         project_id=project_id,
         domain=domain,
-        function_url=project.get("function_url"),
+        function_url=service.get("function_url"),
     )
 
     # Build DNS instructions
@@ -117,9 +123,7 @@ async def verify_domain(
     No separate SSL step needed — the domain goes directly to ACTIVE.
     """
     # Auth
-    project = get_project_by_key(org_id, project_id)
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+    service = _resolve_domain_service(org_id, project_id)
 
     domain = domain.lower().strip()
     domain_item = get_domain_item(domain)
@@ -175,7 +179,7 @@ async def verify_domain(
         update_domain(domain, {
             "status": "PROVISIONING",
             "tenant_id": tenant_result["tenant_id"],
-            "function_url": project.get("function_url"),
+            "function_url": service.get("function_url"),
         })
         tenant_id = tenant_result["tenant_id"]
 
@@ -187,7 +191,7 @@ async def verify_domain(
     if setup_result["success"] and setup_result["domain_status"] == "active":
         update_domain(domain, {
             "status": "ACTIVE",
-            "function_url": project.get("function_url"),
+            "function_url": service.get("function_url"),
         })
         return {
             "domain": domain,
@@ -229,9 +233,7 @@ async def check_domain_status(
     If a CloudFront tenant exists, checks its deployment status.
     """
     # Auth
-    project = get_project_by_key(org_id, project_id)
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+    service = _resolve_domain_service(org_id, project_id)
 
     domain = domain.lower().strip()
     domain_item = get_domain_item(domain)
@@ -274,7 +276,7 @@ async def check_domain_status(
         if setup_result["success"] and setup_result["domain_status"] == "active":
             update_domain(domain, {
                 "status": "ACTIVE",
-                "function_url": project.get("function_url"),
+                "function_url": service.get("function_url"),
             })
             return {
                 "domain": domain,
@@ -320,9 +322,7 @@ async def list_domains(
     org_id: str = Query(...),
 ):
     """List all custom domains for a project."""
-    project = get_project_by_key(org_id, project_id)
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+    _resolve_domain_service(org_id, project_id)
 
     domains = list_project_domains(project_id)
     return [
@@ -349,9 +349,7 @@ async def remove_domain(
 
     Cleans up CloudFront distribution tenant and DynamoDB item.
     """
-    project = get_project_by_key(org_id, project_id)
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+    _resolve_domain_service(org_id, project_id)
 
     domain = domain.lower().strip()
     domain_item = get_domain_item(domain)

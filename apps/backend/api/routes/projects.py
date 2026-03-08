@@ -208,7 +208,7 @@ def _run_deployment_sync(
             from api.db.dynamodb import list_project_domains, update_domain
             custom_domains = list_project_domains(service_id)
             for domain_item in custom_domains:
-                if domain_item.get("status") == "ACTIVE":
+                if domain_item.get("status") in ("ACTIVE", "PROVISIONING"):
                     update_domain(domain_item["domain"], {
                         "function_url": function_url,
                     })

@@ -247,7 +247,7 @@ function WebAppServiceView({
 
                 {hook.activeTab === "domains" && (
                     <CustomDomains
-                        projectId={projectId}
+                        projectId={service.service_id}
                         orgId={hook.orgId ?? null}
                         subdomain={service.subdomain ?? null}
                         customDomains={service.custom_domains}

@@ -9,7 +9,6 @@ import {
     Copy,
     Check,
     XCircle,
-    Shield,
     RefreshCw,
     CheckCircle2,
     Trash2,
@@ -70,12 +69,12 @@ export function CustomDomains({
     const [newDomain, setNewDomain] = useState("")
     const [addingDomain, setAddingDomain] = useState(false)
     const [domainError, setDomainError] = useState<string | null>(null)
-    const [verifyingDomain, setVerifyingDomain] = useState<string | null>(null)
-    const [checkingStatus, setCheckingStatus] = useState<string | null>(null)
+    const [retryingDomain, setRetryingDomain] = useState<string | null>(null)
     const [removingDomain, setRemovingDomain] = useState<string | null>(null)
     const [expandedDomain, setExpandedDomain] = useState<string | null>(null)
     const [domainCopied, setDomainCopied] = useState<string | null>(null)
     const [domainResponses, setDomainResponses] = useState<Record<string, DomainResponse>>({})
+    const [lastChecked, setLastChecked] = useState<Record<string, number>>({})
 
     const copyDomainValue = (text: string, key: string) => {
         navigator.clipboard.writeText(text)
@@ -118,52 +117,6 @@ export function CustomDomains({
             setDomainError(err instanceof Error ? err.message : "Failed to add domain")
         } finally {
             setAddingDomain(false)
-        }
-    }
-
-    const handleVerifyDomain = async (domain: string) => {
-        setVerifyingDomain(domain)
-        try {
-            const token = await getToken()
-            const url = new URL(`${API_BASE_URL}/api/projects/${projectId}/domains/${domain}/verify`)
-            if (orgId) url.searchParams.append("org_id", orgId)
-
-            const response = await fetch(url.toString(), {
-                method: "POST",
-                headers: { Authorization: `Bearer ${token}` },
-            })
-
-            const result = await response.json()
-            setDomainResponses((prev) => ({ ...prev, [domain]: result }))
-
-            if (result.dns_verified) {
-                onRefetch()
-            }
-        } catch (err) {
-            console.error("Failed to verify domain:", err)
-        } finally {
-            setVerifyingDomain(null)
-        }
-    }
-
-    const handleCheckDomainStatus = async (domain: string) => {
-        setCheckingStatus(domain)
-        try {
-            const token = await getToken()
-            const url = new URL(`${API_BASE_URL}/api/projects/${projectId}/domains/${domain}/status`)
-            if (orgId) url.searchParams.append("org_id", orgId)
-
-            const response = await fetch(url.toString(), {
-                headers: { Authorization: `Bearer ${token}` },
-            })
-
-            const result = await response.json()
-            setDomainResponses((prev) => ({ ...prev, [domain]: result }))
-            onRefetch()
-        } catch (err) {
-            console.error("Failed to check domain status:", err)
-        } finally {
-            setCheckingStatus(null)
         }
     }
 
@@ -221,13 +174,15 @@ export function CustomDomains({
         }
     }
 
-    // Auto-poll for PROVISIONING domains
+    // Auto-poll for PENDING_VERIFICATION and PROVISIONING domains
     const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-    const pollProvisioningDomains = useCallback(async () => {
+    const pollInProgressDomains = useCallback(async () => {
         if (!customDomains) return
+        const pending = customDomains.filter((d) => d.status === "PENDING_VERIFICATION")
         const provisioning = customDomains.filter((d) => d.status === "PROVISIONING")
-        if (provisioning.length === 0) {
+
+        if (pending.length === 0 && provisioning.length === 0) {
             if (pollingRef.current) {
                 clearInterval(pollingRef.current)
                 pollingRef.current = null
@@ -235,9 +190,33 @@ export function CustomDomains({
             return
         }
 
+        const token = await getToken()
+
+        // Poll PENDING_VERIFICATION domains via /verify (checks DNS and auto-provisions)
+        for (const d of pending) {
+            try {
+                const url = new URL(`${API_BASE_URL}/api/projects/${projectId}/domains/${d.domain}/verify`)
+                if (orgId) url.searchParams.append("org_id", orgId)
+
+                const response = await fetch(url.toString(), {
+                    method: "POST",
+                    headers: { Authorization: `Bearer ${token}` },
+                })
+                const result = await response.json()
+                setDomainResponses((prev) => ({ ...prev, [d.domain]: result }))
+                setLastChecked((prev) => ({ ...prev, [d.domain]: Date.now() }))
+
+                if (result.dns_verified) {
+                    onRefetch()
+                }
+            } catch {
+                // Silently retry on next interval
+            }
+        }
+
+        // Poll PROVISIONING domains via /status (checks SSL cert readiness)
         for (const d of provisioning) {
             try {
-                const token = await getToken()
                 const url = new URL(`${API_BASE_URL}/api/projects/${projectId}/domains/${d.domain}/status`)
                 if (orgId) url.searchParams.append("org_id", orgId)
 
@@ -246,6 +225,7 @@ export function CustomDomains({
                 })
                 const result = await response.json()
                 setDomainResponses((prev) => ({ ...prev, [d.domain]: result }))
+                setLastChecked((prev) => ({ ...prev, [d.domain]: Date.now() }))
 
                 if (result.status === "ACTIVE") {
                     onRefetch()
@@ -257,11 +237,15 @@ export function CustomDomains({
     }, [customDomains, getToken, projectId, orgId, onRefetch])
 
     useEffect(() => {
-        const hasProvisioning = customDomains?.some((d) => d.status === "PROVISIONING")
-        if (hasProvisioning && !pollingRef.current) {
-            pollingRef.current = setInterval(pollProvisioningDomains, 10000) // every 10s
+        const hasInProgress = customDomains?.some(
+            (d) => d.status === "PENDING_VERIFICATION" || d.status === "PROVISIONING"
+        )
+        if (hasInProgress && !pollingRef.current) {
+            // Run immediately on mount, then every 5s
+            pollInProgressDomains()
+            pollingRef.current = setInterval(pollInProgressDomains, 5000)
         }
-        if (!hasProvisioning && pollingRef.current) {
+        if (!hasInProgress && pollingRef.current) {
             clearInterval(pollingRef.current)
             pollingRef.current = null
         }
@@ -271,11 +255,24 @@ export function CustomDomains({
                 pollingRef.current = null
             }
         }
-    }, [customDomains, pollProvisioningDomains])
+    }, [customDomains, pollInProgressDomains])
+
+    // Also fetch DNS instructions for any PENDING_VERIFICATION domains on mount
+    const initialFetchRef = useRef(false)
+    useEffect(() => {
+        if (initialFetchRef.current || !customDomains) return
+        initialFetchRef.current = true
+        const pending = customDomains.filter((d) => d.status === "PENDING_VERIFICATION")
+        for (const d of pending) {
+            if (!domainResponses[d.domain]?.dns_instructions) {
+                fetchDomainInstructions(d.domain)
+            }
+        }
+    }, [customDomains])
 
 
     const statusBadge = {
-        PENDING_VERIFICATION: { bg: "bg-amber-50 border-amber-100", dot: "bg-amber-500", text: "text-amber-700", label: "Pending DNS" },
+        PENDING_VERIFICATION: { bg: "bg-amber-50 border-amber-100", dot: "bg-amber-500 animate-pulse", text: "text-amber-700", label: "Checking DNS" },
         PROVISIONING: { bg: "bg-blue-50 border-blue-100", dot: "bg-blue-500 animate-pulse", text: "text-blue-700", label: "Provisioning SSL" },
         ACTIVE: { bg: "bg-emerald-50 border-emerald-100", dot: "bg-emerald-500", text: "text-emerald-700", label: "Active" },
         FAILED: { bg: "bg-red-50 border-red-100", dot: "bg-red-500", text: "text-red-700", label: "Failed" },
@@ -394,106 +391,132 @@ export function CustomDomains({
 
                                         {isExpanded && (
                                             <div className="px-4 pb-4 border-t border-zinc-100">
-                                                {/* PENDING_VERIFICATION: Add CNAME + Verify */}
+                                                {/* PENDING_VERIFICATION: Show DNS instructions + auto-checking */}
                                                 {d.status === "PENDING_VERIFICATION" && (() => {
                                                     const isApexDomain = response?.is_apex_domain ?? d.domain.split('.').length === 2
                                                     return (
-                                                        <div className="mt-3 bg-amber-50 rounded-lg border border-amber-100 p-3">
-                                                            <p className="text-sm text-amber-800 font-medium mb-2">Add DNS Record</p>
-                                                            
-                                                            {isApexDomain && (
-                                                                <div className="bg-amber-100 border border-amber-200 rounded-lg p-2.5 mb-3">
-                                                                    <p className="text-xs font-semibold text-amber-900 mb-1">⚠️ Apex Domain Warning</p>
-                                                                    <p className="text-xs text-amber-800 leading-relaxed">
-                                                                        Most DNS providers (like GoDaddy) don't allow CNAME records for apex domains. 
-                                                                        If your provider doesn't support CNAME flattening, add <span className="font-mono font-semibold">www.{d.domain}</span> as a CNAME instead, then forward {d.domain} to www.{d.domain}.
-                                                                    </p>
+                                                        <div className="mt-3 space-y-3">
+                                                            {/* Step indicator */}
+                                                            <div className="flex items-center gap-3 text-xs">
+                                                                <div className="flex items-center gap-1.5">
+                                                                    <span className="flex items-center justify-center w-5 h-5 rounded-full bg-amber-500 text-white font-bold text-[10px]">1</span>
+                                                                    <span className="font-medium text-amber-800">Add DNS record</span>
                                                                 </div>
-                                                            )}
-                                                            
-                                                            <p className="text-xs text-amber-700 mb-3">
-                                                                Add a CNAME record at your domain registrar, then click Verify DNS. SSL will be provisioned automatically.
-                                                            </p>
-                                                            
-                                                            <div className="bg-white rounded-lg border border-amber-200 overflow-hidden mb-3">
-                                                                <table className="w-full text-xs">
-                                                                    <thead className="bg-amber-50/50">
-                                                                        <tr>
-                                                                            <th className="text-left px-3 py-1.5 text-amber-800 font-medium">Type</th>
-                                                                            <th className="text-left px-3 py-1.5 text-amber-800 font-medium">Name</th>
-                                                                            <th className="text-left px-3 py-1.5 text-amber-800 font-medium">Value</th>
-                                                                            <th className="px-3 py-1.5" />
-                                                                        </tr>
-                                                                    </thead>
-                                                                    <tbody>
-                                                                        <tr>
-                                                                            <td className="px-3 py-1.5 font-mono">{dnsInstructions?.type || "CNAME"}</td>
-                                                                            <td className="px-3 py-1.5 font-mono break-all">{dnsInstructions?.name || (d.domain.includes('.') ? d.domain.split('.')[0] : d.domain)}</td>
-                                                                            <td className="px-3 py-1.5 font-mono">{dnsInstructions?.value || "Loading..."}</td>
-                                                                            <td className="px-3 py-1.5">
-                                                                                <button
-                                                                                    type="button"
-                                                                                    onClick={(e) => { 
-                                                                                        e.stopPropagation(); 
-                                                                                        const cnameValue = dnsInstructions?.value
-                                                                                        if (cnameValue) {
-                                                                                            copyDomainValue(cnameValue, `cname-${d.domain}`)
-                                                                                        }
-                                                                                    }}
-                                                                                    className="p-1 hover:bg-amber-100 rounded disabled:opacity-50 disabled:cursor-not-allowed"
-                                                                                    disabled={!dnsInstructions?.value}
-                                                                                >
-                                                                                    {domainCopied === `cname-${d.domain}` ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3 text-amber-500" />}
-                                                                                </button>
-                                                                            </td>
-                                                                        </tr>
-                                                                    </tbody>
-                                                                </table>
+                                                                <div className="h-px flex-1 bg-zinc-200" />
+                                                                <div className="flex items-center gap-1.5">
+                                                                    <span className="flex items-center justify-center w-5 h-5 rounded-full bg-zinc-200 text-zinc-500 font-bold text-[10px]">2</span>
+                                                                    <span className="text-zinc-400">SSL provisioned</span>
+                                                                </div>
+                                                                <div className="h-px flex-1 bg-zinc-200" />
+                                                                <div className="flex items-center gap-1.5">
+                                                                    <span className="flex items-center justify-center w-5 h-5 rounded-full bg-zinc-200 text-zinc-500 font-bold text-[10px]">3</span>
+                                                                    <span className="text-zinc-400">Active</span>
+                                                                </div>
                                                             </div>
-                                                            <Button
-                                                                size="sm"
-                                                                onClick={(e) => { e.stopPropagation(); handleVerifyDomain(d.domain) }}
-                                                                disabled={verifyingDomain === d.domain}
-                                                                className="bg-amber-600 hover:bg-amber-700 text-white rounded-full h-8 px-4 text-xs"
-                                                            >
-                                                                {verifyingDomain === d.domain ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <RefreshCw className="h-3 w-3 mr-1" />}
-                                                                Verify DNS
-                                                            </Button>
-                                                            {response && !response.dns_verified && response.message && (
-                                                                <p className="text-xs text-red-600 mt-2">{response.message}</p>
-                                                            )}
-                                                            {response && response.dns_verified && response.status === "FAILED" && response.message && (
-                                                                <p className="text-xs text-red-600 mt-2">{response.message}</p>
-                                                            )}
+
+                                                            <div className="bg-amber-50 rounded-lg border border-amber-100 p-3">
+                                                                {isApexDomain && (
+                                                                    <div className="bg-amber-100 border border-amber-200 rounded-lg p-2.5 mb-3">
+                                                                        <p className="text-xs font-semibold text-amber-900 mb-1">Apex Domain</p>
+                                                                        <p className="text-xs text-amber-800 leading-relaxed">
+                                                                            Most DNS providers (like GoDaddy) don't allow CNAME records for apex domains. 
+                                                                            If your provider doesn't support CNAME flattening, add <span className="font-mono font-semibold">www.{d.domain}</span> as a CNAME instead, then forward {d.domain} to www.{d.domain}.
+                                                                        </p>
+                                                                    </div>
+                                                                )}
+                                                                
+                                                                <p className="text-xs text-amber-700 mb-3">
+                                                                    Add the following DNS record at your domain registrar. We'll detect it automatically.
+                                                                </p>
+                                                                
+                                                                <div className="bg-white rounded-lg border border-amber-200 overflow-hidden mb-3">
+                                                                    <table className="w-full text-xs">
+                                                                        <thead className="bg-amber-50/50">
+                                                                            <tr>
+                                                                                <th className="text-left px-3 py-1.5 text-amber-800 font-medium">Type</th>
+                                                                                <th className="text-left px-3 py-1.5 text-amber-800 font-medium">Name</th>
+                                                                                <th className="text-left px-3 py-1.5 text-amber-800 font-medium">Value</th>
+                                                                                <th className="px-3 py-1.5" />
+                                                                            </tr>
+                                                                        </thead>
+                                                                        <tbody>
+                                                                            <tr>
+                                                                                <td className="px-3 py-1.5 font-mono">{dnsInstructions?.type || "CNAME"}</td>
+                                                                                <td className="px-3 py-1.5 font-mono break-all">{dnsInstructions?.name || (d.domain.includes('.') ? d.domain.split('.')[0] : d.domain)}</td>
+                                                                                <td className="px-3 py-1.5 font-mono">{dnsInstructions?.value || "Loading..."}</td>
+                                                                                <td className="px-3 py-1.5">
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        onClick={(e) => { 
+                                                                                            e.stopPropagation(); 
+                                                                                            const cnameValue = dnsInstructions?.value
+                                                                                            if (cnameValue) {
+                                                                                                copyDomainValue(cnameValue, `cname-${d.domain}`)
+                                                                                            }
+                                                                                        }}
+                                                                                        className="p-1 hover:bg-amber-100 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                                                                                        disabled={!dnsInstructions?.value}
+                                                                                    >
+                                                                                        {domainCopied === `cname-${d.domain}` ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3 text-amber-500" />}
+                                                                                    </button>
+                                                                                </td>
+                                                                            </tr>
+                                                                        </tbody>
+                                                                    </table>
+                                                                </div>
+                                                                <div className="flex items-center justify-between">
+                                                                    <div className="flex items-center gap-2 text-xs text-amber-700">
+                                                                        <Loader2 className="h-3 w-3 animate-spin" />
+                                                                        <span>Waiting for DNS record{lastChecked[d.domain] ? " · checked just now" : ""}</span>
+                                                                    </div>
+                                                                </div>
+                                                                {response && !response.dns_verified && response.message && (
+                                                                    <p className="text-xs text-amber-600 mt-2">{response.message}</p>
+                                                                )}
+                                                                {response && response.dns_verified && response.status === "FAILED" && response.message && (
+                                                                    <p className="text-xs text-red-600 mt-2">{response.message}</p>
+                                                                )}
+                                                            </div>
                                                         </div>
                                                     )
                                                 })()}
 
                                                 {/* PROVISIONING */}
                                                 {d.status === "PROVISIONING" && (
-                                                    <div className="mt-3 bg-blue-50 rounded-lg border border-blue-100 p-3">
-                                                        <div className="flex items-center gap-2 mb-2">
-                                                            <Loader2 className="h-4 w-4 text-blue-600 animate-spin" />
-                                                            <p className="text-sm text-blue-800 font-medium">Provisioning SSL Certificate</p>
-                                                        </div>
-                                                        <p className="text-xs text-blue-700 mb-3">
-                                                            DNS is verified. Your SSL certificate is being provisioned automatically.
-                                                            This typically takes 1-5 minutes. The page will update when ready.
-                                                        </p>
-                                                        <div className="flex items-center gap-2">
-                                                            <div className="flex-1 bg-blue-100 rounded-full h-1.5 overflow-hidden">
-                                                                <div className="bg-blue-500 h-full rounded-full animate-pulse w-2/3" />
+                                                    <div className="mt-3 space-y-3">
+                                                        {/* Step indicator */}
+                                                        <div className="flex items-center gap-3 text-xs">
+                                                            <div className="flex items-center gap-1.5">
+                                                                <span className="flex items-center justify-center w-5 h-5 rounded-full bg-emerald-500 text-white"><Check className="h-3 w-3" /></span>
+                                                                <span className="font-medium text-emerald-700">DNS verified</span>
                                                             </div>
-                                                            <Button
-                                                                size="sm"
-                                                                variant="outline"
-                                                                onClick={(e) => { e.stopPropagation(); handleCheckDomainStatus(d.domain) }}
-                                                                disabled={checkingStatus === d.domain}
-                                                                className="rounded-full h-7 px-3 text-xs border-blue-200 text-blue-700 hover:bg-blue-100"
-                                                            >
-                                                                {checkingStatus === d.domain ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <RefreshCw className="h-3 w-3 mr-1" />}
-                                                                Check Now
-                                                            </Button>
+                                                            <div className="h-px flex-1 bg-blue-300" />
+                                                            <div className="flex items-center gap-1.5">
+                                                                <span className="flex items-center justify-center w-5 h-5 rounded-full bg-blue-500 text-white font-bold text-[10px]">2</span>
+                                                                <span className="font-medium text-blue-800">SSL provisioning</span>
+                                                            </div>
+                                                            <div className="h-px flex-1 bg-zinc-200" />
+                                                            <div className="flex items-center gap-1.5">
+                                                                <span className="flex items-center justify-center w-5 h-5 rounded-full bg-zinc-200 text-zinc-500 font-bold text-[10px]">3</span>
+                                                                <span className="text-zinc-400">Active</span>
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="bg-blue-50 rounded-lg border border-blue-100 p-3">
+                                                            <div className="flex items-center gap-2 mb-2">
+                                                                <Loader2 className="h-4 w-4 text-blue-600 animate-spin" />
+                                                                <p className="text-sm text-blue-800 font-medium">Provisioning SSL Certificate</p>
+                                                            </div>
+                                                            <p className="text-xs text-blue-700 mb-3">
+                                                                DNS is verified. Your SSL certificate is being provisioned automatically.
+                                                                This typically takes 1-5 minutes.
+                                                            </p>
+                                                            <div className="flex items-center gap-2">
+                                                                <div className="flex-1 bg-blue-100 rounded-full h-1.5 overflow-hidden">
+                                                                    <div className="bg-blue-500 h-full rounded-full animate-pulse w-2/3" />
+                                                                </div>
+                                                                <span className="text-xs text-blue-600 whitespace-nowrap">Checking automatically</span>
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 )}
@@ -518,15 +541,34 @@ export function CustomDomains({
                                                             <p className="text-sm text-red-800 font-medium">Domain configuration failed</p>
                                                         </div>
                                                         <p className="text-xs text-red-700 mb-3">
-                                                            {response?.message || "Try verifying DNS again."}
+                                                            {response?.message || "Something went wrong. Click retry to try again."}
                                                         </p>
                                                         <Button
                                                             size="sm"
-                                                            onClick={(e) => { e.stopPropagation(); handleVerifyDomain(d.domain) }}
-                                                            disabled={verifyingDomain === d.domain}
+                                                            onClick={async (e) => {
+                                                                e.stopPropagation()
+                                                                setRetryingDomain(d.domain)
+                                                                try {
+                                                                    const token = await getToken()
+                                                                    const url = new URL(`${API_BASE_URL}/api/projects/${projectId}/domains/${d.domain}/verify`)
+                                                                    if (orgId) url.searchParams.append("org_id", orgId)
+                                                                    const res = await fetch(url.toString(), {
+                                                                        method: "POST",
+                                                                        headers: { Authorization: `Bearer ${token}` },
+                                                                    })
+                                                                    const result = await res.json()
+                                                                    setDomainResponses((prev) => ({ ...prev, [d.domain]: result }))
+                                                                    onRefetch()
+                                                                } catch {
+                                                                    // Will show error on next poll
+                                                                } finally {
+                                                                    setRetryingDomain(null)
+                                                                }
+                                                            }}
+                                                            disabled={retryingDomain === d.domain}
                                                             className="bg-red-600 hover:bg-red-700 text-white rounded-full h-8 px-4 text-xs"
                                                         >
-                                                            {verifyingDomain === d.domain ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <RefreshCw className="h-3 w-3 mr-1" />}
+                                                            {retryingDomain === d.domain ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <RefreshCw className="h-3 w-3 mr-1" />}
                                                             Retry
                                                         </Button>
                                                     </div>

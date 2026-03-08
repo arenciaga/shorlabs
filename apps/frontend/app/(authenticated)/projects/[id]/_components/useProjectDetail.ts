@@ -254,11 +254,14 @@ export function useProjectDetail(id: string) {
     }
 
     const handleRedeploy = async () => {
+        const svc = _getActiveService()
+        if (!svc) return
         setRedeploying(true)
         try {
             const token = await getToken()
             const url = new URL(`${API_BASE_URL}/api/projects/${id}/redeploy`)
             if (orgId) url.searchParams.append("org_id", orgId)
+            url.searchParams.append("service_id", svc.service_id)
 
             await fetch(url.toString(), {
                 method: "POST",
@@ -272,8 +275,14 @@ export function useProjectDetail(id: string) {
         }
     }
 
+    const _getActiveService = () => {
+        if (!data?.services) return undefined
+        if (activeServiceId) return data.services.find(s => s.service_id === activeServiceId)
+        return data.services[0]
+    }
+
     const startEditingEnvVars = () => {
-        const svc = data?.services?.[0]
+        const svc = _getActiveService()
         if (!svc) return
         const vars = Object.entries(svc.env_vars || {}).map(([key, value]) => ({ key, value, visible: false }))
         setEnvVarsList(vars.length > 0 ? vars : [{ key: "", value: "", visible: true }])
@@ -281,6 +290,8 @@ export function useProjectDetail(id: string) {
     }
 
     const saveEnvVars = async () => {
+        const svc = _getActiveService()
+        if (!svc) return
         setSavingEnvVars(true)
         try {
             const token = await getToken()
@@ -291,6 +302,7 @@ export function useProjectDetail(id: string) {
 
             const url = new URL(`${API_BASE_URL}/api/projects/${id}/env-vars`)
             if (orgId) url.searchParams.append("org_id", orgId)
+            url.searchParams.append("service_id", svc.service_id)
 
             const response = await fetch(url.toString(), {
                 method: "PUT",
@@ -315,18 +327,21 @@ export function useProjectDetail(id: string) {
     }
 
     const startEditingStartCommand = () => {
-        const svc = data?.services?.[0]
+        const svc = _getActiveService()
         if (!svc) return
         setStartCommandValue(svc.start_command || "")
         setEditingStartCommand(true)
     }
 
     const saveStartCommand = async () => {
+        const svc = _getActiveService()
+        if (!svc) return
         setSavingStartCommand(true)
         try {
             const token = await getToken()
             const url = new URL(`${API_BASE_URL}/api/projects/${id}`)
             if (orgId) url.searchParams.append("org_id", orgId)
+            url.searchParams.append("service_id", svc.service_id)
 
             const response = await fetch(url.toString(), {
                 method: "PATCH",
@@ -351,7 +366,7 @@ export function useProjectDetail(id: string) {
     }
 
     const startEditingCompute = (overrides?: { memory?: number, timeout?: number, ephemeral_storage?: number }) => {
-        const svc = data?.services?.[0]
+        const svc = _getActiveService()
         if (!svc) return
         setMemoryValue(overrides?.memory ?? svc.memory ?? 1024)
         setTimeoutValue(overrides?.timeout ?? svc.timeout ?? 30)
@@ -360,11 +375,14 @@ export function useProjectDetail(id: string) {
     }
 
     const saveCompute = async () => {
+        const svc = _getActiveService()
+        if (!svc) return
         setSavingCompute(true)
         try {
             const token = await getToken()
             const url = new URL(`${API_BASE_URL}/api/projects/${id}`)
             if (orgId) url.searchParams.append("org_id", orgId)
+            url.searchParams.append("service_id", svc.service_id)
 
             const response = await fetch(url.toString(), {
                 method: "PATCH",
@@ -398,6 +416,7 @@ export function useProjectDetail(id: string) {
             const token = await getToken()
             const url = new URL(`${API_BASE_URL}/api/projects/${id}/runtime`)
             if (orgId) url.searchParams.append("org_id", orgId)
+            if (activeServiceId) url.searchParams.append("service_id", activeServiceId)
 
             const response = await fetch(
                 url.toString(),
@@ -412,7 +431,7 @@ export function useProjectDetail(id: string) {
         } finally {
             setLogsLoading(false)
         }
-    }, [getToken, id, orgId])
+    }, [getToken, id, orgId, activeServiceId])
 
     // Database: show password / fetch connection
     const handleShowPassword = async () => {
@@ -424,7 +443,8 @@ export function useProjectDetail(id: string) {
         try {
             const token = await getToken()
             if (token && orgId) {
-                const conn = await fetchDatabaseConnection(token, data!.project.project_id, orgId)
+                const svc = _getActiveService()
+                const conn = await fetchDatabaseConnection(token, data!.project.project_id, orgId, svc?.service_id)
                 setDbConnection(conn)
                 setShowPassword(true)
             }
@@ -443,7 +463,7 @@ export function useProjectDetail(id: string) {
         try {
             const token = await getToken()
             if (token) {
-                const rules = await fetchSecurityRules(token, projectId, orgId)
+                const rules = await fetchSecurityRules(token, projectId, orgId, activeServiceId ?? undefined)
                 setSecurityRules(rules)
             }
         } catch (err) {
@@ -451,7 +471,7 @@ export function useProjectDetail(id: string) {
         } finally {
             setLoadingRules(false)
         }
-    }, [data?.project?.project_id, orgId, getToken])
+    }, [data?.project?.project_id, orgId, getToken, activeServiceId])
 
     // Derive access mode from rules: "open" if 0.0.0.0/0 exists in inbound
     const isOpenAccess = securityRules?.inbound?.some(
@@ -475,6 +495,7 @@ export function useProjectDetail(id: string) {
             const token = await getToken()
             if (!token) return
 
+            const svcId = activeServiceId ?? undefined
             if (mode === "open" && !isOpenAccess) {
                 await addSecurityRule(token, data.project.project_id, orgId, {
                     direction: "inbound",
@@ -483,10 +504,10 @@ export function useProjectDetail(id: string) {
                     to_port: 5432,
                     cidr: "0.0.0.0/0",
                     description: "PostgreSQL public access",
-                })
+                }, svcId)
             } else if (mode === "restricted" && isOpenAccess && openAccessRules.length > 0) {
                 for (const rule of openAccessRules) {
-                    await deleteSecurityRule(token, data.project.project_id, orgId, rule.rule_id, "inbound")
+                    await deleteSecurityRule(token, data.project.project_id, orgId, rule.rule_id, "inbound", svcId)
                 }
             }
             await loadSecurityRules()
@@ -514,7 +535,7 @@ export function useProjectDetail(id: string) {
                     to_port: 5432,
                     cidr: cidrValue,
                     description: labelToUse || undefined,
-                })
+                }, activeServiceId ?? undefined)
                 setNewIpCidr("")
                 setNewIpLabel("")
                 await loadSecurityRules()
@@ -533,7 +554,7 @@ export function useProjectDetail(id: string) {
         try {
             const token = await getToken()
             if (token) {
-                await deleteSecurityRule(token, data.project.project_id, orgId, ruleId, "inbound")
+                await deleteSecurityRule(token, data.project.project_id, orgId, ruleId, "inbound", activeServiceId ?? undefined)
                 await loadSecurityRules()
             }
         } catch (err) {

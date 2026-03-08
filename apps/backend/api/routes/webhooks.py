@@ -27,7 +27,7 @@ def _json_safe_env_vars(env_vars: dict) -> dict:
             out[k] = v
     return out
 
-from api.db.dynamodb import get_org_id_by_installation_id, list_projects
+from api.db.dynamodb import get_org_id_by_installation_id, list_all_org_services
 from api.routes.github import get_or_refresh_token_for_org
 from api.routes.projects import send_deployment_to_sqs
 
@@ -107,13 +107,13 @@ async def github_webhook(request: Request):
         print(f"[webhook] push {full_name}: no org for installation_id={installation_id}")
         return {"status": "ignored", "reason": "unknown_installation"}
 
-    projects = list_projects(org_id)
+    services = list_all_org_services(org_id, service_type="web-app")
     # Match by github_repo (same format as full_name: "owner/repo")
-    matching = [p for p in projects if (p.get("github_repo") or "").lower() == full_name.lower()]
+    matching = [s for s in services if (s.get("github_repo") or "").lower() == full_name.lower()]
     if not matching:
-        repo_list = [p.get("github_repo") for p in projects[:5]]
-        print(f"[webhook] push {full_name}: no matching project in org. org projects (sample): {repo_list}")
-        return {"status": "ok", "deployments_triggered": 0, "reason": "no_matching_projects"}
+        repo_list = [s.get("github_repo") for s in services[:5]]
+        print(f"[webhook] push {full_name}: no matching service in org. org services (sample): {repo_list}")
+        return {"status": "ok", "deployments_triggered": 0, "reason": "no_matching_services"}
 
     github_token = await get_or_refresh_token_for_org(org_id)
     if not github_token:
@@ -125,29 +125,29 @@ async def github_webhook(request: Request):
 
     triggered = 0
     skipped = 0
-    for project in matching:
-        project_id = project.get("project_id")
-        if not project_id:
+    for svc in matching:
+        service_id = svc.get("service_id")
+        if not service_id:
             continue
 
-        # Only deploy when push is to the project's production branch
+        # Only deploy when push is to the service's production branch
         # Default to "main" if not configured (also accept "master" as legacy fallback)
-        production_branch = project.get("branch") or project.get("default_branch") or "main"
+        production_branch = svc.get("branch") or svc.get("default_branch") or "main"
         if pushed_branch != production_branch:
-            print(f"[webhook] push {full_name}: skipping project_id={project_id} (pushed to '{pushed_branch}', production branch is '{production_branch}')")
+            print(f"[webhook] push {full_name}: skipping service_id={service_id} (pushed to '{pushed_branch}', production branch is '{production_branch}')")
             skipped += 1
             continue
 
-        root_directory = project.get("root_directory") or "./"
-        start_command = project.get("start_command") or "uvicorn main:app --host 0.0.0.0 --port 8080"
-        env_vars = _json_safe_env_vars(project.get("env_vars") or {})
-        memory = int(project.get("memory", 1024))
-        timeout = int(project.get("timeout", 30))
-        ephemeral_storage = int(project.get("ephemeral_storage", 512))
-        github_url = project.get("github_url") or f"https://github.com/{full_name}"
+        root_directory = svc.get("root_directory") or "./"
+        start_command = svc.get("start_command") or "uvicorn main:app --host 0.0.0.0 --port 8080"
+        env_vars = _json_safe_env_vars(svc.get("env_vars") or {})
+        memory = int(svc.get("memory", 1024))
+        timeout = int(svc.get("timeout", 30))
+        ephemeral_storage = int(svc.get("ephemeral_storage", 512))
+        github_url = svc.get("github_url") or f"https://github.com/{full_name}"
 
         send_deployment_to_sqs(
-            project_id=project_id,
+            service_id=service_id,
             github_url=github_url,
             github_token=github_token,
             root_directory=root_directory,
@@ -163,7 +163,7 @@ async def github_webhook(request: Request):
             branch=pushed_branch,
             org_id=org_id,
         )
-        print(f"[webhook] push {full_name}@{pushed_branch}: triggered deploy for project_id={project_id}")
+        print(f"[webhook] push {full_name}@{pushed_branch}: triggered deploy for service_id={service_id}")
         triggered += 1
 
     return {

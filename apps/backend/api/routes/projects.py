@@ -262,7 +262,7 @@ def _run_deployment_sync(
 
 
 def send_deployment_to_sqs(
-    project_id: str,
+    service_id: str,
     github_url: str,
     github_token: Optional[str],
     root_directory: str = "./",
@@ -277,6 +277,8 @@ def send_deployment_to_sqs(
     commit_author_username: Optional[str] = None,
     branch: Optional[str] = None,
     org_id: Optional[str] = None,
+    # Legacy compat: callers may still pass project_id= keyword
+    project_id: Optional[str] = None,
 ):
     """
     Send deployment task to SQS queue for background processing.
@@ -289,12 +291,17 @@ def send_deployment_to_sqs(
     """
     import time
 
+    # Legacy compat: allow callers to pass project_id= for now
+    sid = service_id or project_id
+    if not sid:
+        raise ValueError("service_id is required")
+
     # Check if running on Lambda
     if not os.environ.get("AWS_LAMBDA_FUNCTION_NAME"):
         # Running locally - use thread pool fallback
         def run_in_thread():
             _run_deployment_sync(
-                project_id, github_url, github_token, root_directory, start_command,
+                sid, github_url, github_token, root_directory, start_command,
                 env_vars, memory, timeout, ephemeral_storage,
                 commit_sha=commit_sha, commit_message=commit_message,
                 commit_author_name=commit_author_name,
@@ -303,7 +310,7 @@ def send_deployment_to_sqs(
             )
         thread = threading.Thread(target=run_in_thread)
         thread.start()
-        print(f"📤 Local: Deployment started in background thread for project {project_id}")
+        print(f"📤 Local: Deployment started in background thread for service {sid}")
         return
 
     # Running on Lambda - send message to SQS queue
@@ -315,7 +322,7 @@ def send_deployment_to_sqs(
         print("⚠️ DEPLOY_QUEUE_URL not set, falling back to thread-based execution")
         def run_in_thread():
             _run_deployment_sync(
-                project_id, github_url, github_token, root_directory, start_command,
+                sid, github_url, github_token, root_directory, start_command,
                 env_vars, memory, timeout, ephemeral_storage,
                 commit_sha=commit_sha, commit_message=commit_message,
                 commit_author_name=commit_author_name,
@@ -327,7 +334,7 @@ def send_deployment_to_sqs(
         return
 
     message_body = {
-        "project_id": project_id,
+        "service_id": sid,
         "github_url": github_url,
         "github_token": github_token,
         "root_directory": root_directory,
@@ -347,14 +354,15 @@ def send_deployment_to_sqs(
     response = sqs_client.send_message(
         QueueUrl=queue_url,
         MessageBody=json.dumps(message_body),
-        # Use project_id as MessageGroupId so each project gets its own deployment lane
-        # This allows different projects to deploy in parallel while maintaining strict
-        # ordering within each project (industry-standard pattern for multi-tenant systems)
-        MessageGroupId=project_id,  # Required for FIFO queue - one lane per project
-        MessageDeduplicationId=f"{project_id}-{int(time.time())}",
+        # Use service_id as MessageGroupId so each service gets its own deployment lane
+        # This allows different services to deploy in parallel while maintaining strict
+        # ordering within each service (industry-standard pattern for multi-tenant systems)
+        MessageGroupId=sid,  # Required for FIFO queue - one lane per service
+        MessageDeduplicationId=f"{sid}-{int(time.time())}",
     )
     
-    print(f"📤 Deployment queued for project {project_id}, MessageId: {response['MessageId']}")
+    print(f"📤 Deployment queued for service {sid}, MessageId: {response['MessageId']}")
+
 
 
 # ─────────────────────────────────────────────────────────────
@@ -459,7 +467,7 @@ def send_database_provision_to_sqs(
 
     message_body = {
         "message_type": "database_provision",
-        "project_id": service_id,
+        "service_id": service_id,
         "db_name": db_name,
         "min_acu": normalized_min_acu,
         "max_acu": normalized_max_acu,
@@ -498,7 +506,7 @@ def _run_database_delete_sync(service_id: str):
         traceback.print_exc()
 
 
-def send_database_delete_to_sqs(project_id: str):
+def send_database_delete_to_sqs(service_id: str):
     """Send database deletion task to SQS queue for background processing."""
     import time
 
@@ -506,10 +514,10 @@ def send_database_delete_to_sqs(project_id: str):
     if not os.environ.get("AWS_LAMBDA_FUNCTION_NAME"):
         # Running locally - use thread pool fallback
         def run_in_thread():
-            _run_database_delete_sync(project_id)
+            _run_database_delete_sync(service_id)
         thread = threading.Thread(target=run_in_thread)
         thread.start()
-        print(f"📤 Local: Database deletion started in background thread for project {project_id}")
+        print(f"📤 Local: Database deletion started in background thread for service {service_id}")
         return
 
     # Running on Lambda - send message to SQS queue
@@ -519,24 +527,24 @@ def send_database_delete_to_sqs(project_id: str):
     if not queue_url:
         print("⚠️ DEPLOY_QUEUE_URL not set, falling back to thread-based execution")
         def run_in_thread():
-            _run_database_delete_sync(project_id)
+            _run_database_delete_sync(service_id)
         thread = threading.Thread(target=run_in_thread)
         thread.start()
         return
 
     message_body = {
         "message_type": "database_delete",
-        "project_id": project_id,
+        "service_id": service_id,
     }
 
     response = sqs_client.send_message(
         QueueUrl=queue_url,
         MessageBody=json.dumps(message_body),
-        MessageGroupId=project_id,
-        MessageDeduplicationId=f"{project_id}-delete-{int(time.time())}",
+        MessageGroupId=service_id,
+        MessageDeduplicationId=f"{service_id}-delete-{int(time.time())}",
     )
 
-    print(f"📤 Database deletion queued for project {project_id}, MessageId: {response['MessageId']}")
+    print(f"📤 Database deletion queued for service {service_id}, MessageId: {response['MessageId']}")
 
 
 # ─────────────────────────────────────────────────────────────

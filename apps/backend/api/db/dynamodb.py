@@ -386,19 +386,6 @@ def delete_project(project_id: str) -> bool:
         # Delete the service item itself
         projects_table.delete_item(Key={"PK": svc["PK"], "SK": svc["SK"]})
 
-    # Also delete any legacy domains/deployments keyed by project_id itself
-    legacy_domains = list_project_domains(project_id)
-    if legacy_domains:
-        domains_table = get_or_create_domains_table()
-        with domains_table.batch_writer() as batch:
-            for d in legacy_domains:
-                batch.delete_item(Key={"domain": d["domain"], "SK": d["SK"]})
-    legacy_deployments = list_deployments(project_id)
-    if legacy_deployments:
-        with deployments_table.batch_writer() as batch:
-            for d in legacy_deployments:
-                batch.delete_item(Key={"project_id": d["project_id"], "SK": d["SK"]})
-
     # Delete the project container itself
     projects_table.delete_item(Key={"PK": project["PK"], "SK": project["SK"]})
     return True
@@ -604,6 +591,26 @@ def delete_service(service_id: str) -> bool:
     # Delete the service item
     projects_table.delete_item(Key={"PK": service["PK"], "SK": service["SK"]})
     return True
+
+
+def list_all_org_services(org_id: str, service_type: str = None) -> list:
+    """
+    List all services across all projects for an organization.
+
+    Optionally filter by service_type ("web-app" or "database").
+    Useful for org-wide operations like webhook matching, quota enforcement,
+    and usage aggregation where you need every service regardless of project.
+    """
+    table = get_or_create_table()
+    response = table.query(
+        KeyConditionExpression=Key("PK").eq(f"ORG#{org_id}"),
+        FilterExpression="entity_type = :et",
+        ExpressionAttributeValues={":et": "service"},
+    )
+    items = response.get("Items", [])
+    if service_type:
+        items = [i for i in items if i.get("service_type") == service_type]
+    return items
 
 
 def get_project_with_services(project_id: str, org_id: str = None) -> Optional[dict]:

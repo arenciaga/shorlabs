@@ -111,9 +111,14 @@ def _handle_sqs_event(event: dict) -> dict:
             message_type = body.get("message_type", "deployment")
             print(f"📦 Processing message {message_id} (type: {message_type}) body={body}")
 
+            # Resolve service_id (new key) with fallback to project_id (legacy in-flight messages)
+            sid = body.get("service_id") or body.get("project_id")
+            if not sid:
+                raise ValueError("Missing service_id in SQS message body")
+
             if message_type == "database_provision":
                 result = _run_database_provision_sync(
-                    service_id=body["project_id"],
+                    service_id=sid,
                     db_name=body.get("db_name", "shorlabs"),
                     min_acu=body.get("min_acu", 0),
                     max_acu=body.get("max_acu", 2),
@@ -122,23 +127,23 @@ def _handle_sqs_event(event: dict) -> dict:
                     handled_with_error = True
                     print(
                         f"[DB-TRACE] SQS DB PROVISION RESULT message_id={message_id} "
-                        f"project_id={body.get('project_id')} status=FAILED "
+                        f"service_id={sid} status=FAILED "
                         f"trace_id={result.get('trace_id')} error_type={result.get('error_type')} "
                         f"error={result.get('error')}"
                     )
                 else:
                     print(
                         f"[DB-TRACE] SQS DB PROVISION RESULT message_id={message_id} "
-                        f"project_id={body.get('project_id')} status=SUCCESS "
+                        f"service_id={sid} status=SUCCESS "
                         f"trace_id={result.get('trace_id') if isinstance(result, dict) else None}"
                     )
             elif message_type == "database_delete":
                 _run_database_delete_sync(
-                    service_id=body["project_id"],
+                    service_id=sid,
                 )
             else:
                 _run_deployment_sync(
-                    service_id=body["project_id"],
+                    service_id=sid,
                     github_url=body["github_url"],
                     github_token=body.get("github_token"),
                     root_directory=body.get("root_directory", "./"),

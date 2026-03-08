@@ -65,22 +65,11 @@ export async function checkGitHubConnection(token: string, orgId: string): Promi
 export interface Project {
     project_id: string;
     name: string;
-    project_type: "web-app" | "database";
-    status: "PENDING" | "CLONING" | "PREPARING" | "UPLOADING" | "BUILDING" | "DEPLOYING" | "PROVISIONING" | "LIVE" | "FAILED";
+    description?: string;
+    organization_id?: string;
     created_at: string;
     updated_at: string;
-    // Web-app fields
-    github_url?: string;
-    github_repo?: string;
-    function_url?: string | null;
-    // Database fields
-    db_endpoint?: string | null;
-    db_port?: number | null;
-    db_name?: string | null;
-    db_master_username?: string | null;
-    db_cluster_identifier?: string | null;
-    min_acu?: number | null;
-    max_acu?: number | null;
+    is_throttled?: boolean;
 }
 
 export interface Deployment {
@@ -96,9 +85,51 @@ export interface Deployment {
     branch: string | null;
 }
 
+export interface Service {
+    service_id: string;
+    project_id: string;
+    name: string;
+    service_type: "web-app" | "database";
+    status: string;
+    created_at: string;
+    updated_at: string;
+    // Web-app fields
+    github_url?: string;
+    github_repo?: string;
+    function_url?: string | null;
+    custom_url?: string | null;
+    subdomain?: string | null;
+    ecr_repo?: string | null;
+    env_vars?: Record<string, string>;
+    start_command?: string;
+    root_directory?: string;
+    memory?: number;
+    timeout?: number;
+    ephemeral_storage?: number;
+    // Database fields
+    db_endpoint?: string | null;
+    db_port?: number | null;
+    db_name?: string | null;
+    db_master_username?: string | null;
+    db_cluster_identifier?: string | null;
+    min_acu?: number | null;
+    max_acu?: number | null;
+    // Nested data
+    deployments?: Deployment[];
+    custom_domains?: CustomDomain[];
+}
+
+export interface CustomDomain {
+    domain: string;
+    status: "PENDING_VERIFICATION" | "ACTIVE" | "FAILED";
+    is_active: boolean;
+    tenant_id: string | null;
+    created_at: string;
+}
+
 export interface ProjectDetails {
-    project: Project & { ecr_repo: string | null };
-    deployments: Deployment[];
+    project: Project;
+    services: Service[];
 }
 
 export interface CreateProjectRequest {
@@ -264,9 +295,11 @@ export async function fetchDatabaseConnection(
     token: string,
     projectId: string,
     orgId: string,
+    serviceId?: string,
 ): Promise<DatabaseConnection> {
     const url = new URL(`${API_BASE_URL}/api/projects/${projectId}/connection`);
     url.searchParams.append("org_id", orgId);
+    if (serviceId) url.searchParams.append("service_id", serviceId);
 
     const response = await fetch(url.toString(), {
         headers: {
@@ -444,9 +477,11 @@ export async function fetchSecurityRules(
     token: string,
     projectId: string,
     orgId: string,
+    serviceId?: string,
 ): Promise<SecurityRulesResponse> {
     const url = new URL(`${API_BASE_URL}/api/projects/${projectId}/database/security-rules`);
     url.searchParams.append("org_id", orgId);
+    if (serviceId) url.searchParams.append("service_id", serviceId);
 
     const response = await fetch(url.toString(), {
         headers: {
@@ -475,9 +510,11 @@ export async function addSecurityRule(
         cidr: string;
         description?: string;
     },
+    serviceId?: string,
 ): Promise<{ status: string }> {
     const url = new URL(`${API_BASE_URL}/api/projects/${projectId}/database/security-rules`);
     url.searchParams.append("org_id", orgId);
+    if (serviceId) url.searchParams.append("service_id", serviceId);
 
     const response = await fetch(url.toString(), {
         method: "POST",
@@ -502,10 +539,12 @@ export async function deleteSecurityRule(
     orgId: string,
     ruleId: string,
     direction: "inbound" | "outbound",
+    serviceId?: string,
 ): Promise<{ status: string }> {
     const url = new URL(`${API_BASE_URL}/api/projects/${projectId}/database/security-rules/${ruleId}`);
     url.searchParams.append("org_id", orgId);
     url.searchParams.append("direction", direction);
+    if (serviceId) url.searchParams.append("service_id", serviceId);
 
     const response = await fetch(url.toString(), {
         method: "DELETE",

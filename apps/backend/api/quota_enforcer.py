@@ -15,7 +15,7 @@ import boto3
 import httpx
 
 from api.db.dynamodb import (
-    list_projects,
+    list_all_org_services,
     get_throttle_state,
     set_throttle_state,
     clear_throttle_state,
@@ -30,13 +30,13 @@ AUTUMN_BASE_URL = os.environ.get(
 
 
 def _get_org_lambda_functions(org_id: str) -> List[str]:
-    """Get all Lambda function names for an org's LIVE projects."""
-    projects = list_projects(org_id)
+    """Get all Lambda function names for an org's LIVE web-app services."""
+    services = list_all_org_services(org_id, service_type="web-app")
     function_names = []
-    for project in projects:
-        if project.get("status") != "LIVE":
+    for svc in services:
+        if svc.get("status") != "LIVE":
             continue
-        fn = project.get("function_name")
+        fn = svc.get("function_name")
         if fn:
             function_names.append(get_lambda_function_name(fn))
     return function_names

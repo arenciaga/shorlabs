@@ -215,40 +215,41 @@ def get_gb_seconds(
     return gb_seconds
 
 
-def get_all_projects() -> List[Dict]:
-    """Get all projects from DynamoDB."""
+def get_all_services() -> List[Dict]:
+    """Get all web-app service items from DynamoDB."""
     table = get_or_create_table()
     
-    # Scan for all project items
+    # Scan for service items only (not project containers)
     # In production with many users, use pagination
     response = table.scan(
-        FilterExpression="begins_with(SK, :sk_prefix)",
+        FilterExpression="entity_type = :et AND service_type = :st",
         ExpressionAttributeValues={
-            ":sk_prefix": "PROJECT#",
+            ":et": "service",
+            ":st": "web-app",
         },
     )
     
     return response.get("Items", [])
 
 
-def _get_build_seconds_for_project(
-    project_id: str,
+def _get_build_seconds_for_service(
+    service_id: str,
     *,
     window_seconds: int,
     window_end: datetime,
 ) -> float:
     """
-    Calculate total build time in seconds for a project within the aggregation window.
+    Calculate total build time in seconds for a service within the aggregation window.
 
     We derive build time from deployment records:
       - Each deployment has started_at / finished_at timestamps
       - We include deployments whose started_at falls inside the window
       - Duration is (finished_at - started_at) in seconds (or until window_end if unfinished)
 
-    This gives us per-project build time that we can aggregate per organization and
+    This gives us per-service build time that we can aggregate per organization and
     send to Autumn as a separate "build_seconds" feature.
     """
-    deployments = list_deployments(project_id)
+    deployments = list_deployments(service_id)
     if not deployments:
         return 0.0
 
@@ -295,25 +296,25 @@ def aggregate_usage_metrics():
     """
     print(f"🔄 Starting usage metrics aggregation at {datetime.utcnow().isoformat()}")
     
-    # Get all projects
-    projects = get_all_projects()
-    print(f"📊 Found {len(projects)} projects to aggregate")
+    # Get all web-app services
+    services = get_all_services()
+    print(f"📊 Found {len(services)} services to aggregate")
     
-    if not projects:
-        print("✅ No projects to aggregate")
+    if not services:
+        print("✅ No services to aggregate")
         return
     
-    # Group projects by organization_id (orgs are the billing entity)
-    orgs_projects: Dict[str, List[Dict]] = {}
-    for project in projects:
-        org_id = project.get("organization_id")
+    # Group services by organization_id (orgs are the billing entity)
+    orgs_services: Dict[str, List[Dict]] = {}
+    for svc in services:
+        org_id = svc.get("organization_id")
         if not org_id:
             continue
-        if org_id not in orgs_projects:
-            orgs_projects[org_id] = []
-        orgs_projects[org_id].append(project)
+        if org_id not in orgs_services:
+            orgs_services[org_id] = []
+        orgs_services[org_id].append(svc)
     
-    print(f"🏢 Aggregating for {len(orgs_projects)} organizations")
+    print(f"🏢 Aggregating for {len(orgs_services)} organizations")
     
     # Period label for logging only
     period = datetime.utcnow().strftime("%Y-%m")
@@ -326,29 +327,29 @@ def aggregate_usage_metrics():
     total_gb_seconds = 0.0
     total_build_seconds = 0.0
     
-    for org_id, org_projects in orgs_projects.items():
+    for org_id, org_svcs in orgs_services.items():
         org_requests = 0
         org_gb_seconds = 0.0
         org_build_seconds = 0.0
         
-        for project in org_projects:
-            # Skip if project is not LIVE
-            if project.get("status") != "LIVE":
+        for svc in org_svcs:
+            # Skip if service is not LIVE
+            if svc.get("status") != "LIVE":
                 continue
             # Get function name - prefer stored function_name, fallback to deriving from github_url
-            # for backwards compatibility with projects that don't have function_name stored
-            stored_function_name = project.get("function_name")
+            # for backwards compatibility with services that don't have function_name stored
+            stored_function_name = svc.get("function_name")
             if stored_function_name:
                 # Apply shorlabs- prefix to get full Lambda function name
                 function_name = get_lambda_function_name(stored_function_name)
             else:
                 # Fallback: derive from github_url and apply prefix
-                project_name = extract_project_name(project.get("github_url", ""))
+                project_name = extract_project_name(svc.get("github_url", ""))
                 if not project_name:
                     continue
                 function_name = get_lambda_function_name(project_name)
             
-            memory_mb = int(project.get("memory", 1024))
+            memory_mb = int(svc.get("memory", 1024))
             # Fetch metrics from CloudWatch
             try:
                 invocations = get_invocations(
@@ -364,8 +365,8 @@ def aggregate_usage_metrics():
                 )
 
                 # Deployment/build time (seconds) from deployments table
-                build_seconds = _get_build_seconds_for_project(
-                    project.get("project_id"),
+                build_seconds = _get_build_seconds_for_service(
+                    svc.get("service_id"),
                     window_seconds=window_seconds,
                     window_end=window_end,
                 )
@@ -420,7 +421,7 @@ def aggregate_usage_metrics():
     print("🛡️ Running quota enforcement pass...")
     from api.quota_enforcer import check_and_enforce_quota
 
-    for org_id in orgs_projects.keys():
+    for org_id in orgs_services.keys():
         try:
             result = check_and_enforce_quota(org_id)
             if result == "throttled":

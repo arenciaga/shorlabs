@@ -19,7 +19,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import httpx
 
 from api.db.dynamodb import get_throttle_state
-from api.usage_aggregator import get_all_projects
+from api.usage_aggregator import get_all_services
 
 
 # Configuration
@@ -86,30 +86,30 @@ def _ping_function_url(function_url: str, timeout: float = WARM_TIMEOUT_SECONDS)
         }
 
 
-def _get_live_project_urls() -> List[Dict]:
+def _get_live_service_urls() -> List[Dict]:
     """
-    Scan DynamoDB for all LIVE projects on paid plans (Pro/Plus) with a function_url.
+    Scan DynamoDB for all LIVE web-app services on paid plans (Pro/Plus) with a function_url.
     Skips Hobby orgs and throttled orgs.
 
     Returns:
-        List of dicts with 'project_id', 'function_url', 'organization_id', 'name'
+        List of dicts with 'service_id', 'function_url', 'organization_id', 'name'
     """
-    projects = get_all_projects()
+    services = get_all_services()
     result = []
     # Cache org checks so we only call Autumn once per org
     org_paid_cache: Dict[str, bool] = {}
     org_throttle_cache: Dict[str, bool] = {}
     skipped_hobby = 0
 
-    for project in projects:
-        if project.get("status") != "LIVE":
+    for svc in services:
+        if svc.get("status") != "LIVE":
             continue
 
-        function_url = project.get("function_url")
+        function_url = svc.get("function_url")
         if not function_url:
             continue
 
-        org_id = project.get("organization_id")
+        org_id = svc.get("organization_id")
         if not org_id:
             continue
 
@@ -132,14 +132,14 @@ def _get_live_project_urls() -> List[Dict]:
             continue
 
         result.append({
-            "project_id": project.get("project_id"),
+            "service_id": svc.get("service_id"),
             "function_url": function_url,
             "organization_id": org_id,
-            "name": project.get("name", "unknown"),
+            "name": svc.get("name", "unknown"),
         })
 
     if skipped_hobby:
-        print(f"   Skipped {skipped_hobby} Hobby project(s) (warming is a paid feature)")
+        print(f"   Skipped {skipped_hobby} Hobby service(s) (warming is a paid feature)")
 
     return result
 
@@ -155,11 +155,11 @@ def warm_all_lambdas() -> dict:
     """
     print(f"🔥 Starting Lambda warming at {datetime.utcnow().isoformat()}")
 
-    targets = _get_live_project_urls()
-    print(f"   Found {len(targets)} paid LIVE projects to warm")
+    targets = _get_live_service_urls()
+    print(f"   Found {len(targets)} paid LIVE services to warm")
 
     if not targets:
-        print("   No projects to warm")
+        print("   No services to warm")
         return {"warmed": 0, "failed": 0}
 
     warmed = 0

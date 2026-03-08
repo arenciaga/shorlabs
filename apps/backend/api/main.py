@@ -113,7 +113,7 @@ def _handle_sqs_event(event: dict) -> dict:
 
             if message_type == "database_provision":
                 result = _run_database_provision_sync(
-                    project_id=body["project_id"],
+                    service_id=body["project_id"],
                     db_name=body.get("db_name", "shorlabs"),
                     min_acu=body.get("min_acu", 0),
                     max_acu=body.get("max_acu", 2),
@@ -134,11 +134,11 @@ def _handle_sqs_event(event: dict) -> dict:
                     )
             elif message_type == "database_delete":
                 _run_database_delete_sync(
-                    project_id=body["project_id"],
+                    service_id=body["project_id"],
                 )
             else:
                 _run_deployment_sync(
-                    project_id=body["project_id"],
+                    service_id=body["project_id"],
                     github_url=body["github_url"],
                     github_token=body.get("github_token"),
                     root_directory=body.get("root_directory", "./"),

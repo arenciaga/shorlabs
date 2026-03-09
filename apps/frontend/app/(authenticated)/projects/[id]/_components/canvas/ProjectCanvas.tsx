@@ -89,7 +89,7 @@ function CanvasInner({ services, projectId, onSelectService }: ProjectCanvasProp
                 maxZoom={1.2}
                 proOptions={{ hideAttribution: true }}
             >
-                <Background variant={BackgroundVariant.Dots} gap={20} size={1.5} color="rgba(0,0,0,0.15)" />
+                <Background variant={BackgroundVariant.Dots} gap={20} size={2.5} color="rgba(0,0,0,0.15)" />
             </ReactFlow>
 
             <ZoomControls />

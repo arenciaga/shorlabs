@@ -2,6 +2,7 @@ import { Database, Loader2, Zap } from "lucide-react"
 import { DatabaseExplorer } from "@/components/DatabaseExplorer"
 import { TabNavigation } from "./TabNavigation"
 import { DatabaseConnectionDetails } from "./DatabaseConnectionDetails"
+import { DatabaseConfigTab } from "./DatabaseConfigTab"
 import { DatabaseSecurityTab } from "./DatabaseSecurityTab"
 import { DeleteProjectDialog } from "./DeleteProjectDialog"
 import { STATUS_CONFIG } from "./constants"
@@ -123,30 +124,11 @@ export function DatabaseServiceView({ service, hook }: DatabaseServiceViewProps)
                 <div className="py-6">
                     {/* Configuration Tab */}
                     {hook.dbActiveTab === "configuration" && (
-                        <div className="bg-zinc-50 rounded-none border border-zinc-200 p-6">
-                            <div className="flex items-center gap-3 mb-4">
-                                <Database className="h-5 w-5 text-zinc-400" />
-                                <h3 className="font-semibold text-zinc-900">Database Information</h3>
-                            </div>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <div>
-                                    <span className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Cluster</span>
-                                    <p className="text-sm text-zinc-900 font-mono mt-1">{service.db_cluster_identifier || "—"}</p>
-                                </div>
-                                <div>
-                                    <span className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Engine</span>
-                                    <p className="text-sm text-zinc-900 mt-1">PostgreSQL</p>
-                                </div>
-                                <div>
-                                    <span className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Min ACU</span>
-                                    <p className="text-sm text-zinc-900 mt-1">{service.min_acu ?? "—"}</p>
-                                </div>
-                                <div>
-                                    <span className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Max ACU</span>
-                                    <p className="text-sm text-zinc-900 mt-1">{service.max_acu ?? "—"}</p>
-                                </div>
-                            </div>
-                        </div>
+                        <DatabaseConfigTab
+                            service={service}
+                            projectId={project.project_id}
+                            onRefresh={hook.fetchProject}
+                        />
                     )}
 
                     {/* Explorer Tab */}

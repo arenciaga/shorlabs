@@ -568,6 +568,49 @@ def get_cluster_secret(cluster_identifier: str) -> dict:
     }
 
 
+def modify_aurora_cluster_scaling(
+    cluster_identifier: str,
+    min_acu: float = DEFAULT_MIN_ACU,
+    max_acu: float = DEFAULT_MAX_ACU,
+) -> dict:
+    """
+    Modify the ServerlessV2ScalingConfiguration on a live Aurora cluster.
+
+    This is an online operation — no downtime. The cluster will scale
+    to the new capacity bounds on next demand change.
+
+    Args:
+        cluster_identifier: The DB cluster identifier
+        min_acu: New minimum ACU (0 = scale to zero)
+        max_acu: New maximum ACU
+
+    Returns:
+        Dict with cluster_identifier, min_acu, max_acu applied.
+    """
+    rds = get_rds_client()
+
+    normalized_min, normalized_max = _normalize_serverless_v2_capacity(min_acu, max_acu)
+
+    print(f"⚙️ Modifying cluster scaling: {cluster_identifier} → {normalized_min}-{normalized_max} ACU")
+
+    rds.modify_db_cluster(
+        DBClusterIdentifier=cluster_identifier,
+        ServerlessV2ScalingConfiguration={
+            "MinCapacity": normalized_min,
+            "MaxCapacity": normalized_max,
+        },
+        ApplyImmediately=True,
+    )
+
+    print(f"✅ Cluster scaling updated: {cluster_identifier} → {normalized_min}-{normalized_max} ACU")
+
+    return {
+        "cluster_identifier": cluster_identifier,
+        "min_acu": normalized_min,
+        "max_acu": normalized_max,
+    }
+
+
 def delete_aurora_cluster(cluster_identifier: str) -> bool:
     """
     Delete an Aurora cluster and its instances.

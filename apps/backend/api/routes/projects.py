@@ -39,7 +39,7 @@ from deployer import provision_database, delete_database_resources
 from deployer.aws import (
     get_lambda_logs,
 )
-from deployer.aws.rds import get_cluster_secret, get_cluster_security_group_ids, get_security_group_rules
+from deployer.aws.rds import get_cluster_secret, get_cluster_security_group_ids, get_security_group_rules, modify_aurora_cluster_scaling
 from api.db.pg_explorer import (
     list_schemas as pg_list_schemas,
     list_tables as pg_list_tables,
@@ -1405,6 +1405,7 @@ class UpdateServiceRequest(BaseModel):
     memory: Optional[int] = None
     timeout: Optional[int] = None
     ephemeral_storage: Optional[int] = None
+    max_acu: Optional[float] = None
 
 
 @router.patch("/{project_id}")
@@ -1415,9 +1416,9 @@ async def update_project_fields(
     org_id: str = Query(...),
     service_id: Optional[str] = Query(None),
 ):
-    """Update service fields like start_command, root_directory, name."""
+    """Update service fields like start_command, root_directory, name, max_acu."""
     svc = _resolve_service(org_id, project_id, service_id)
-    
+
     # Build updates dict from non-None fields
     updates = {}
     if request.start_command is not None:
@@ -1432,17 +1433,38 @@ async def update_project_fields(
         updates["timeout"] = request.timeout
     if request.ephemeral_storage is not None:
         updates["ephemeral_storage"] = request.ephemeral_storage
-    
+    if request.max_acu is not None:
+        from decimal import Decimal
+        updates["max_acu"] = Decimal(str(request.max_acu))
+
     if not updates:
         raise HTTPException(status_code=400, detail="No fields to update")
-    
+
     updated = update_service(svc["service_id"], updates)
-    
+
+    # If max_acu changed on a live database, apply to the Aurora cluster immediately
+    if request.max_acu is not None and svc.get("service_type") == "database":
+        cluster_id = svc.get("db_cluster_identifier")
+        if cluster_id and svc.get("status") == "LIVE":
+            try:
+                modify_aurora_cluster_scaling(
+                    cluster_identifier=cluster_id,
+                    min_acu=0,
+                    max_acu=request.max_acu,
+                )
+            except Exception as e:
+                print(f"⚠️ Failed to modify cluster scaling: {e}")
+                traceback.print_exc()
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Saved to database but failed to apply to cluster: {str(e)}",
+                )
+
     return {
         "project_id": project_id,
         "service_id": svc["service_id"],
         "updated_fields": list(updates.keys()),
-        "message": "Service updated. Redeploy to apply changes.",
+        "message": "Service updated." + (" Redeploy to apply changes." if svc.get("service_type") != "database" else ""),
     }
 
 

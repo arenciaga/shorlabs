@@ -79,14 +79,14 @@ function CanvasInner({ services, projectId, onSelectService }: ProjectCanvasProp
                 nodeTypes={nodeTypes}
                 onNodeClick={handleNodeClick}
                 fitView
-                fitViewOptions={{ padding: 0.8 }}
+                fitViewOptions={{ padding: 0.3, maxZoom: 1 }}
                 nodesDraggable={false}
                 nodesConnectable={false}
                 elementsSelectable={false}
                 panOnScroll
                 zoomOnScroll
-                minZoom={0.5}
-                maxZoom={1.5}
+                minZoom={0.3}
+                maxZoom={1.2}
                 proOptions={{ hideAttribution: true }}
             >
                 <Background variant={BackgroundVariant.Dots} gap={20} size={1.5} color="rgba(0,0,0,0.15)" />

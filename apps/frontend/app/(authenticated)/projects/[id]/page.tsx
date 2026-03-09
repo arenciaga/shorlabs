@@ -151,7 +151,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
             <Sheet open={detailOpen} onOpenChange={(open) => !open && setDetailOpen(false)}>
                 <SheetContent
                     side="right"
-                    className="w-full gap-0 border-l border-zinc-200 bg-white p-0 md:!w-full md:!max-w-none overflow-y-auto"
+                    className="w-full gap-0 border-l border-zinc-200 bg-white p-0 md:!w-[70%] md:!max-w-none overflow-y-auto"
                 >
                     <SheetHeader className="sr-only">
                         <SheetTitle>{activeService.name || "Service"}</SheetTitle>

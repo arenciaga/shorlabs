@@ -45,6 +45,12 @@ from api.db.pg_explorer import (
     list_tables as pg_list_tables,
     get_columns as pg_get_columns,
     get_table_data as pg_get_table_data,
+    create_table as pg_create_table,
+    add_column as pg_add_column,
+    alter_column as pg_alter_column,
+    drop_column as pg_drop_column,
+    rename_table as pg_rename_table,
+    drop_table as pg_drop_table,
 )
 from deployer.aws.ecr import get_ecr_repo_name
 
@@ -1135,6 +1141,212 @@ async def get_database_table_data(
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database query failed: {str(e)}")
+
+
+# ─────────────────────────────────────────────────────────────
+# DATABASE TABLE MANAGEMENT ENDPOINTS
+# ─────────────────────────────────────────────────────────────
+
+
+class ColumnDefinition(BaseModel):
+    name: str
+    type: str
+    nullable: bool = True
+    default: Optional[str] = None
+    is_primary_key: bool = False
+
+
+class CreateTableRequest(BaseModel):
+    table_name: str
+    columns: list[ColumnDefinition]
+
+
+class AddColumnRequest(BaseModel):
+    name: str
+    type: str
+    nullable: bool = True
+    default: Optional[str] = None
+
+
+class AlterColumnRequest(BaseModel):
+    type: Optional[str] = None
+    nullable: Optional[bool] = None
+    default: Optional[str] = None
+    new_name: Optional[str] = None
+
+
+class RenameTableRequest(BaseModel):
+    new_name: str
+
+
+@router.post("/{project_id}/database/tables")
+async def create_database_table(
+    project_id: str,
+    request: CreateTableRequest,
+    user_id: str = Depends(get_current_user_id),
+    org_id: str = Query(...),
+    schema: str = Query(default="public"),
+):
+    """Create a new table in the database."""
+    svc = _get_live_database_service(org_id, project_id)
+    try:
+        result = pg_create_table(
+            cluster_identifier=svc["db_cluster_identifier"],
+            db_name=svc["db_name"],
+            port=int(svc.get("db_port", 5432)),
+            endpoint=svc["db_endpoint"],
+            schema=schema,
+            table_name=request.table_name,
+            columns=[col.model_dump() for col in request.columns],
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to create table: {str(e)}")
+
+
+@router.delete("/{project_id}/database/tables/{table_name}")
+async def delete_database_table(
+    project_id: str,
+    table_name: str,
+    user_id: str = Depends(get_current_user_id),
+    org_id: str = Query(...),
+    schema: str = Query(default="public"),
+):
+    """Drop a table from the database."""
+    svc = _get_live_database_service(org_id, project_id)
+    try:
+        result = pg_drop_table(
+            cluster_identifier=svc["db_cluster_identifier"],
+            db_name=svc["db_name"],
+            port=int(svc.get("db_port", 5432)),
+            endpoint=svc["db_endpoint"],
+            schema=schema,
+            table_name=table_name,
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to drop table: {str(e)}")
+
+
+@router.put("/{project_id}/database/tables/{table_name}/rename")
+async def rename_database_table(
+    project_id: str,
+    table_name: str,
+    request: RenameTableRequest,
+    user_id: str = Depends(get_current_user_id),
+    org_id: str = Query(...),
+    schema: str = Query(default="public"),
+):
+    """Rename a table."""
+    svc = _get_live_database_service(org_id, project_id)
+    try:
+        result = pg_rename_table(
+            cluster_identifier=svc["db_cluster_identifier"],
+            db_name=svc["db_name"],
+            port=int(svc.get("db_port", 5432)),
+            endpoint=svc["db_endpoint"],
+            schema=schema,
+            old_name=table_name,
+            new_name=request.new_name,
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to rename table: {str(e)}")
+
+
+@router.post("/{project_id}/database/tables/{table_name}/columns")
+async def add_database_column(
+    project_id: str,
+    table_name: str,
+    request: AddColumnRequest,
+    user_id: str = Depends(get_current_user_id),
+    org_id: str = Query(...),
+    schema: str = Query(default="public"),
+):
+    """Add a column to an existing table."""
+    svc = _get_live_database_service(org_id, project_id)
+    try:
+        result = pg_add_column(
+            cluster_identifier=svc["db_cluster_identifier"],
+            db_name=svc["db_name"],
+            port=int(svc.get("db_port", 5432)),
+            endpoint=svc["db_endpoint"],
+            schema=schema,
+            table_name=table_name,
+            column=request.model_dump(),
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to add column: {str(e)}")
+
+
+@router.put("/{project_id}/database/tables/{table_name}/columns/{column_name}")
+async def alter_database_column(
+    project_id: str,
+    table_name: str,
+    column_name: str,
+    request: AlterColumnRequest,
+    user_id: str = Depends(get_current_user_id),
+    org_id: str = Query(...),
+    schema: str = Query(default="public"),
+):
+    """Alter a column in a table."""
+    svc = _get_live_database_service(org_id, project_id)
+    changes = {k: v for k, v in request.model_dump().items() if v is not None}
+    if not changes:
+        raise HTTPException(status_code=400, detail="No changes specified")
+    try:
+        result = pg_alter_column(
+            cluster_identifier=svc["db_cluster_identifier"],
+            db_name=svc["db_name"],
+            port=int(svc.get("db_port", 5432)),
+            endpoint=svc["db_endpoint"],
+            schema=schema,
+            table_name=table_name,
+            column_name=column_name,
+            changes=changes,
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to alter column: {str(e)}")
+
+
+@router.delete("/{project_id}/database/tables/{table_name}/columns/{column_name}")
+async def delete_database_column(
+    project_id: str,
+    table_name: str,
+    column_name: str,
+    user_id: str = Depends(get_current_user_id),
+    org_id: str = Query(...),
+    schema: str = Query(default="public"),
+):
+    """Drop a column from a table."""
+    svc = _get_live_database_service(org_id, project_id)
+    try:
+        result = pg_drop_column(
+            cluster_identifier=svc["db_cluster_identifier"],
+            db_name=svc["db_name"],
+            port=int(svc.get("db_port", 5432)),
+            endpoint=svc["db_endpoint"],
+            schema=schema,
+            table_name=table_name,
+            column_name=column_name,
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to drop column: {str(e)}")
 
 
 # ─────────────────────────────────────────────────────────────

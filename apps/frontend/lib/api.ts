@@ -454,6 +454,212 @@ export async function fetchTableData(
 }
 
 // ─────────────────────────────────────────────────────────────
+// DATABASE TABLE MANAGEMENT
+// ─────────────────────────────────────────────────────────────
+
+export interface ColumnDefinitionPayload {
+    name: string;
+    type: string;
+    nullable: boolean;
+    default: string | null;
+    is_primary_key: boolean;
+}
+
+export interface CreateTablePayload {
+    table_name: string;
+    columns: ColumnDefinitionPayload[];
+}
+
+export interface AddColumnPayload {
+    name: string;
+    type: string;
+    nullable: boolean;
+    default: string | null;
+}
+
+export interface AlterColumnPayload {
+    type?: string;
+    nullable?: boolean;
+    default?: string | null;
+    new_name?: string;
+}
+
+export interface RenameTablePayload {
+    new_name: string;
+}
+
+export async function createDatabaseTable(
+    token: string,
+    projectId: string,
+    orgId: string,
+    payload: CreateTablePayload,
+    schema: string = "public",
+): Promise<{ table_name: string; schema: string; sql: string }> {
+    const url = new URL(`${API_BASE_URL}/api/projects/${projectId}/database/tables`);
+    url.searchParams.append("org_id", orgId);
+    url.searchParams.append("schema", schema);
+
+    const response = await fetch(url.toString(), {
+        method: "POST",
+        headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ detail: "Unknown error" }));
+        throw new Error(error.detail || `HTTP ${response.status}`);
+    }
+
+    return response.json();
+}
+
+export async function dropDatabaseTable(
+    token: string,
+    projectId: string,
+    orgId: string,
+    tableName: string,
+    schema: string = "public",
+): Promise<{ table_name: string; sql: string }> {
+    const url = new URL(`${API_BASE_URL}/api/projects/${projectId}/database/tables/${tableName}`);
+    url.searchParams.append("org_id", orgId);
+    url.searchParams.append("schema", schema);
+
+    const response = await fetch(url.toString(), {
+        method: "DELETE",
+        headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+        },
+    });
+
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ detail: "Unknown error" }));
+        throw new Error(error.detail || `HTTP ${response.status}`);
+    }
+
+    return response.json();
+}
+
+export async function renameDatabaseTable(
+    token: string,
+    projectId: string,
+    orgId: string,
+    tableName: string,
+    payload: RenameTablePayload,
+    schema: string = "public",
+): Promise<{ old_name: string; new_name: string; sql: string }> {
+    const url = new URL(`${API_BASE_URL}/api/projects/${projectId}/database/tables/${tableName}/rename`);
+    url.searchParams.append("org_id", orgId);
+    url.searchParams.append("schema", schema);
+
+    const response = await fetch(url.toString(), {
+        method: "PUT",
+        headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ detail: "Unknown error" }));
+        throw new Error(error.detail || `HTTP ${response.status}`);
+    }
+
+    return response.json();
+}
+
+export async function addDatabaseColumn(
+    token: string,
+    projectId: string,
+    orgId: string,
+    tableName: string,
+    payload: AddColumnPayload,
+    schema: string = "public",
+): Promise<{ column_name: string; sql: string }> {
+    const url = new URL(`${API_BASE_URL}/api/projects/${projectId}/database/tables/${tableName}/columns`);
+    url.searchParams.append("org_id", orgId);
+    url.searchParams.append("schema", schema);
+
+    const response = await fetch(url.toString(), {
+        method: "POST",
+        headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ detail: "Unknown error" }));
+        throw new Error(error.detail || `HTTP ${response.status}`);
+    }
+
+    return response.json();
+}
+
+export async function alterDatabaseColumn(
+    token: string,
+    projectId: string,
+    orgId: string,
+    tableName: string,
+    columnName: string,
+    payload: AlterColumnPayload,
+    schema: string = "public",
+): Promise<{ column_name: string; statements: string[] }> {
+    const url = new URL(`${API_BASE_URL}/api/projects/${projectId}/database/tables/${tableName}/columns/${columnName}`);
+    url.searchParams.append("org_id", orgId);
+    url.searchParams.append("schema", schema);
+
+    const response = await fetch(url.toString(), {
+        method: "PUT",
+        headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ detail: "Unknown error" }));
+        throw new Error(error.detail || `HTTP ${response.status}`);
+    }
+
+    return response.json();
+}
+
+export async function dropDatabaseColumn(
+    token: string,
+    projectId: string,
+    orgId: string,
+    tableName: string,
+    columnName: string,
+    schema: string = "public",
+): Promise<{ column_name: string; sql: string }> {
+    const url = new URL(`${API_BASE_URL}/api/projects/${projectId}/database/tables/${tableName}/columns/${columnName}`);
+    url.searchParams.append("org_id", orgId);
+    url.searchParams.append("schema", schema);
+
+    const response = await fetch(url.toString(), {
+        method: "DELETE",
+        headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+        },
+    });
+
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ detail: "Unknown error" }));
+        throw new Error(error.detail || `HTTP ${response.status}`);
+    }
+
+    return response.json();
+}
+
+// ─────────────────────────────────────────────────────────────
 // DATABASE SECURITY RULES
 // ─────────────────────────────────────────────────────────────
 

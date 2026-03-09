@@ -1,8 +1,9 @@
 """
 PostgreSQL Database Explorer
 
-Read-only query utilities for browsing user-provisioned Aurora databases.
-All connections are ephemeral (per-request) and session-level read-only.
+Query utilities for browsing and managing user-provisioned Aurora databases.
+Read connections are ephemeral (per-request) and session-level read-only.
+Write connections use explicit transactions for DDL operations.
 """
 
 import re
@@ -64,6 +65,46 @@ def _get_connection(cluster_identifier: str, db_name: str, port: int, endpoint: 
     )
     conn.set_session(readonly=True, autocommit=True)
     return conn
+
+
+ALLOWED_COLUMN_TYPES = frozenset({
+    "uuid", "text", "varchar", "char", "integer", "int", "bigint", "smallint",
+    "boolean", "bool", "timestamp", "timestamptz", "timestamp with time zone",
+    "timestamp without time zone", "date", "time", "timetz",
+    "real", "float4", "double precision", "float8", "numeric", "decimal",
+    "serial", "bigserial", "smallserial",
+    "jsonb", "json", "bytea", "cidr", "inet", "macaddr",
+    "interval", "money", "point", "line", "circle", "box",
+    "tsquery", "tsvector", "xml",
+})
+
+
+def _validate_column_type(col_type: str) -> str:
+    base = col_type.strip().lower()
+    # Allow types with length specifiers like varchar(255) or numeric(10,2)
+    base_name = re.split(r"[\s(]", base, maxsplit=1)[0]
+    if base_name not in ALLOWED_COLUMN_TYPES:
+        raise ValueError(f"Unsupported column type: {col_type!r}")
+    return col_type.strip()
+
+
+def _get_write_connection(cluster_identifier: str, db_name: str, port: int, endpoint: str):
+    credentials = get_cluster_secret(cluster_identifier)
+    conn = psycopg2.connect(
+        host=endpoint,
+        port=port,
+        dbname=db_name,
+        user=credentials["username"],
+        password=credentials["password"],
+        connect_timeout=10,
+    )
+    conn.set_session(autocommit=False)
+    return conn
+
+
+# ─────────────────────────────────────────────────────────────
+# READ OPERATIONS
+# ─────────────────────────────────────────────────────────────
 
 
 def list_schemas(
@@ -237,5 +278,260 @@ def get_table_data(
                 "total_count": total_count,
                 "total_pages": max(1, (total_count + page_size - 1) // page_size),
             }
+    finally:
+        conn.close()
+
+
+# ─────────────────────────────────────────────────────────────
+# WRITE OPERATIONS
+# ─────────────────────────────────────────────────────────────
+
+
+def create_table(
+    cluster_identifier: str,
+    db_name: str,
+    port: int,
+    endpoint: str,
+    schema: str,
+    table_name: str,
+    columns: list[dict],
+) -> dict:
+    """Create a new table with the given columns.
+
+    Each column dict: {name, type, nullable (bool), default (str|None), is_primary_key (bool)}
+    """
+    _validate_identifier(schema, "schema")
+    _validate_identifier(table_name, "table name")
+
+    if not columns:
+        raise ValueError("At least one column is required")
+
+    col_defs = []
+    pk_columns = []
+    for col in columns:
+        name = _validate_identifier(col["name"], "column name")
+        col_type = _validate_column_type(col["type"])
+        parts = [f'"{name}" {col_type}']
+
+        if not col.get("nullable", True):
+            parts.append("NOT NULL")
+
+        default = col.get("default")
+        if default is not None and default.strip():
+            # Validate default is a safe expression (no semicolons, no sub-selects)
+            cleaned = default.strip()
+            if ";" in cleaned:
+                raise ValueError(f"Invalid default value for column {name!r}")
+            parts.append(f"DEFAULT {cleaned}")
+
+        col_defs.append(" ".join(parts))
+
+        if col.get("is_primary_key"):
+            pk_columns.append(f'"{name}"')
+
+    ddl_parts = ", ".join(col_defs)
+    if pk_columns:
+        ddl_parts += f", PRIMARY KEY ({', '.join(pk_columns)})"
+
+    ddl = f'CREATE TABLE "{schema}"."{table_name}" ({ddl_parts})'
+
+    conn = _get_write_connection(cluster_identifier, db_name, port, endpoint)
+    try:
+        with conn.cursor() as cur:
+            cur.execute(ddl)
+        conn.commit()
+        return {"table_name": table_name, "schema": schema, "sql": ddl}
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+def add_column(
+    cluster_identifier: str,
+    db_name: str,
+    port: int,
+    endpoint: str,
+    schema: str,
+    table_name: str,
+    column: dict,
+) -> dict:
+    """Add a column to an existing table.
+
+    column dict: {name, type, nullable (bool), default (str|None)}
+    """
+    _validate_identifier(schema, "schema")
+    _validate_identifier(table_name, "table name")
+    name = _validate_identifier(column["name"], "column name")
+    col_type = _validate_column_type(column["type"])
+
+    parts = [f'ALTER TABLE "{schema}"."{table_name}" ADD COLUMN "{name}" {col_type}']
+
+    if not column.get("nullable", True):
+        parts.append("NOT NULL")
+
+    default = column.get("default")
+    if default is not None and default.strip():
+        cleaned = default.strip()
+        if ";" in cleaned:
+            raise ValueError(f"Invalid default value for column {name!r}")
+        parts.append(f"DEFAULT {cleaned}")
+
+    ddl = " ".join(parts)
+
+    conn = _get_write_connection(cluster_identifier, db_name, port, endpoint)
+    try:
+        with conn.cursor() as cur:
+            cur.execute(ddl)
+        conn.commit()
+        return {"column_name": name, "sql": ddl}
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+def alter_column(
+    cluster_identifier: str,
+    db_name: str,
+    port: int,
+    endpoint: str,
+    schema: str,
+    table_name: str,
+    column_name: str,
+    changes: dict,
+) -> dict:
+    """Alter an existing column. Supported changes: {type, nullable, default, new_name}."""
+    _validate_identifier(schema, "schema")
+    _validate_identifier(table_name, "table name")
+    _validate_identifier(column_name, "column name")
+
+    statements = []
+    prefix = f'ALTER TABLE "{schema}"."{table_name}"'
+
+    if "type" in changes:
+        col_type = _validate_column_type(changes["type"])
+        statements.append(f'{prefix} ALTER COLUMN "{column_name}" TYPE {col_type} USING "{column_name}"::{col_type}')
+
+    if "nullable" in changes:
+        if changes["nullable"]:
+            statements.append(f'{prefix} ALTER COLUMN "{column_name}" DROP NOT NULL')
+        else:
+            statements.append(f'{prefix} ALTER COLUMN "{column_name}" SET NOT NULL')
+
+    if "default" in changes:
+        default_val = changes["default"]
+        if default_val is None or (isinstance(default_val, str) and not default_val.strip()):
+            statements.append(f'{prefix} ALTER COLUMN "{column_name}" DROP DEFAULT')
+        else:
+            cleaned = default_val.strip()
+            if ";" in cleaned:
+                raise ValueError(f"Invalid default value for column {column_name!r}")
+            statements.append(f'{prefix} ALTER COLUMN "{column_name}" SET DEFAULT {cleaned}')
+
+    if "new_name" in changes:
+        new_name = _validate_identifier(changes["new_name"], "new column name")
+        statements.append(f'{prefix} RENAME COLUMN "{column_name}" TO "{new_name}"')
+
+    if not statements:
+        raise ValueError("No changes specified")
+
+    conn = _get_write_connection(cluster_identifier, db_name, port, endpoint)
+    try:
+        with conn.cursor() as cur:
+            for stmt in statements:
+                cur.execute(stmt)
+        conn.commit()
+        return {"column_name": column_name, "statements": statements}
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+def drop_column(
+    cluster_identifier: str,
+    db_name: str,
+    port: int,
+    endpoint: str,
+    schema: str,
+    table_name: str,
+    column_name: str,
+) -> dict:
+    """Drop a column from a table."""
+    _validate_identifier(schema, "schema")
+    _validate_identifier(table_name, "table name")
+    _validate_identifier(column_name, "column name")
+
+    ddl = f'ALTER TABLE "{schema}"."{table_name}" DROP COLUMN "{column_name}"'
+
+    conn = _get_write_connection(cluster_identifier, db_name, port, endpoint)
+    try:
+        with conn.cursor() as cur:
+            cur.execute(ddl)
+        conn.commit()
+        return {"column_name": column_name, "sql": ddl}
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+def rename_table(
+    cluster_identifier: str,
+    db_name: str,
+    port: int,
+    endpoint: str,
+    schema: str,
+    old_name: str,
+    new_name: str,
+) -> dict:
+    """Rename a table."""
+    _validate_identifier(schema, "schema")
+    _validate_identifier(old_name, "current table name")
+    _validate_identifier(new_name, "new table name")
+
+    ddl = f'ALTER TABLE "{schema}"."{old_name}" RENAME TO "{new_name}"'
+
+    conn = _get_write_connection(cluster_identifier, db_name, port, endpoint)
+    try:
+        with conn.cursor() as cur:
+            cur.execute(ddl)
+        conn.commit()
+        return {"old_name": old_name, "new_name": new_name, "sql": ddl}
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+def drop_table(
+    cluster_identifier: str,
+    db_name: str,
+    port: int,
+    endpoint: str,
+    schema: str,
+    table_name: str,
+) -> dict:
+    """Drop a table."""
+    _validate_identifier(schema, "schema")
+    _validate_identifier(table_name, "table name")
+
+    ddl = f'DROP TABLE "{schema}"."{table_name}"'
+
+    conn = _get_write_connection(cluster_identifier, db_name, port, endpoint)
+    try:
+        with conn.cursor() as cur:
+            cur.execute(ddl)
+        conn.commit()
+        return {"table_name": table_name, "sql": ddl}
+    except Exception:
+        conn.rollback()
+        raise
     finally:
         conn.close()

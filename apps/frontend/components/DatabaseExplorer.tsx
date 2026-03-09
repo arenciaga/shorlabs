@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { useAuth } from "@clerk/nextjs"
+import { toast } from "sonner"
 import {
     Database,
     Loader2,
@@ -11,6 +12,11 @@ import {
     Key,
     RefreshCw,
     AlertCircle,
+    Plus,
+    MoreHorizontal,
+    Pencil,
+    Trash2,
+    Type,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -21,15 +27,43 @@ import {
     SelectValue,
 } from "@/components/ui/select"
 import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import {
+    AlertDialog,
+    AlertDialogContent,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogCancel,
+} from "@/components/ui/alert-dialog"
+import {
     fetchDatabaseSchemas,
     fetchDatabaseTables,
     fetchTableColumns,
     fetchTableData,
+    createDatabaseTable,
+    dropDatabaseTable,
+    renameDatabaseTable,
+    addDatabaseColumn,
+    alterDatabaseColumn,
+    dropDatabaseColumn,
     SchemaInfo,
     TableInfo,
     ColumnInfo,
     TableData,
 } from "@/lib/api"
+import { CreateTableDialog } from "@/components/database/CreateTableDialog"
+import { AddColumnDialog } from "@/components/database/AddColumnDialog"
+import { EditColumnDialog } from "@/components/database/EditColumnDialog"
+import { DropTableDialog } from "@/components/database/DropTableDialog"
+import { RenameTableDialog } from "@/components/database/RenameTableDialog"
+import type { ColumnDraft } from "@/components/database/types"
 
 interface DatabaseExplorerProps {
     projectId: string
@@ -58,6 +92,17 @@ export function DatabaseExplorer({ projectId, orgId, projectStatus }: DatabaseEx
     const [columns, setColumns] = useState<ColumnInfo[]>([])
     const [tableData, setTableData] = useState<TableData | null>(null)
     const [currentPage, setCurrentPage] = useState(1)
+
+    // Dialog states
+    const [createTableOpen, setCreateTableOpen] = useState(false)
+    const [dropTableOpen, setDropTableOpen] = useState(false)
+    const [renameTableOpen, setRenameTableOpen] = useState(false)
+    const [addColumnOpen, setAddColumnOpen] = useState(false)
+    const [editColumnOpen, setEditColumnOpen] = useState(false)
+    const [dropColumnConfirmOpen, setDropColumnConfirmOpen] = useState(false)
+    const [editingColumn, setEditingColumn] = useState<ColumnInfo | null>(null)
+    const [droppingColumn, setDroppingColumn] = useState<string | null>(null)
+    const [droppingColumnLoading, setDroppingColumnLoading] = useState(false)
 
     const loadSchemas = useCallback(async () => {
         if (!orgId) return
@@ -166,6 +211,84 @@ export function DatabaseExplorer({ projectId, orgId, projectStatus }: DatabaseEx
         }
     }
 
+    // ── Mutation handlers ──────────────────────────────────────
+
+    const handleCreateTable = async (tableName: string, columnDrafts: ColumnDraft[]) => {
+        if (!orgId) return
+        const token = await getToken()
+        if (!token) return
+        await createDatabaseTable(token, projectId, orgId, {
+            table_name: tableName,
+            columns: columnDrafts.map(c => ({
+                name: c.name,
+                type: c.type,
+                nullable: c.nullable,
+                default: c.defaultValue.trim() || null,
+                is_primary_key: c.isPrimaryKey,
+            })),
+        }, selectedSchema)
+        toast.success(`Table "${tableName}" created`)
+        loadTables(selectedSchema)
+    }
+
+    const handleDropTable = async () => {
+        if (!orgId || !selectedTable) return
+        const token = await getToken()
+        if (!token) return
+        await dropDatabaseTable(token, projectId, orgId, selectedTable, selectedSchema)
+        toast.success(`Table "${selectedTable}" dropped`)
+        setSelectedTable(null)
+        setColumns([])
+        setTableData(null)
+        loadTables(selectedSchema)
+    }
+
+    const handleRenameTable = async (newName: string) => {
+        if (!orgId || !selectedTable) return
+        const token = await getToken()
+        if (!token) return
+        await renameDatabaseTable(token, projectId, orgId, selectedTable, { new_name: newName }, selectedSchema)
+        toast.success(`Table renamed to "${newName}"`)
+        setSelectedTable(newName)
+        loadTables(selectedSchema)
+    }
+
+    const handleAddColumn = async (column: { name: string; type: string; nullable: boolean; default: string | null }) => {
+        if (!orgId || !selectedTable) return
+        const token = await getToken()
+        if (!token) return
+        await addDatabaseColumn(token, projectId, orgId, selectedTable, column, selectedSchema)
+        toast.success(`Column "${column.name}" added`)
+        loadColumns(selectedTable, selectedSchema)
+    }
+
+    const handleEditColumn = async (columnName: string, changes: { type?: string; nullable?: boolean; default?: string | null; new_name?: string }) => {
+        if (!orgId || !selectedTable) return
+        const token = await getToken()
+        if (!token) return
+        await alterDatabaseColumn(token, projectId, orgId, selectedTable, columnName, changes, selectedSchema)
+        toast.success(`Column "${columnName}" updated`)
+        loadColumns(selectedTable, selectedSchema)
+    }
+
+    const handleDropColumn = async () => {
+        if (!orgId || !selectedTable || !droppingColumn) return
+        setDroppingColumnLoading(true)
+        try {
+            const token = await getToken()
+            if (!token) return
+            await dropDatabaseColumn(token, projectId, orgId, selectedTable, droppingColumn, selectedSchema)
+            toast.success(`Column "${droppingColumn}" dropped`)
+            setDropColumnConfirmOpen(false)
+            setDroppingColumn(null)
+            loadColumns(selectedTable, selectedSchema)
+        } catch (e) {
+            toast.error(e instanceof Error ? e.message : "Failed to drop column")
+        } finally {
+            setDroppingColumnLoading(false)
+        }
+    }
+
     if (projectStatus !== "LIVE") {
         return (
             <div className="flex flex-col items-center justify-center py-20 text-zinc-400">
@@ -216,13 +339,22 @@ export function DatabaseExplorer({ projectId, orgId, projectStatus }: DatabaseEx
                                 <span className="text-xs font-medium text-zinc-500 uppercase tracking-wider">
                                     Tables
                                 </span>
-                                <button
-                                    onClick={() => loadTables(selectedSchema)}
-                                    className="p-1 hover:bg-zinc-200 rounded transition-colors"
-                                    title="Refresh tables"
-                                >
-                                    <RefreshCw className="h-3 w-3 text-zinc-400" />
-                                </button>
+                                <div className="flex items-center gap-0.5">
+                                    <button
+                                        onClick={() => setCreateTableOpen(true)}
+                                        className="p-1.5 sm:p-1 hover:bg-zinc-200 rounded transition-colors"
+                                        title="Create table"
+                                    >
+                                        <Plus className="h-4 w-4 sm:h-3 sm:w-3 text-zinc-400" />
+                                    </button>
+                                    <button
+                                        onClick={() => loadTables(selectedSchema)}
+                                        className="p-1.5 sm:p-1 hover:bg-zinc-200 rounded transition-colors"
+                                        title="Refresh tables"
+                                    >
+                                        <RefreshCw className="h-4 w-4 sm:h-3 sm:w-3 text-zinc-400" />
+                                    </button>
+                                </div>
                             </div>
                         </div>
                         {loadingTables ? (
@@ -231,8 +363,21 @@ export function DatabaseExplorer({ projectId, orgId, projectStatus }: DatabaseEx
                                 Loading...
                             </div>
                         ) : tables.length === 0 ? (
-                            <div className="px-3 py-4 text-center">
-                                <p className="text-sm text-zinc-400">No tables in this schema</p>
+                            <div className="px-4 py-6 flex flex-col items-center text-center">
+                                <div className="h-10 w-10 rounded-full bg-zinc-100 flex items-center justify-center mb-3">
+                                    <Table2 className="h-5 w-5 text-zinc-400" />
+                                </div>
+                                <p className="text-sm font-medium text-zinc-700">No tables yet</p>
+                                <p className="text-xs text-zinc-400 mt-1 mb-3">Create your first table to get started</p>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setCreateTableOpen(true)}
+                                    className="h-8 text-xs"
+                                >
+                                    <Plus className="h-3 w-3 mr-1.5" />
+                                    Create Table
+                                </Button>
                             </div>
                         ) : (
                             <div className="space-y-0.5 px-2 pb-3">
@@ -274,9 +419,32 @@ export function DatabaseExplorer({ projectId, orgId, projectStatus }: DatabaseEx
                     )}
 
                     {!selectedTable ? (
-                        <div className="flex-1 flex flex-col items-center justify-center text-zinc-400 py-12 md:py-0">
-                            <Database className="h-10 w-10 mb-3" />
-                            <p className="text-sm">Select a table to explore</p>
+                        <div className="flex-1 flex flex-col items-center justify-center py-12 md:py-0 px-6">
+                            <div className="h-12 w-12 rounded-full bg-zinc-100 flex items-center justify-center mb-4">
+                                <Database className="h-6 w-6 text-zinc-400" />
+                            </div>
+                            {tables.length === 0 ? (
+                                <>
+                                    <p className="text-sm font-medium text-zinc-700">No tables in this database</p>
+                                    <p className="text-xs text-zinc-400 mt-1 mb-4 text-center max-w-[240px]">
+                                        Create a table to start storing and exploring your data
+                                    </p>
+                                    <Button
+                                        variant="default"
+                                        size="sm"
+                                        onClick={() => setCreateTableOpen(true)}
+                                        className="h-9 text-xs"
+                                    >
+                                        <Plus className="h-3.5 w-3.5 mr-1.5" />
+                                        Create Table
+                                    </Button>
+                                </>
+                            ) : (
+                                <>
+                                    <p className="text-sm font-medium text-zinc-700">Select a table</p>
+                                    <p className="text-xs text-zinc-400 mt-1">Choose a table from the sidebar to explore</p>
+                                </>
+                            )}
                         </div>
                     ) : (
                         <>
@@ -284,7 +452,28 @@ export function DatabaseExplorer({ projectId, orgId, projectStatus }: DatabaseEx
                             <div className="border-b border-zinc-200 px-3 sm:px-4 pt-3">
                                 <div className="flex items-center gap-2 mb-3">
                                     <Table2 className="h-4 w-4 text-zinc-400 shrink-0" />
-                                    <h3 className="font-semibold text-zinc-900 text-sm font-mono truncate">{selectedTable}</h3>
+                                    <h3 className="font-semibold text-zinc-900 text-sm font-mono truncate flex-1">{selectedTable}</h3>
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <Button variant="ghost" size="sm" className="h-9 w-9 sm:h-7 sm:w-7 p-0">
+                                                <MoreHorizontal className="h-4 w-4 text-zinc-500" />
+                                            </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end">
+                                            <DropdownMenuItem onClick={() => setRenameTableOpen(true)}>
+                                                <Type className="h-4 w-4 mr-2" />
+                                                Rename Table
+                                            </DropdownMenuItem>
+                                            <DropdownMenuSeparator />
+                                            <DropdownMenuItem
+                                                onClick={() => setDropTableOpen(true)}
+                                                className="text-red-600 focus:text-red-600"
+                                            >
+                                                <Trash2 className="h-4 w-4 mr-2" />
+                                                Drop Table
+                                            </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
                                 </div>
                                 <div className="flex gap-0">
                                     <button
@@ -319,7 +508,13 @@ export function DatabaseExplorer({ projectId, orgId, projectStatus }: DatabaseEx
                             {/* Content area */}
                             <div className="flex-1 overflow-auto">
                                 {tableView === "structure" ? (
-                                    <StructureView columns={columns} loading={loadingColumns} />
+                                    <StructureView
+                                        columns={columns}
+                                        loading={loadingColumns}
+                                        onAddColumn={() => setAddColumnOpen(true)}
+                                        onEditColumn={(col) => { setEditingColumn(col); setEditColumnOpen(true) }}
+                                        onDropColumn={(colName) => { setDroppingColumn(colName); setDropColumnConfirmOpen(true) }}
+                                    />
                                 ) : (
                                     <DataView
                                         tableData={tableData}
@@ -333,11 +528,91 @@ export function DatabaseExplorer({ projectId, orgId, projectStatus }: DatabaseEx
                     )}
                 </div>
             </div>
+
+            {/* ── Dialogs ─────────────────────────────────────── */}
+            <CreateTableDialog
+                open={createTableOpen}
+                onOpenChange={setCreateTableOpen}
+                onSubmit={handleCreateTable}
+            />
+
+            {selectedTable && (
+                <>
+                    <DropTableDialog
+                        open={dropTableOpen}
+                        onOpenChange={setDropTableOpen}
+                        tableName={selectedTable}
+                        onConfirm={handleDropTable}
+                    />
+                    <RenameTableDialog
+                        open={renameTableOpen}
+                        onOpenChange={setRenameTableOpen}
+                        currentName={selectedTable}
+                        onSubmit={handleRenameTable}
+                    />
+                    <AddColumnDialog
+                        open={addColumnOpen}
+                        onOpenChange={setAddColumnOpen}
+                        tableName={selectedTable}
+                        onSubmit={handleAddColumn}
+                    />
+                    <EditColumnDialog
+                        open={editColumnOpen}
+                        onOpenChange={setEditColumnOpen}
+                        tableName={selectedTable}
+                        column={editingColumn}
+                        onSubmit={handleEditColumn}
+                    />
+
+                    {/* Drop Column Confirmation */}
+                    <AlertDialog open={dropColumnConfirmOpen} onOpenChange={setDropColumnConfirmOpen}>
+                        <AlertDialogContent>
+                            <AlertDialogHeader>
+                                <AlertDialogTitle>Drop Column</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                    Are you sure you want to drop the column{" "}
+                                    <span className="font-mono font-semibold text-zinc-900">{droppingColumn}</span>?
+                                    This will permanently delete the column and all its data.
+                                </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                                <AlertDialogCancel disabled={droppingColumnLoading}>Cancel</AlertDialogCancel>
+                                <Button
+                                    variant="destructive"
+                                    onClick={handleDropColumn}
+                                    disabled={droppingColumnLoading}
+                                >
+                                    {droppingColumnLoading ? (
+                                        <>
+                                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                            Dropping...
+                                        </>
+                                    ) : (
+                                        "Drop Column"
+                                    )}
+                                </Button>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
+                </>
+            )}
         </div>
     )
 }
 
-function StructureView({ columns, loading }: { columns: ColumnInfo[]; loading: boolean }) {
+function StructureView({
+    columns,
+    loading,
+    onAddColumn,
+    onEditColumn,
+    onDropColumn,
+}: {
+    columns: ColumnInfo[]
+    loading: boolean
+    onAddColumn: () => void
+    onEditColumn: (col: ColumnInfo) => void
+    onDropColumn: (colName: string) => void
+}) {
     if (loading) {
         return (
             <div className="flex items-center justify-center py-12 text-zinc-400">
@@ -356,40 +631,123 @@ function StructureView({ columns, loading }: { columns: ColumnInfo[]; loading: b
     }
 
     return (
-        <div className="overflow-x-auto">
-            <table className="w-full text-sm" style={{ minWidth: "480px" }}>
-                <thead>
-                    <tr className="border-b border-zinc-200 bg-zinc-50">
-                        <th className="text-left px-3 sm:px-4 py-2 text-xs font-medium text-zinc-500 uppercase tracking-wider">Name</th>
-                        <th className="text-left px-3 sm:px-4 py-2 text-xs font-medium text-zinc-500 uppercase tracking-wider">Type</th>
-                        <th className="text-left px-3 sm:px-4 py-2 text-xs font-medium text-zinc-500 uppercase tracking-wider">Nullable</th>
-                        <th className="text-left px-3 sm:px-4 py-2 text-xs font-medium text-zinc-500 uppercase tracking-wider">Default</th>
-                        <th className="text-center px-3 sm:px-4 py-2 text-xs font-medium text-zinc-500 uppercase tracking-wider">PK</th>
-                    </tr>
-                </thead>
-                <tbody>
+        <div className="flex flex-col h-full">
+            <div className="flex-1 overflow-x-auto">
+                {/* Mobile: card layout */}
+                <div className="sm:hidden space-y-2 p-3">
                     {columns.map((col) => (
-                        <tr key={col.column_name} className="border-b border-zinc-100 hover:bg-zinc-50/50">
-                            <td className="px-3 sm:px-4 py-2 font-mono text-xs text-zinc-900 whitespace-nowrap">{col.column_name}</td>
-                            <td className="px-3 sm:px-4 py-2 font-mono text-xs text-zinc-600 whitespace-nowrap">
-                                {col.data_type}
-                                {col.character_maximum_length ? `(${col.character_maximum_length})` : ""}
-                            </td>
-                            <td className="px-3 sm:px-4 py-2 text-xs text-zinc-500">
-                                {col.is_nullable === "YES" ? "Yes" : "No"}
-                            </td>
-                            <td className="px-3 sm:px-4 py-2 font-mono text-xs text-zinc-500 max-w-48 truncate">
-                                {col.column_default || "—"}
-                            </td>
-                            <td className="px-3 sm:px-4 py-2 text-center">
-                                {col.is_primary_key && (
-                                    <Key className="h-3.5 w-3.5 text-amber-500 inline-block" />
-                                )}
-                            </td>
-                        </tr>
+                        <div key={col.column_name} className="border border-zinc-200 rounded-lg p-3 bg-white space-y-2">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2 min-w-0">
+                                    {col.is_primary_key && (
+                                        <Key className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                                    )}
+                                    <span className="font-mono text-sm text-zinc-900 font-medium truncate">{col.column_name}</span>
+                                </div>
+                                <div className="flex items-center gap-1 shrink-0">
+                                    <button
+                                        onClick={() => onEditColumn(col)}
+                                        className="p-2 hover:bg-zinc-100 rounded-md transition-colors"
+                                        title="Edit column"
+                                    >
+                                        <Pencil className="h-3.5 w-3.5 text-zinc-500" />
+                                    </button>
+                                    <button
+                                        onClick={() => onDropColumn(col.column_name)}
+                                        className="p-2 hover:bg-red-50 rounded-md transition-colors"
+                                        title="Drop column"
+                                    >
+                                        <Trash2 className="h-3.5 w-3.5 text-zinc-400 hover:text-red-500" />
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                                <div>
+                                    <span className="text-zinc-400">Type</span>
+                                    <p className="font-mono text-zinc-600">
+                                        {col.data_type}
+                                        {col.character_maximum_length ? `(${col.character_maximum_length})` : ""}
+                                    </p>
+                                </div>
+                                <div>
+                                    <span className="text-zinc-400">Nullable</span>
+                                    <p className="text-zinc-600">{col.is_nullable === "YES" ? "Yes" : "No"}</p>
+                                </div>
+                                <div className="col-span-2">
+                                    <span className="text-zinc-400">Default</span>
+                                    <p className="font-mono text-zinc-600 truncate">{col.column_default || "—"}</p>
+                                </div>
+                            </div>
+                        </div>
                     ))}
-                </tbody>
-            </table>
+                </div>
+
+                {/* Desktop: table layout */}
+                <table className="hidden sm:table w-full text-sm" style={{ minWidth: "560px" }}>
+                    <thead>
+                        <tr className="border-b border-zinc-200 bg-zinc-50">
+                            <th className="text-left px-4 py-2 text-xs font-medium text-zinc-500 uppercase tracking-wider">Name</th>
+                            <th className="text-left px-4 py-2 text-xs font-medium text-zinc-500 uppercase tracking-wider">Type</th>
+                            <th className="text-left px-4 py-2 text-xs font-medium text-zinc-500 uppercase tracking-wider">Nullable</th>
+                            <th className="text-left px-4 py-2 text-xs font-medium text-zinc-500 uppercase tracking-wider">Default</th>
+                            <th className="text-center px-4 py-2 text-xs font-medium text-zinc-500 uppercase tracking-wider">PK</th>
+                            <th className="text-right px-4 py-2 text-xs font-medium text-zinc-500 uppercase tracking-wider w-20">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {columns.map((col) => (
+                            <tr key={col.column_name} className="border-b border-zinc-100 hover:bg-zinc-50/50 group">
+                                <td className="px-4 py-2 font-mono text-xs text-zinc-900 whitespace-nowrap">{col.column_name}</td>
+                                <td className="px-4 py-2 font-mono text-xs text-zinc-600 whitespace-nowrap">
+                                    {col.data_type}
+                                    {col.character_maximum_length ? `(${col.character_maximum_length})` : ""}
+                                </td>
+                                <td className="px-4 py-2 text-xs text-zinc-500">
+                                    {col.is_nullable === "YES" ? "Yes" : "No"}
+                                </td>
+                                <td className="px-4 py-2 font-mono text-xs text-zinc-500 max-w-48 truncate">
+                                    {col.column_default || "—"}
+                                </td>
+                                <td className="px-4 py-2 text-center">
+                                    {col.is_primary_key && (
+                                        <Key className="h-3.5 w-3.5 text-amber-500 inline-block" />
+                                    )}
+                                </td>
+                                <td className="px-4 py-2 text-right">
+                                    <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <button
+                                            onClick={() => onEditColumn(col)}
+                                            className="p-1 hover:bg-zinc-200 rounded transition-colors"
+                                            title="Edit column"
+                                        >
+                                            <Pencil className="h-3 w-3 text-zinc-500" />
+                                        </button>
+                                        <button
+                                            onClick={() => onDropColumn(col.column_name)}
+                                            className="p-1 hover:bg-red-100 rounded transition-colors"
+                                            title="Drop column"
+                                        >
+                                            <Trash2 className="h-3 w-3 text-zinc-500 hover:text-red-500" />
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+            {/* Add Column button */}
+            <div className="border-t border-zinc-200 px-3 sm:px-4 py-2.5 sm:py-2 bg-white shrink-0">
+                <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={onAddColumn}
+                    className="h-9 sm:h-7 text-xs"
+                >
+                    <Plus className="h-3.5 w-3.5 sm:h-3 sm:w-3 mr-1" />
+                    Add Column
+                </Button>
+            </div>
         </div>
     )
 }

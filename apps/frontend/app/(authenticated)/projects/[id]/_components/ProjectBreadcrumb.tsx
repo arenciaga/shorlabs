@@ -1,12 +1,14 @@
 import Link from "next/link"
-import { ArrowLeft, Database } from "lucide-react"
+import { ArrowLeft } from "lucide-react"
 
 interface ProjectBreadcrumbProps {
     projectName: string
     isDatabase?: boolean
+    serviceName?: string
+    onBackToCanvas?: () => void
 }
 
-export function ProjectBreadcrumb({ projectName, isDatabase }: ProjectBreadcrumbProps) {
+export function ProjectBreadcrumb({ projectName, isDatabase, serviceName, onBackToCanvas }: ProjectBreadcrumbProps) {
     return (
         <div className="flex items-center gap-2 pt-5 pb-4">
             <Link
@@ -17,7 +19,23 @@ export function ProjectBreadcrumb({ projectName, isDatabase }: ProjectBreadcrumb
                 <span>Projects</span>
             </Link>
             <span className="text-zinc-300">/</span>
-            <span className="text-sm text-zinc-900 font-medium truncate">{projectName}</span>
+
+            {onBackToCanvas ? (
+                <>
+                    <button
+                        onClick={onBackToCanvas}
+                        className="text-sm text-zinc-500 hover:text-zinc-900 transition-colors"
+                    >
+                        {projectName}
+                    </button>
+                    <span className="text-zinc-300">/</span>
+                    <span className="text-sm text-zinc-900 font-medium truncate">
+                        {serviceName || "Service"}
+                    </span>
+                </>
+            ) : (
+                <span className="text-sm text-zinc-900 font-medium truncate">{projectName}</span>
+            )}
         </div>
     )
 }

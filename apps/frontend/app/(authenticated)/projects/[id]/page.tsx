@@ -1,6 +1,6 @@
 "use client"
 
-import { use, useState } from "react"
+import { use, useState, useEffect, useRef } from "react"
 import { AlertCircle, Plus } from "lucide-react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -27,6 +27,16 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     const hook = useProjectDetail(id)
     const isMobile = useIsMobile()
     const [detailOpen, setDetailOpen] = useState(false)
+
+    // Close the sheet when a service is deleted (service count drops)
+    const serviceCount = hook.data?.services?.length ?? 0
+    const prevServiceCount = useRef(serviceCount)
+    useEffect(() => {
+        if (serviceCount < prevServiceCount.current && prevServiceCount.current > 0) {
+            setDetailOpen(false)
+        }
+        prevServiceCount.current = serviceCount
+    }, [serviceCount])
 
     // Loading skeleton
     if (hook.loading) {

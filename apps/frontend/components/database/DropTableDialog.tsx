@@ -8,9 +8,7 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
     AlertDialogDescription,
-    AlertDialogFooter,
     AlertDialogCancel,
-    AlertDialogAction,
 } from "@/components/ui/alert-dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -85,12 +83,14 @@ export function DropTableDialog({ open, onOpenChange, tableName, onConfirm }: Dr
                         {error}
                     </div>
                 )}
-                <AlertDialogFooter>
+                <div className="flex flex-row justify-end gap-2 pt-2">
                     <AlertDialogCancel disabled={submitting}>Cancel</AlertDialogCancel>
-                    <AlertDialogAction
-                        onClick={async (e) => { e.preventDefault(); await handleConfirm() }}
+                    <button
+                        type="button"
+                        onClick={handleConfirm}
                         disabled={!canConfirm}
-                        className="bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 disabled:pointer-events-none"
+                        style={{ backgroundColor: canConfirm ? '#dc2626' : '#fca5a5', color: 'white' }}
+                        className="inline-flex items-center justify-center rounded-md text-sm font-medium h-9 px-4 py-2 disabled:pointer-events-none"
                     >
                         {submitting ? (
                             <>
@@ -100,8 +100,8 @@ export function DropTableDialog({ open, onOpenChange, tableName, onConfirm }: Dr
                         ) : (
                             "Drop Table"
                         )}
-                    </AlertDialogAction>
-                </AlertDialogFooter>
+                    </button>
+                </div>
             </AlertDialogContent>
         </AlertDialog>
     )

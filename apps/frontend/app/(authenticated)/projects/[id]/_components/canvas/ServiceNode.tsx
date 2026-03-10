@@ -20,8 +20,6 @@ export const ServiceNode = memo(function ServiceNode({ data }: NodeProps) {
     const isDb = service.service_type === "database"
     const statusConfig = STATUS_CONFIG[service.status] || STATUS_CONFIG.PENDING
     const isBuilding = !["LIVE", "FAILED", "DELETING"].includes(service.status)
-    const Icon = isDb ? PostgreSQLIcon : GitHubIcon
-
     const latestDeploy = service.deployments?.[0]
 
     return (
@@ -39,9 +37,11 @@ export const ServiceNode = memo(function ServiceNode({ data }: NodeProps) {
                     <div className={`w-9 h-9 flex items-center justify-center shrink-0 ${
                         isDb ? "bg-purple-50" : "bg-blue-50"
                     }`}>
-                        <Icon className={`h-4.5 w-4.5 ${
-                            isDb ? "text-purple-500" : "text-blue-500"
-                        }`} />
+                        {isDb ? (
+                            <PostgreSQLIcon className="h-5 w-5" />
+                        ) : (
+                            <GitHubIcon className="h-4.5 w-4.5 text-blue-500" />
+                        )}
                     </div>
                     <div className="min-w-0 flex-1">
                         <div className="text-sm font-semibold text-zinc-900 truncate">

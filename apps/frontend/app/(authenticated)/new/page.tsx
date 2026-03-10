@@ -21,14 +21,12 @@ function NewProjectPageInner() {
             id: "web-app",
             name: "Web App",
             description: "Deploy a web application from a Git repository",
-            icon: GitHubIcon,
             href: projectId ? `/new/web-app?project_id=${projectId}` : "/new/web-app",
         },
         {
             id: "database",
             name: "Database",
             description: "Provision a PostgreSQL database with scale-to-zero",
-            icon: PostgreSQLIcon,
             href: projectId ? `/new/database?project_id=${projectId}` : "/new/database",
         },
     ]
@@ -80,7 +78,11 @@ function NewProjectPageInner() {
                             className="flex items-center gap-4 px-4 sm:px-6 py-4 hover:bg-zinc-50 transition-colors group"
                         >
                             <div className="w-10 h-10 rounded-none bg-zinc-900 flex items-center justify-center shrink-0">
-                                <type.icon className="h-5 w-5 text-white" />
+                                {type.id === "database" ? (
+                                    <PostgreSQLIcon className="h-6 w-6" />
+                                ) : (
+                                    <GitHubIcon className="h-5 w-5 text-white" />
+                                )}
                             </div>
                             <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2">

@@ -10,8 +10,8 @@ import {
     AlertDialogDescription,
     AlertDialogFooter,
     AlertDialogCancel,
+    AlertDialogAction,
 } from "@/components/ui/alert-dialog"
-import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 
@@ -87,10 +87,10 @@ export function DropTableDialog({ open, onOpenChange, tableName, onConfirm }: Dr
                 )}
                 <AlertDialogFooter>
                     <AlertDialogCancel disabled={submitting}>Cancel</AlertDialogCancel>
-                    <Button
-                        variant="destructive"
-                        onClick={handleConfirm}
+                    <AlertDialogAction
+                        onClick={async (e) => { e.preventDefault(); await handleConfirm() }}
                         disabled={!canConfirm}
+                        className="bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 disabled:pointer-events-none"
                     >
                         {submitting ? (
                             <>
@@ -100,7 +100,7 @@ export function DropTableDialog({ open, onOpenChange, tableName, onConfirm }: Dr
                         ) : (
                             "Drop Table"
                         )}
-                    </Button>
+                    </AlertDialogAction>
                 </AlertDialogFooter>
             </AlertDialogContent>
         </AlertDialog>

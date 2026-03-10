@@ -13,16 +13,16 @@ export function HeroSection() {
     <section className="relative w-full px-4 pt-6 pb-10 sm:px-6 sm:pt-8 sm:pb-12 md:px-8 lg:px-12 lg:pt-10 lg:pb-16 xl:px-16">
       <div className="mx-auto w-full max-w-6xl">
         <div className="flex flex-col items-center text-center">
-          <Badge variant="outline" className="mb-6 rounded-none font-mono text-[10px] tracking-[0.2em] uppercase">
-            OPEN SOURCE
+          <Badge variant="outline" className="mb-6 rounded-none font-mono text-[10px] tracking-[0.2em]">
+            Open Source
           </Badge>
           <h1
-            className="font-mono sm:text-xl lg:text-2xl xl:text-4xl tracking-tight text-foreground mb-5 font-bold leading-[0.95]"
+            className="font-mono sm:text-xl lg:text-2xl xl:text-4xl tracking-tight text-foreground mb-5 font-bold uppercase leading-[0.95]"
             style={{ letterSpacing: "-0.01em" }}
           >
             Stop paying for idle time.
           </h1>
-          <p className="text-xs sm:text-sm text-muted-foreground max-w-2xl mb-8 sm:mb-9 leading-relaxed font-mono px-1 sm:px-0">
+          <p className="text-s sm:text-md text-muted-foreground max-w-2xl mb-8 sm:mb-9 leading-relaxed font-mono px-1 sm:px-0">
             Shorlabs provides the infrastructure to deploy serverless web apps and databases, scale instantly, and only pay for what you use.
           </p>
           <div className="flex w-full max-w-md sm:max-w-none flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3">

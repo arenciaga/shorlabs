@@ -246,6 +246,35 @@ export async function deleteProject(token: string, projectId: string, orgId: str
 }
 
 // ─────────────────────────────────────────────────────────────
+// BLANK PROJECT API
+// ─────────────────────────────────────────────────────────────
+
+export async function createBlankProject(
+    token: string,
+    orgId: string,
+    data: { name: string },
+): Promise<{ project_id: string; organization_id?: string; name: string }> {
+    const url = new URL(`${API_BASE_URL}/api/projects/blank`);
+    url.searchParams.append("org_id", orgId);
+
+    const response = await fetch(url.toString(), {
+        method: "POST",
+        headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ ...data, organization_id: orgId }),
+    });
+
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ detail: "Unknown error" }));
+        throw new Error(error.detail || `HTTP ${response.status}`);
+    }
+
+    return response.json();
+}
+
+// ─────────────────────────────────────────────────────────────
 // DATABASE API
 // ─────────────────────────────────────────────────────────────
 

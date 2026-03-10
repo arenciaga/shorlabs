@@ -1,8 +1,7 @@
 "use client"
 
 import { use, useState, useEffect, useRef } from "react"
-import { AlertCircle, Plus } from "lucide-react"
-import Link from "next/link"
+import { AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { UpgradeModal } from "@/components/upgrade-modal"
 import { useIsMobile } from "@/hooks/use-mobile"
@@ -15,7 +14,6 @@ import {
 } from "@/components/ui/sheet"
 
 import { useProjectDetail } from "./_components/useProjectDetail"
-import { ProjectBreadcrumb } from "./_components/ProjectBreadcrumb"
 import { DatabaseServiceView } from "./_components/DatabaseServiceView"
 import { WebAppServiceView } from "./_components/WebAppServiceView"
 import { DeleteProjectDialog } from "./_components/DeleteProjectDialog"
@@ -95,34 +93,9 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
 
     const { project, services } = hook.data
 
-    if (services.length === 0) {
-        return (
-            <div className="min-h-screen bg-white flex items-center justify-center">
-                <div className="text-center">
-                    <AlertCircle className="h-8 w-8 text-zinc-400 mx-auto mb-4" />
-                    <h2 className="text-xl font-semibold text-zinc-900 mb-2">No services</h2>
-                    <p className="text-zinc-500 mb-6">This project has no services yet.</p>
-                    <div className="flex items-center justify-center gap-3">
-                        <Link href={`/new?project_id=${project.project_id}`}>
-                            <Button variant="outline" className="rounded-full">
-                                <Plus className="h-3.5 w-3.5 mr-1.5" />
-                                Add Service
-                            </Button>
-                        </Link>
-                        <DeleteProjectDialog
-                            projectName={project.name}
-                            deleting={hook.deleting}
-                            open={hook.deleteDialogOpen}
-                            onOpenChange={hook.setDeleteDialogOpen}
-                            onDelete={hook.handleDeleteProject}
-                        />
-                    </div>
-                </div>
-            </div>
-        )
-    }
-
-    const activeService = hook.activeService || services[0]
+    const activeService = services.length > 0
+        ? (hook.activeService || services[0])
+        : null
 
     const handleCanvasSelect = (serviceId: string) => {
         hook.setActiveServiceId(serviceId)
@@ -147,35 +120,48 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                         onSelectService={handleCanvasSelect}
                     />
                 ) : (
-                    <div className="flex-1 min-h-0">
+                    <div className="flex-1 min-h-0 relative">
                         <ProjectCanvas
                             services={services}
                             projectId={project.project_id}
                             onSelectService={handleCanvasSelect}
                         />
+                        {services.length === 0 && (
+                            <div className="absolute bottom-4 right-4 z-10">
+                                <DeleteProjectDialog
+                                    projectName={project.name}
+                                    deleting={hook.deleting}
+                                    open={hook.deleteDialogOpen}
+                                    onOpenChange={hook.setDeleteDialogOpen}
+                                    onDelete={hook.handleDeleteProject}
+                                />
+                            </div>
+                        )}
                     </div>
                 )}
             </div>
 
             {/* Detail slide-in from right */}
-            <Sheet open={detailOpen} onOpenChange={(open) => !open && setDetailOpen(false)}>
-                <SheetContent
-                    side="right"
-                    className="w-full gap-0 border-l border-zinc-200 bg-white p-0 md:!w-[70%] md:!max-w-none overflow-y-auto"
-                >
-                    <SheetHeader className="sr-only">
-                        <SheetTitle>{activeService.name || "Service"}</SheetTitle>
-                        <SheetDescription>Service details</SheetDescription>
-                    </SheetHeader>
-                    <div className="px-4 sm:px-6 lg:px-8 pt-6 pb-12">
-                        {activeService.service_type === "database" ? (
-                            <DatabaseServiceView service={activeService} hook={hook} />
-                        ) : (
-                            <WebAppServiceView service={activeService} project={project} hook={hook} projectId={id} />
-                        )}
-                    </div>
-                </SheetContent>
-            </Sheet>
+            {activeService && (
+                <Sheet open={detailOpen} onOpenChange={(open) => !open && setDetailOpen(false)}>
+                    <SheetContent
+                        side="right"
+                        className="w-full gap-0 border-l border-zinc-200 bg-white p-0 md:!w-[70%] md:!max-w-none overflow-y-auto"
+                    >
+                        <SheetHeader className="sr-only">
+                            <SheetTitle>{activeService.name || "Service"}</SheetTitle>
+                            <SheetDescription>Service details</SheetDescription>
+                        </SheetHeader>
+                        <div className="px-4 sm:px-6 lg:px-8 pt-6 pb-12">
+                            {activeService.service_type === "database" ? (
+                                <DatabaseServiceView service={activeService} hook={hook} />
+                            ) : (
+                                <WebAppServiceView service={activeService} project={project} hook={hook} projectId={id} />
+                            )}
+                        </div>
+                    </SheetContent>
+                </Sheet>
+            )}
 
             <UpgradeModal isOpen={hook.upgradeModalOpen} onClose={hook.closeUpgradeModal} />
         </>

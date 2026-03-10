@@ -75,6 +75,12 @@ class CreateProjectRequest(BaseModel):
     timeout: Optional[int] = 30
     ephemeral_storage: Optional[int] = 512
 
+class CreateBlankProjectRequest(BaseModel):
+    """Create a blank project container with no services."""
+    name: str
+    organization_id: str
+    description: Optional[str] = ""
+
 class CreateDatabaseProjectRequest(BaseModel):
     """Create a project container with an initial database service."""
     name: str
@@ -646,6 +652,29 @@ async def create_new_project(
         "status": service["status"],
         "subdomain": service.get("subdomain"),
         "custom_url": service.get("custom_url"),
+    }
+
+
+@router.post("/blank")
+async def create_blank_project(
+    request: CreateBlankProjectRequest,
+    user_id: str = Depends(get_current_user_id),
+):
+    """Create a blank project container — no services, no deployment."""
+    if not request.organization_id or not request.organization_id.strip():
+        raise HTTPException(status_code=400, detail="organization_id is required")
+
+    project = create_project(
+        user_id=user_id,
+        organization_id=request.organization_id,
+        name=request.name,
+        description=request.description or "",
+    )
+
+    return {
+        "project_id": project["project_id"],
+        "organization_id": project.get("organization_id"),
+        "name": project["name"],
     }
 
 

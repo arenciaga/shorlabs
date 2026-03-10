@@ -225,11 +225,6 @@ export function useProjectDetail(id: string) {
             setData(prev => {
                 if (!prev) return prev
                 const remaining = prev.services.filter(s => s.service_id !== serviceId)
-                if (remaining.length === 0) {
-                    // Last service deleted — redirect to projects list
-                    router.push("/projects")
-                    return prev
-                }
                 return { ...prev, services: remaining }
             })
 

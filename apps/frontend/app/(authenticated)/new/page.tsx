@@ -1,14 +1,36 @@
 "use client"
 
-import { Suspense } from "react"
+import { Suspense, useState } from "react"
 import Link from "next/link"
-import { useSearchParams } from "next/navigation"
-import { ArrowLeft, ArrowRight, Globe, Database, Loader2 } from "lucide-react"
+import { useSearchParams, useRouter } from "next/navigation"
+import { useAuth } from "@clerk/nextjs"
+import { ArrowLeft, ArrowRight, Globe, Database, Loader2, FolderOpen } from "lucide-react"
+import { createBlankProject } from "@/lib/api"
+
+function generateProjectName(): string {
+    const adjectives = [
+        "bold", "calm", "dark", "fast", "keen",
+        "neat", "warm", "wise", "cool", "fair",
+        "wild", "soft", "bright", "swift", "vivid",
+    ]
+    const nouns = [
+        "falcon", "river", "storm", "ember", "cedar",
+        "frost", "spark", "bloom", "coral", "drift",
+        "atlas", "prism", "lunar", "orbit", "pulse",
+    ]
+    const adj = adjectives[Math.floor(Math.random() * adjectives.length)]
+    const noun = nouns[Math.floor(Math.random() * nouns.length)]
+    const num = Math.floor(Math.random() * 100)
+    return `${adj}-${noun}-${num}`
+}
 
 function NewProjectPageInner() {
     const searchParams = useSearchParams()
+    const router = useRouter()
+    const { getToken, orgId } = useAuth()
     const projectId = searchParams.get("project_id")
     const isAddService = !!projectId
+    const [creatingBlank, setCreatingBlank] = useState(false)
 
     const PROJECT_TYPES = [
         {
@@ -26,6 +48,21 @@ function NewProjectPageInner() {
             href: projectId ? `/new/database?project_id=${projectId}` : "/new/database",
         },
     ]
+
+    const handleCreateBlankProject = async () => {
+        if (creatingBlank || !orgId) return
+        setCreatingBlank(true)
+        try {
+            const token = await getToken()
+            if (!token) return
+            const name = generateProjectName()
+            const result = await createBlankProject(token, orgId, { name })
+            router.push(`/projects/${result.project_id}`)
+        } catch (err) {
+            console.error("Failed to create blank project:", err)
+            setCreatingBlank(false)
+        }
+    }
 
     return (
         <div className="min-h-screen bg-white">
@@ -77,6 +114,30 @@ function NewProjectPageInner() {
                         </Link>
                     ))}
                 </div>
+
+                {/* Blank Project — only when creating a new project, not adding a service */}
+                {!isAddService && (
+                    <button
+                        onClick={handleCreateBlankProject}
+                        disabled={creatingBlank}
+                        className="mt-4 w-full flex items-center gap-4 px-4 sm:px-6 py-4 border border-dashed border-zinc-300 hover:bg-zinc-50 hover:border-zinc-400 transition-colors group text-left disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        <div className="w-10 h-10 rounded-none bg-zinc-100 flex items-center justify-center shrink-0">
+                            {creatingBlank ? (
+                                <Loader2 className="h-5 w-5 text-zinc-500 animate-spin" />
+                            ) : (
+                                <FolderOpen className="h-5 w-5 text-zinc-500" />
+                            )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <p className="font-medium text-zinc-900">Blank Project</p>
+                            <p className="text-sm text-zinc-500">
+                                Start with an empty project and add services later
+                            </p>
+                        </div>
+                        <ArrowRight className="h-4 w-4 text-zinc-400 group-hover:text-zinc-900 transition-colors shrink-0" />
+                    </button>
+                )}
             </div>
         </div>
     )

@@ -4,16 +4,9 @@ import { useState } from "react"
 import { useAuth } from "@clerk/nextjs"
 import { Database, Check, Loader2 } from "lucide-react"
 import type { Service } from "./types"
+import { ACU_OPTIONS } from "@/lib/database"
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
-
-const ACU_OPTIONS = [
-    { value: 0.5, label: "Starter", description: "Side projects" },
-    { value: 1, label: "Small", description: "Light apps" },
-    { value: 2, label: "Medium", description: "Most apps" },
-    { value: 4, label: "Large", description: "Production" },
-    { value: 8, label: "XL", description: "High traffic" },
-]
 
 function resolveCurrentTier(maxAcu: number | null | undefined) {
     if (maxAcu == null) return null

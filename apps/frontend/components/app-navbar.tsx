@@ -4,8 +4,8 @@ import * as React from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Sparkles, Menu, X } from "lucide-react"
-import { OrganizationSwitcher, UserButton } from "@clerk/nextjs"
+import { Sparkles, Menu, X, ChevronRight } from "lucide-react"
+import { OrganizationSwitcher, UserButton, useAuth } from "@clerk/nextjs"
 
 import {
     NavigationMenu,
@@ -16,17 +16,51 @@ import {
 } from "@/components/ui/navigation-menu"
 import { UpgradeModal, useUpgradeModal } from "@/components/upgrade-modal"
 import { cn } from "@/lib/utils"
+import { fetchProject } from "@/lib/api"
 
 const navItems = [
     { title: "Projects", href: "/projects" },
     { title: "Settings", href: "/settings" },
 ] as const
 
-export function AppNavbar() {
+interface AppNavbarProps {
+    projectId?: string
+}
+
+function useProjectName(projectId?: string) {
+    const { getToken, orgId } = useAuth()
+    const [name, setName] = React.useState<string | null>(null)
+
+    React.useEffect(() => {
+        if (!projectId || !orgId) {
+            setName(null)
+            return
+        }
+
+        let cancelled = false
+        ;(async () => {
+            try {
+                const token = await getToken()
+                if (!token || cancelled) return
+                const data = await fetchProject(token, projectId, orgId)
+                if (!cancelled) setName(data.project.name)
+            } catch {
+                if (!cancelled) setName(null)
+            }
+        })()
+
+        return () => { cancelled = true }
+    }, [projectId, orgId, getToken])
+
+    return name
+}
+
+export function AppNavbar({ projectId }: AppNavbarProps) {
     const pathname = usePathname()
     const [mounted, setMounted] = React.useState(false)
     const [mobileOpen, setMobileOpen] = React.useState(false)
     const { isOpen, openUpgradeModal, closeUpgradeModal } = useUpgradeModal()
+    const projectName = useProjectName(projectId)
 
     React.useEffect(() => {
         setMounted(true)
@@ -37,6 +71,8 @@ export function AppNavbar() {
         setMobileOpen(false)
     }, [pathname])
 
+    const isProjectPage = !!projectId
+
     return (
         <>
             <header className="sticky top-0 z-50 w-full bg-white">
@@ -44,7 +80,7 @@ export function AppNavbar() {
                 <div className="flex h-14 items-center px-4 sm:px-6">
 
                     {/* Left group */}
-                    <div className="flex items-center">
+                    <div className="flex items-center min-w-0">
                         {/* Logo */}
                         <Link href="/projects" className="shrink-0 mr-3">
                             <Image
@@ -79,32 +115,54 @@ export function AppNavbar() {
                             )}
                         </div>
 
-                        {/* Divider + Nav links — hidden on mobile */}
+                        {/* Divider + Nav links OR Breadcrumb — hidden on mobile */}
                         <div className="hidden md:flex items-center">
                             <div className="h-5 w-px bg-zinc-200 mx-3 shrink-0" />
-                            <NavigationMenu>
-                                <NavigationMenuList>
-                                    {navItems.map((item) => {
-                                        const isActive = pathname.startsWith(item.href)
-                                        return (
-                                            <NavigationMenuItem key={item.href}>
-                                                <NavigationMenuLink
-                                                    asChild
-                                                    className={cn(
-                                                        navigationMenuTriggerStyle(),
-                                                        "h-9 rounded-none px-3 text-xs font-mono tracking-[0.18em] uppercase transition-colors bg-transparent hover:bg-zinc-100",
-                                                        isActive
-                                                            ? "text-zinc-900 bg-zinc-100"
-                                                            : "text-zinc-500 hover:text-zinc-900"
-                                                    )}
-                                                >
-                                                    <Link href={item.href}>{item.title}</Link>
-                                                </NavigationMenuLink>
-                                            </NavigationMenuItem>
-                                        )
-                                    })}
-                                </NavigationMenuList>
-                            </NavigationMenu>
+
+                            {isProjectPage ? (
+                                /* Breadcrumb: Projects > project-name */
+                                <div className="flex items-center gap-1.5">
+                                    <Link
+                                        href="/projects"
+                                        className="text-xs font-mono tracking-[0.18em] uppercase text-zinc-500 hover:text-zinc-900 transition-colors"
+                                    >
+                                        Projects
+                                    </Link>
+                                    <ChevronRight className="h-3.5 w-3.5 text-zinc-300 shrink-0" />
+                                    {projectName ? (
+                                        <span className="text-xs font-mono tracking-[0.18em] uppercase text-zinc-900 font-medium truncate max-w-[200px]">
+                                            {projectName}
+                                        </span>
+                                    ) : (
+                                        <div className="h-4 w-24 bg-zinc-100 animate-pulse" />
+                                    )}
+                                </div>
+                            ) : (
+                                /* Normal nav links */
+                                <NavigationMenu>
+                                    <NavigationMenuList>
+                                        {navItems.map((item) => {
+                                            const isActive = pathname.startsWith(item.href)
+                                            return (
+                                                <NavigationMenuItem key={item.href}>
+                                                    <NavigationMenuLink
+                                                        asChild
+                                                        className={cn(
+                                                            navigationMenuTriggerStyle(),
+                                                            "h-9 rounded-none px-3 text-xs font-mono tracking-[0.18em] uppercase transition-colors bg-transparent hover:bg-zinc-100",
+                                                            isActive
+                                                                ? "text-zinc-900 bg-zinc-100"
+                                                                : "text-zinc-500 hover:text-zinc-900"
+                                                        )}
+                                                    >
+                                                        <Link href={item.href}>{item.title}</Link>
+                                                    </NavigationMenuLink>
+                                                </NavigationMenuItem>
+                                            )
+                                        })}
+                                    </NavigationMenuList>
+                                </NavigationMenu>
+                            )}
                         </div>
                     </div>
 
@@ -165,25 +223,40 @@ export function AppNavbar() {
                             </div>
                         )}
 
-                        {/* Nav links on mobile */}
+                        {/* Nav links or breadcrumb on mobile */}
                         <nav className="flex flex-col gap-1">
-                            {navItems.map((item) => {
-                                const isActive = pathname.startsWith(item.href)
-                                return (
+                            {isProjectPage ? (
+                                <>
                                     <Link
-                                        key={item.href}
-                                        href={item.href}
-                                        className={cn(
-                                            "flex items-center px-3 py-2.5 rounded-none text-xs font-mono tracking-[0.18em] uppercase transition-colors",
-                                            isActive
-                                                ? "bg-zinc-100 text-zinc-900"
-                                                : "text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900"
-                                        )}
+                                        href="/projects"
+                                        className="flex items-center px-3 py-2.5 rounded-none text-xs font-mono tracking-[0.18em] uppercase text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900 transition-colors"
                                     >
-                                        {item.title}
+                                        Projects
                                     </Link>
-                                )
-                            })}
+                                    <div className="flex items-center px-3 py-2.5 rounded-none text-xs font-mono tracking-[0.18em] uppercase bg-zinc-100 text-zinc-900">
+                                        <ChevronRight className="h-3 w-3 text-zinc-400 mr-2 shrink-0" />
+                                        <span className="truncate">{projectName || "..."}</span>
+                                    </div>
+                                </>
+                            ) : (
+                                navItems.map((item) => {
+                                    const isActive = pathname.startsWith(item.href)
+                                    return (
+                                        <Link
+                                            key={item.href}
+                                            href={item.href}
+                                            className={cn(
+                                                "flex items-center px-3 py-2.5 rounded-none text-xs font-mono tracking-[0.18em] uppercase transition-colors",
+                                                isActive
+                                                    ? "bg-zinc-100 text-zinc-900"
+                                                    : "text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900"
+                                            )}
+                                        >
+                                            {item.title}
+                                        </Link>
+                                    )
+                                })
+                            )}
                         </nav>
                     </div>
                 )}

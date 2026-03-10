@@ -8,9 +8,9 @@ import { GlitchMarquee } from "@/components/glitch-marquee";
 import { CtaSection } from "@/components/cta-section-brutalist";
 import { Footer } from "@/components/footer-brutalist";
 
-const homepageTitle = "Shorlabs | Deploy Your App in Minutes, Not Hours";
+const homepageTitle = "Shorlabs: Deploy Your App in Minutes, Not Hours";
 const homepageDescription =
-  "Push your code to GitHub. Your app gets built, containerized, and deployed automatically. Logs, custom domains, and environment variables — all from one dashboard.";
+  "Shorlabs provides the infrastructure to deploy serverless web apps and databases, scale instantly, and only pay for what you use.";
 
 export const metadata: Metadata = {
   title: {

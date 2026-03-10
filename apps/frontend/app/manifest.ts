@@ -5,7 +5,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "Shorlabs",
     short_name: "Shorlabs",
     description:
-      "Deploy your frontend and backend, serverless. Pay only when your code runs.",
+      "Shorlabs provides the infrastructure to deploy serverless web apps and databases, scale instantly, and only pay for what you use.",
     start_url: "/",
     display: "standalone",
     background_color: "#ffffff",

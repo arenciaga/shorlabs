@@ -17,7 +17,7 @@ export function HeroSection() {
             OPEN SOURCE
           </Badge>
           <h1
-            className="font-mono sm:text-xl lg:text-2xl xl:text-4xl tracking-tight text-foreground mb-5 select-none font-bold uppercase leading-[0.95]"
+            className="font-mono sm:text-xl lg:text-2xl xl:text-4xl tracking-tight text-foreground mb-5 font-bold leading-[0.95]"
             style={{ letterSpacing: "-0.01em" }}
           >
             Stop paying for idle time.

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { useAuth } from "@clerk/nextjs"
 import { toast } from "sonner"
 import {
@@ -80,6 +80,14 @@ export function DatabaseExplorer({ projectId, orgId, projectStatus }: DatabaseEx
     const [tables, setTables] = useState<TableInfo[]>([])
     const [selectedTable, setSelectedTable] = useState<string | null>(null)
     const [tableView, setTableView] = useState<"structure" | "data">("structure")
+
+    // Initial load gate — hides all UI until first successful schema+table load
+    const [initialLoaded, setInitialLoaded] = useState(false)
+    const [initialLoading, setInitialLoading] = useState(false)
+    const [initialLoadError, setInitialLoadError] = useState<string | null>(null)
+    const retryCountRef = useRef(0)
+    const maxRetries = 3
+    const mountedRef = useRef(true)
 
     // Loading / error
     const [loadingSchemas, setLoadingSchemas] = useState(false)
@@ -172,22 +180,85 @@ export function DatabaseExplorer({ projectId, orgId, projectStatus }: DatabaseEx
         }
     }, [getToken, projectId, orgId])
 
-    // Load schemas on mount
-    useEffect(() => {
-        if (projectStatus === "LIVE") {
-            loadSchemas()
-        }
-    }, [projectStatus, loadSchemas])
+    // Initial load with retry — fetches schemas + tables in one go
+    const performInitialLoad = useCallback(async () => {
+        if (!orgId) return
+        setInitialLoading(true)
+        setInitialLoadError(null)
 
-    // Load tables when schema changes
+        const attempt = async (): Promise<boolean> => {
+            try {
+                const token = await getToken()
+                if (!token || !mountedRef.current) return false
+
+                const schemaResult = await fetchDatabaseSchemas(token, projectId, orgId)
+                if (!mountedRef.current) return false
+                setSchemas(schemaResult.schemas)
+
+                let schemaToLoad = "public"
+                if (schemaResult.schemas.length > 0) {
+                    const hasPublic = schemaResult.schemas.some(s => s.schema_name === "public")
+                    if (!hasPublic) {
+                        schemaToLoad = schemaResult.schemas[0].schema_name
+                        setSelectedSchema(schemaToLoad)
+                    }
+                }
+
+                const tableResult = await fetchDatabaseTables(token, projectId, orgId, schemaToLoad)
+                if (!mountedRef.current) return false
+                setTables(tableResult.tables)
+
+                return true
+            } catch {
+                return false
+            }
+        }
+
+        for (let i = 0; i < maxRetries; i++) {
+            if (!mountedRef.current) return
+            const success = await attempt()
+            if (success) {
+                if (mountedRef.current) {
+                    retryCountRef.current = 0
+                    setInitialLoaded(true)
+                    setInitialLoading(false)
+                }
+                return
+            }
+            if (i < maxRetries - 1 && mountedRef.current) {
+                const delay = 3000 * (i + 1) // 3s, 6s
+                await new Promise(r => setTimeout(r, delay))
+            }
+        }
+
+        if (mountedRef.current) {
+            setInitialLoadError("Could not connect to the database. It may be waking up from a cold start.")
+            setInitialLoading(false)
+        }
+    }, [getToken, projectId, orgId])
+
+    // Mount / unmount tracking
     useEffect(() => {
-        if (projectStatus === "LIVE" && selectedSchema) {
+        mountedRef.current = true
+        return () => { mountedRef.current = false }
+    }, [])
+
+    // Trigger initial load on mount when LIVE
+    useEffect(() => {
+        if (projectStatus === "LIVE" && !initialLoaded) {
+            performInitialLoad()
+        }
+    }, [projectStatus, initialLoaded, performInitialLoad])
+
+    // Load tables when schema changes (only after initial load)
+    useEffect(() => {
+        if (projectStatus === "LIVE" && selectedSchema && initialLoaded) {
             loadTables(selectedSchema)
             setSelectedTable(null)
             setColumns([])
             setTableData(null)
         }
-    }, [projectStatus, selectedSchema, loadTables])
+    }, [projectStatus, selectedSchema, loadTables, initialLoaded])
 
     const handleSelectTable = (tableName: string) => {
         setSelectedTable(tableName)
@@ -299,6 +370,44 @@ export function DatabaseExplorer({ projectId, orgId, projectStatus }: DatabaseEx
         )
     }
 
+    // Initial loading gate — show full-panel spinner or error until first load succeeds
+    if (!initialLoaded) {
+        return (
+            <div className="bg-zinc-50 border border-zinc-200 rounded-none overflow-hidden">
+                <div className="flex flex-col items-center justify-center py-20 px-6" style={{ minHeight: "500px" }}>
+                    {initialLoadError ? (
+                        <>
+                            <div className="h-12 w-12 rounded-full bg-red-50 flex items-center justify-center mb-4">
+                                <AlertCircle className="h-6 w-6 text-red-500" />
+                            </div>
+                            <p className="text-sm font-medium text-zinc-700 mb-1">Connection failed</p>
+                            <p className="text-xs text-zinc-400 text-center max-w-[320px] mb-5">
+                                {initialLoadError}
+                            </p>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => performInitialLoad()}
+                                className="h-9 text-xs"
+                            >
+                                <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+                                Retry Connection
+                            </Button>
+                        </>
+                    ) : (
+                        <>
+                            <Loader2 className="h-8 w-8 animate-spin text-zinc-400 mb-4" />
+                            <p className="text-sm font-medium text-zinc-700 mb-1">Connecting to database</p>
+                            <p className="text-xs text-zinc-400 text-center max-w-[280px]">
+                                This may take a moment if the database is waking up
+                            </p>
+                        </>
+                    )}
+                </div>
+            </div>
+        )
+    }
+
     return (
         <div className="bg-zinc-50 border border-zinc-200 rounded-none overflow-hidden">
             <div className="flex flex-col md:flex-row" style={{ minHeight: "500px" }}>
@@ -342,17 +451,19 @@ export function DatabaseExplorer({ projectId, orgId, projectStatus }: DatabaseEx
                                 <div className="flex items-center gap-0.5">
                                     <button
                                         onClick={() => setCreateTableOpen(true)}
-                                        className="p-1.5 sm:p-1 hover:bg-zinc-200 rounded transition-colors"
+                                        disabled={loadingSchemas || loadingTables}
+                                        className="p-1.5 sm:p-1 hover:bg-zinc-200 rounded transition-colors disabled:opacity-40 disabled:pointer-events-none"
                                         title="Create table"
                                     >
                                         <Plus className="h-4 w-4 sm:h-3 sm:w-3 text-zinc-400" />
                                     </button>
                                     <button
                                         onClick={() => loadTables(selectedSchema)}
-                                        className="p-1.5 sm:p-1 hover:bg-zinc-200 rounded transition-colors"
+                                        disabled={loadingSchemas || loadingTables}
+                                        className="p-1.5 sm:p-1 hover:bg-zinc-200 rounded transition-colors disabled:opacity-40 disabled:pointer-events-none"
                                         title="Refresh tables"
                                     >
-                                        <RefreshCw className="h-4 w-4 sm:h-3 sm:w-3 text-zinc-400" />
+                                        <RefreshCw className={`h-4 w-4 sm:h-3 sm:w-3 text-zinc-400 ${loadingTables ? "animate-spin" : ""}`} />
                                     </button>
                                 </div>
                             </div>

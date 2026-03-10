@@ -390,6 +390,7 @@ export async function fetchDatabaseSchemas(
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
         },
+        signal: AbortSignal.timeout(60_000),
     });
 
     if (!response.ok) {
@@ -415,6 +416,7 @@ export async function fetchDatabaseTables(
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
         },
+        signal: AbortSignal.timeout(60_000),
     });
 
     if (!response.ok) {
@@ -441,6 +443,7 @@ export async function fetchTableColumns(
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
         },
+        signal: AbortSignal.timeout(60_000),
     });
 
     if (!response.ok) {
@@ -471,6 +474,7 @@ export async function fetchTableData(
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
         },
+        signal: AbortSignal.timeout(60_000),
     });
 
     if (!response.ok) {

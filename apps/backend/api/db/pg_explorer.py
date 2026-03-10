@@ -10,11 +10,18 @@ import re
 import decimal
 import datetime
 import uuid
+import time
+import logging
 
 import psycopg2
 import psycopg2.extras
 
 from deployer.aws.rds import get_cluster_secret
+
+logger = logging.getLogger(__name__)
+
+_COLD_START_MAX_RETRIES = 3
+_COLD_START_BASE_DELAY = 2  # seconds
 
 
 _IDENTIFIER_RE = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]{0,62}$")
@@ -52,19 +59,47 @@ def _sanitize_row(row: dict) -> dict:
     return sanitized
 
 
+def _connect_with_retry(connect_fn, max_retries=_COLD_START_MAX_RETRIES):
+    """Retry a connection function with exponential backoff for Aurora cold starts."""
+    last_err = None
+    for attempt in range(1, max_retries + 1):
+        try:
+            return connect_fn()
+        except psycopg2.OperationalError as e:
+            last_err = e
+            if attempt < max_retries:
+                delay = _COLD_START_BASE_DELAY * (2 ** (attempt - 1))
+                logger.warning(
+                    "Database connection attempt %d/%d failed (%s). "
+                    "Retrying in %ds (possible Aurora cold start)...",
+                    attempt, max_retries, str(e).strip(), delay,
+                )
+                time.sleep(delay)
+            else:
+                logger.error(
+                    "Database connection failed after %d attempts: %s",
+                    max_retries, str(e).strip(),
+                )
+    raise last_err
+
+
 def _get_connection(cluster_identifier: str, db_name: str, port: int, endpoint: str):
     credentials = get_cluster_secret(cluster_identifier)
-    conn = psycopg2.connect(
-        host=endpoint,
-        port=port,
-        dbname=db_name,
-        user=credentials["username"],
-        password=credentials["password"],
-        options="-c default_transaction_read_only=on",
-        connect_timeout=10,
-    )
-    conn.set_session(readonly=True, autocommit=True)
-    return conn
+
+    def _connect():
+        conn = psycopg2.connect(
+            host=endpoint,
+            port=port,
+            dbname=db_name,
+            user=credentials["username"],
+            password=credentials["password"],
+            options="-c default_transaction_read_only=on",
+            connect_timeout=30,
+        )
+        conn.set_session(readonly=True, autocommit=True)
+        return conn
+
+    return _connect_with_retry(_connect)
 
 
 ALLOWED_COLUMN_TYPES = frozenset({
@@ -90,16 +125,20 @@ def _validate_column_type(col_type: str) -> str:
 
 def _get_write_connection(cluster_identifier: str, db_name: str, port: int, endpoint: str):
     credentials = get_cluster_secret(cluster_identifier)
-    conn = psycopg2.connect(
-        host=endpoint,
-        port=port,
-        dbname=db_name,
-        user=credentials["username"],
-        password=credentials["password"],
-        connect_timeout=10,
-    )
-    conn.set_session(autocommit=False)
-    return conn
+
+    def _connect():
+        conn = psycopg2.connect(
+            host=endpoint,
+            port=port,
+            dbname=db_name,
+            user=credentials["username"],
+            password=credentials["password"],
+            connect_timeout=30,
+        )
+        conn.set_session(autocommit=False)
+        return conn
+
+    return _connect_with_retry(_connect)
 
 
 # ─────────────────────────────────────────────────────────────

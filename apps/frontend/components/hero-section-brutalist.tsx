@@ -22,7 +22,7 @@ export function HeroSection() {
           >
             Stop paying for idle time.
           </h1>
-          <p className="text-s sm:text-md text-muted-foreground max-w-2xl mb-8 sm:mb-9 leading-relaxed font-mono px-1 sm:px-0">
+          <p className="text-xs sm:text-base text-muted-foreground max-w-2xl mb-8 sm:mb-9 leading-relaxed font-mono px-1 sm:px-0">
             Shorlabs provides the infrastructure to deploy serverless web apps and databases, scale instantly, and only pay for what you use.
           </p>
           <div className="flex w-full max-w-md sm:max-w-none flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3">

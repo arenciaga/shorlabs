@@ -1,6 +1,7 @@
 "use client"
 
-import { Globe, Database, Plus, ExternalLink } from "lucide-react"
+import { Plus, ExternalLink } from "lucide-react"
+import { GitHubIcon, PostgreSQLIcon } from "@/components/service-icons"
 import Link from "next/link"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -22,7 +23,7 @@ export function MobileServiceGrid({ services, projectId, onSelectService }: Mobi
                 const isDb = service.service_type === "database"
                 const statusConfig = STATUS_CONFIG[service.status] || STATUS_CONFIG.PENDING
                 const isBuilding = !["LIVE", "FAILED", "DELETING"].includes(service.status)
-                const Icon = isDb ? Database : Globe
+                const Icon = isDb ? PostgreSQLIcon : GitHubIcon
                 const latestDeploy = service.deployments?.[0]
 
                 return (

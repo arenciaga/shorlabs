@@ -4,8 +4,9 @@ import { Suspense, useState } from "react"
 import Link from "next/link"
 import { useSearchParams, useRouter } from "next/navigation"
 import { useAuth } from "@clerk/nextjs"
-import { ArrowLeft, ArrowRight, Globe, Database, Loader2, FolderOpen } from "lucide-react"
+import { ArrowLeft, ArrowRight, Loader2, FolderOpen } from "lucide-react"
 import { createBlankProject } from "@/lib/api"
+import { GitHubIcon, PostgreSQLIcon } from "@/components/service-icons"
 
 function NewProjectPageInner() {
     const searchParams = useSearchParams()
@@ -20,14 +21,14 @@ function NewProjectPageInner() {
             id: "web-app",
             name: "Web App",
             description: "Deploy a web application from a Git repository",
-            icon: Globe,
+            icon: GitHubIcon,
             href: projectId ? `/new/web-app?project_id=${projectId}` : "/new/web-app",
         },
         {
             id: "database",
             name: "Database",
             description: "Provision a PostgreSQL database with scale-to-zero",
-            icon: Database,
+            icon: PostgreSQLIcon,
             href: projectId ? `/new/database?project_id=${projectId}` : "/new/database",
         },
     ]

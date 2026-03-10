@@ -2,7 +2,8 @@
 
 import { memo } from "react"
 import { Handle, Position, type NodeProps } from "@xyflow/react"
-import { Globe, Database, ExternalLink } from "lucide-react"
+import { ExternalLink } from "lucide-react"
+import { GitHubIcon, PostgreSQLIcon } from "@/components/service-icons"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
@@ -19,7 +20,7 @@ export const ServiceNode = memo(function ServiceNode({ data }: NodeProps) {
     const isDb = service.service_type === "database"
     const statusConfig = STATUS_CONFIG[service.status] || STATUS_CONFIG.PENDING
     const isBuilding = !["LIVE", "FAILED", "DELETING"].includes(service.status)
-    const Icon = isDb ? Database : Globe
+    const Icon = isDb ? PostgreSQLIcon : GitHubIcon
 
     const latestDeploy = service.deployments?.[0]
 

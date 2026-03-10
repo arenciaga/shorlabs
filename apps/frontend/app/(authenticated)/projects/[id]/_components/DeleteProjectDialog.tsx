@@ -94,7 +94,7 @@ export function DeleteProjectDialog({
                     <AlertDialogAction
                         onClick={onDelete}
                         disabled={deleting || confirmProjectName !== projectName || confirmPhrase !== "delete my project"}
-                        className="bg-red-600 hover:bg-red-700 rounded-full"
+                        className="bg-red-600 text-white hover:bg-red-700 rounded-full"
                     >
                         {deleting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                         {entityLabel}

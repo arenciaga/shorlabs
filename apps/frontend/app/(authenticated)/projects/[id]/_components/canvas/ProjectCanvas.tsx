@@ -101,7 +101,7 @@ function CanvasInner({ services, projectId, onSelectService, topRightExtra }: Pr
                 <Link href={`/new?project_id=${projectId}`}>
                     <Button
                         variant="outline"
-                        className="rounded-none border-dashed"
+                        className="rounded-none border-dashed w-full"
                     >
                         <Plus className="h-4 w-4 mr-1.5" />
                         Add Service

@@ -570,23 +570,23 @@ function ConfigureProjectContent() {
                 {/* General Section */}
                 {activeSection === "general" && (
                     <div className="space-y-6">
-                        {/* Project Name + Root Directory - Side by side */}
+                        {/* Service Name + Root Directory - Side by side */}
                         <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-                            {/* Project Name - Takes 3 columns */}
+                            {/* Service Name - Takes 3 columns */}
                             <div className="lg:col-span-3 bg-white rounded-none border border-zinc-200 overflow-hidden">
                                 <div className="flex items-center gap-3 px-4 sm:px-6 py-4 border-b border-zinc-100">
                                     <FileText className="h-5 w-5 text-zinc-400" />
-                                    <h3 className="font-semibold text-zinc-900">Project Name</h3>
+                                    <h3 className="font-semibold text-zinc-900">Service Name</h3>
                                 </div>
                                 <div className="p-4 sm:p-6">
                                     <Input
                                         value={projectName}
                                         onChange={(e) => setProjectName(e.target.value)}
-                                        placeholder="my-awesome-project"
+                                        placeholder="my-web-app"
                                         className="h-12 text-sm border-zinc-200 rounded-none font-medium"
                                     />
                                     <p className="text-xs text-zinc-500 mt-2">
-                                        Used in your deployment URL
+                                        Name for your web app service
                                     </p>
                                 </div>
                             </div>

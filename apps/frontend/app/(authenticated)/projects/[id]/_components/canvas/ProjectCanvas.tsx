@@ -27,6 +27,8 @@ interface ProjectCanvasProps {
     services: Service[]
     projectId: string
     onSelectService: (serviceId: string) => void
+    /** Optional extra content rendered below the Add Service button (top-right) */
+    topRightExtra?: React.ReactNode
 }
 
 function ZoomControls() {
@@ -64,7 +66,7 @@ function ZoomControls() {
     )
 }
 
-function CanvasInner({ services, projectId, onSelectService }: ProjectCanvasProps) {
+function CanvasInner({ services, projectId, onSelectService, topRightExtra }: ProjectCanvasProps) {
     const { nodes, edges } = useCanvasLayout(services)
 
     const handleNodeClick = (_event: React.MouseEvent, node: Node) => {
@@ -94,8 +96,8 @@ function CanvasInner({ services, projectId, onSelectService }: ProjectCanvasProp
 
             <ZoomControls />
 
-            {/* Add Service button — top right */}
-            <div className="absolute top-4 right-4 z-10">
+            {/* Top-right actions */}
+            <div className="absolute top-4 right-4 z-10 flex flex-col gap-2">
                 <Link href={`/new?project_id=${projectId}`}>
                     <Button
                         variant="outline"
@@ -105,6 +107,7 @@ function CanvasInner({ services, projectId, onSelectService }: ProjectCanvasProp
                         Add Service
                     </Button>
                 </Link>
+                {topRightExtra}
             </div>
         </div>
     )

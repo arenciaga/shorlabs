@@ -7,23 +7,6 @@ import { useAuth } from "@clerk/nextjs"
 import { ArrowLeft, ArrowRight, Globe, Database, Loader2, FolderOpen } from "lucide-react"
 import { createBlankProject } from "@/lib/api"
 
-function generateProjectName(): string {
-    const adjectives = [
-        "bold", "calm", "dark", "fast", "keen",
-        "neat", "warm", "wise", "cool", "fair",
-        "wild", "soft", "bright", "swift", "vivid",
-    ]
-    const nouns = [
-        "falcon", "river", "storm", "ember", "cedar",
-        "frost", "spark", "bloom", "coral", "drift",
-        "atlas", "prism", "lunar", "orbit", "pulse",
-    ]
-    const adj = adjectives[Math.floor(Math.random() * adjectives.length)]
-    const noun = nouns[Math.floor(Math.random() * nouns.length)]
-    const num = Math.floor(Math.random() * 100)
-    return `${adj}-${noun}-${num}`
-}
-
 function NewProjectPageInner() {
     const searchParams = useSearchParams()
     const router = useRouter()
@@ -55,8 +38,7 @@ function NewProjectPageInner() {
         try {
             const token = await getToken()
             if (!token) return
-            const name = generateProjectName()
-            const result = await createBlankProject(token, orgId, { name })
+            const result = await createBlankProject(token, orgId)
             router.push(`/projects/${result.project_id}`)
         } catch (err) {
             console.error("Failed to create blank project:", err)

@@ -12,6 +12,7 @@ import boto3
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 import httpx
+from coolname import generate_slug
 
 from api.auth import get_current_user_id
 from api.db.dynamodb import (
@@ -61,6 +62,11 @@ AUTUMN_BASE_URL = os.environ.get("AUTUMN_BASE_URL", "https://api.useautumn.com/v
 
 
 
+def generate_project_name() -> str:
+    """Generate a random project name like 'fantastic-acoustic-whale'."""
+    return generate_slug(2)
+
+
 class CreateProjectRequest(BaseModel):
     """Create a project container with an initial service."""
     name: str
@@ -77,7 +83,6 @@ class CreateProjectRequest(BaseModel):
 
 class CreateBlankProjectRequest(BaseModel):
     """Create a blank project container with no services."""
-    name: str
     organization_id: str
     description: Optional[str] = ""
 
@@ -603,15 +608,15 @@ async def create_new_project(
     timeout = request.timeout or 30
     ephemeral_storage = request.ephemeral_storage or 512
 
-    # 1. Create project container
+    # 1. Create project container (auto-generated name)
     project = create_project(
         user_id=user_id,
         organization_id=request.organization_id,
-        name=request.name,
+        name=generate_project_name(),
         description=request.description or "",
     )
 
-    # 2. Create web-app service inside the project
+    # 2. Create web-app service inside the project (user-provided name)
     service = create_service(
         user_id=user_id,
         organization_id=request.organization_id,
@@ -667,7 +672,7 @@ async def create_blank_project(
     project = create_project(
         user_id=user_id,
         organization_id=request.organization_id,
-        name=request.name,
+        name=generate_project_name(),
         description=request.description or "",
     )
 
@@ -692,15 +697,15 @@ async def create_database_project(
         request.max_acu if request.max_acu is not None else 2,
     )
 
-    # 1. Create project container
+    # 1. Create project container (auto-generated name)
     project = create_project(
         user_id=user_id,
         organization_id=request.organization_id,
-        name=request.name,
+        name=generate_project_name(),
         description=request.description or "",
     )
 
-    # 2. Create database service inside the project
+    # 2. Create database service inside the project (user-provided name)
     service = create_service(
         user_id=user_id,
         organization_id=request.organization_id,

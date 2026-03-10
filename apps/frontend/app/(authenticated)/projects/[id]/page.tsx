@@ -120,14 +120,12 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                         onSelectService={handleCanvasSelect}
                     />
                 ) : (
-                    <div className="flex-1 min-h-0 relative">
+                    <div className="flex-1 min-h-0">
                         <ProjectCanvas
                             services={services}
                             projectId={project.project_id}
                             onSelectService={handleCanvasSelect}
-                        />
-                        {services.length === 0 && (
-                            <div className="absolute bottom-4 right-4 z-10">
+                            topRightExtra={services.length === 0 ? (
                                 <DeleteProjectDialog
                                     projectName={project.name}
                                     deleting={hook.deleting}
@@ -135,8 +133,8 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                                     onOpenChange={hook.setDeleteDialogOpen}
                                     onDelete={hook.handleDeleteProject}
                                 />
-                            </div>
-                        )}
+                            ) : undefined}
+                        />
                     </div>
                 )}
             </div>

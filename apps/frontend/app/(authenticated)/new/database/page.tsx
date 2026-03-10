@@ -148,10 +148,10 @@ function NewDatabaseContent() {
 
                 {/* Configuration Form */}
                 <div className="space-y-5 sm:space-y-6">
-                    {/* Project Name */}
+                    {/* Service Name */}
                     <div>
                         <label className="block text-sm font-medium text-zinc-900 mb-2">
-                            Project Name
+                            Service Name
                         </label>
                         <Input
                             value={projectName}
@@ -159,7 +159,7 @@ function NewDatabaseContent() {
                             placeholder="my-database"
                             className="h-10"
                         />
-                        <p className="text-xs text-zinc-400 mt-1">Display name for your project</p>
+                        <p className="text-xs text-zinc-400 mt-1">Name for your database service</p>
                     </div>
 
                     {/* Database Name */}

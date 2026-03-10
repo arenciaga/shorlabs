@@ -252,7 +252,6 @@ export async function deleteProject(token: string, projectId: string, orgId: str
 export async function createBlankProject(
     token: string,
     orgId: string,
-    data: { name: string },
 ): Promise<{ project_id: string; organization_id?: string; name: string }> {
     const url = new URL(`${API_BASE_URL}/api/projects/blank`);
     url.searchParams.append("org_id", orgId);
@@ -263,7 +262,7 @@ export async function createBlankProject(
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
         },
-        body: JSON.stringify({ ...data, organization_id: orgId }),
+        body: JSON.stringify({ organization_id: orgId }),
     });
 
     if (!response.ok) {

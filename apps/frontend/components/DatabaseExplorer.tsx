@@ -397,10 +397,7 @@ export function DatabaseExplorer({ projectId, orgId, projectStatus }: DatabaseEx
                     ) : (
                         <>
                             <Loader2 className="h-8 w-8 animate-spin text-zinc-400 mb-4" />
-                            <p className="text-sm font-medium text-zinc-700 mb-1">Connecting to database</p>
-                            <p className="text-xs text-zinc-400 text-center max-w-[280px]">
-                                This may take a moment if the database is waking up
-                            </p>
+                            <p className="text-sm font-medium text-zinc-700">Connecting...</p>
                         </>
                     )}
                 </div>

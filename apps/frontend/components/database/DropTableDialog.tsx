@@ -61,34 +61,30 @@ export function DropTableDialog({ open, onOpenChange, tableName, onConfirm }: Dr
                         <AlertTriangle className="h-5 w-5 text-red-500" />
                         Drop Table
                     </AlertDialogTitle>
-                    <AlertDialogDescription asChild>
-                        <div className="space-y-3">
-                            <p>
-                                This will permanently delete the table{" "}
-                                <span className="font-mono font-semibold text-zinc-900">{tableName}</span>{" "}
-                                and all its data. This action cannot be undone.
-                            </p>
-                            <div className="space-y-2">
-                                <Label htmlFor="confirm-drop" className="text-sm">
-                                    Type <span className="font-mono font-semibold text-zinc-900">{tableName}</span> to confirm:
-                                </Label>
-                                <Input
-                                    id="confirm-drop"
-                                    placeholder={tableName}
-                                    value={confirmText}
-                                    onChange={e => setConfirmText(e.target.value)}
-                                    className="font-mono text-base sm:text-sm h-10 sm:h-9"
-                                    autoFocus
-                                />
-                            </div>
-                            {error && (
-                                <div className="bg-red-50 border border-red-200 rounded p-3 text-sm text-red-700">
-                                    {error}
-                                </div>
-                            )}
-                        </div>
+                    <AlertDialogDescription>
+                        This will permanently delete the table{" "}
+                        <span className="font-mono font-semibold text-zinc-900">{tableName}</span>{" "}
+                        and all its data. This action cannot be undone.
                     </AlertDialogDescription>
                 </AlertDialogHeader>
+                <div className="space-y-2">
+                    <Label htmlFor="confirm-drop" className="text-sm">
+                        Type <span className="font-mono font-semibold text-zinc-900">{tableName}</span> to confirm:
+                    </Label>
+                    <Input
+                        id="confirm-drop"
+                        placeholder={tableName}
+                        value={confirmText}
+                        onChange={e => setConfirmText(e.target.value)}
+                        className="font-mono text-base sm:text-sm h-10 sm:h-9"
+                        autoFocus
+                    />
+                </div>
+                {error && (
+                    <div className="bg-red-50 border border-red-200 rounded p-3 text-sm text-red-700">
+                        {error}
+                    </div>
+                )}
                 <AlertDialogFooter>
                     <AlertDialogCancel disabled={submitting}>Cancel</AlertDialogCancel>
                     <Button

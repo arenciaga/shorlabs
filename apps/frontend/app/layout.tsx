@@ -23,7 +23,7 @@ const geistMono = Geist_Mono({
 
 const homepageTitle = "Shorlabs | Deploy Your App in Minutes, Not Hours";
 const homepageDescription =
-  "Push your code to GitHub. Your app gets built, containerized, and deployed automatically. Logs, custom domains, and environment variables — all from one dashboard.";
+  "Shorlabs provides the infrastructure to deploy serverless web apps and databases, scale instantly, and only pay for what you use.";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://shorlabs.com"),

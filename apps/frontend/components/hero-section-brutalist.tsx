@@ -20,10 +20,10 @@ export function HeroSection() {
             className="font-mono sm:text-xl lg:text-2xl xl:text-4xl tracking-tight text-foreground mb-5 select-none font-bold uppercase leading-[0.95]"
             style={{ letterSpacing: "-0.01em" }}
           >
-            DEPLOY YOUR APP IN MINUTES, NOT HOURS.
+            Your whole stack. Zero idle costs.
           </h1>
           <p className="text-xs sm:text-sm text-muted-foreground max-w-2xl mb-8 sm:mb-9 leading-relaxed font-mono px-1 sm:px-0">
-            Push your code to GitHub. Your app gets built, containerized, and deployed automatically. Logs, custom domains, and environment variables — all from one dashboard.
+            Shorlabs provides the infrastructure to deploy serverless web apps and databases, scale instantly, and only pay for what you use.
           </p>
           <div className="flex w-full max-w-md sm:max-w-none flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3">
             {!isLoaded ? (

@@ -15,6 +15,6 @@ export default function robots(): MetadataRoute.Robots {
         "/api",
       ],
     },
-    sitemap: "https://shorlabs.com/sitemap.xml",
+    sitemap: "https://www.shorlabs.com/sitemap.xml",
   };
 }

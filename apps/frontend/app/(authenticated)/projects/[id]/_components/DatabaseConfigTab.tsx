@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react"
 import { useAuth } from "@clerk/nextjs"
 import { Database, Check, Loader2, Lock } from "lucide-react"
 import type { Service } from "./types"
-import { ACU_OPTIONS } from "@/lib/database"
+import { ACU_OPTIONS, isOptionLocked } from "@/lib/database"
 import { useIsPro } from "@/hooks/use-is-pro"
 import { useUpgradeModal, UpgradeModal } from "@/components/upgrade-modal"
 
@@ -173,9 +173,7 @@ export function DatabaseConfigTab({ service, projectId, onRefresh }: DatabaseCon
                         </p>
                         <div className="grid grid-cols-3 gap-3">
                             {ACU_OPTIONS.map((option) => {
-                                const isPlusRequired = option.minPlan === "plus" && currentPlan !== "pro" && currentPlan !== "plus";
-                                const locked = isPlusRequired;
-                                const lockText = isPlusRequired ? "Plus" : "";
+                                const { locked, requiredPlan: lockText } = isOptionLocked(option.minPlan, currentPlan);
 
                                 return (
                                     <button

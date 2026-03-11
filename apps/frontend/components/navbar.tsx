@@ -24,12 +24,15 @@ export function Navbar() {
   ]
 
   return (
-    <div className="w-full px-3 pt-3 sm:px-4 sm:pt-4 lg:px-6 lg:pt-6">
-      <nav className="mx-auto w-full max-w-7xl border border-foreground/20 bg-background/80 backdrop-blur-sm px-3 py-2.5 sm:px-5 sm:py-3 lg:px-8">
+    <div className="sticky top-0 z-50 w-full bg-background">
+      <nav className="mx-auto w-full max-w-7xl px-4 py-3 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-            <Link href="/" className="text-[10px] sm:text-xs font-mono tracking-[0.15em] uppercase font-bold">
-              SHORLABS
+            <Link href="/" className="flex items-center gap-2 sm:gap-2.5">
+              <img src="/favicon.ico" alt="Shorlabs" className="h-5 w-5 sm:h-6 sm:w-6" />
+              <span className="text-sm sm:text-base font-mono tracking-[0.15em] uppercase font-bold">
+                SHORLABS
+              </span>
             </Link>
           </div>
 

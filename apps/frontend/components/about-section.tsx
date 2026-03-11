@@ -6,9 +6,9 @@ import { Separator } from "@/components/ui/separator"
 const STEPS = [
   {
     number: "01",
-    title: "Connect your repo",
+    title: "Create your project",
     description:
-      "Link your GitHub account and import any repository. We auto-detect your framework and suggest the right settings.",
+      "Start with a web app, database, or both. Connect your GitHub repo or provision a PostgreSQL database with one click.",
     start: 4,
     end: 7,
   },
@@ -16,15 +16,15 @@ const STEPS = [
     number: "02",
     title: "Configure & deploy",
     description:
-      "Set environment variables, pick your compute settings, and hit deploy. Your code is containerized and shipped automatically.",
+      "Set environment variables, pick your compute settings, and hit deploy. Your code is containerized and your database auto-scales.",
     start: 8,
     end: 22,
   },
   {
     number: "03",
-    title: "You're live",
+    title: "Manage everything",
     description:
-      "Your app gets a production URL instantly. Add a custom domain, stream logs in real-time, and redeploy with every git push.",
+      "Get a production URL instantly. Add custom domains, stream logs in real-time, manage your database tables, and scale as you grow.",
     start: 103,
     end: 108,
   },

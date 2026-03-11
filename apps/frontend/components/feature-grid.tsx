@@ -1,5 +1,5 @@
 import { Separator } from "@/components/ui/separator"
-import { GitBranch, Scan, Rocket, Radio, Globe, Lock, Container, Zap } from "lucide-react"
+import { GitBranch, Database, Layers, Radio, Globe, Lock, Container, Zap } from "lucide-react"
 
 const FEATURES = [
   {
@@ -8,14 +8,14 @@ const FEATURES = [
     description: "Connect your repo and deploy with one click.",
   },
   {
-    icon: Scan,
-    title: "Auto-Detection",
-    description: "Detects your framework and configures automatically.",
+    icon: Database,
+    title: "Managed Databases",
+    description: "Serverless PostgreSQL with auto-scaling.",
   },
   {
-    icon: Rocket,
-    title: "Push to Deploy",
-    description: "Every push to main triggers a new deployment.",
+    icon: Layers,
+    title: "Multi-Service Projects",
+    description: "Combine web apps and databases in one project.",
   },
   {
     icon: Radio,
@@ -39,8 +39,8 @@ const FEATURES = [
   },
   {
     icon: Lock,
-    title: "Env Variables",
-    description: "Set secrets and config per project.",
+    title: "Database Explorer",
+    description: "Manage tables, columns, and data from the UI.",
   },
 ]
 

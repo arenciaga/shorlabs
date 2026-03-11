@@ -22,12 +22,12 @@ const CtaSection = () => {
             Get Started
           </span>
 
-          <h2 className="text-2xl sm:text-3xl md:text-4xl font-mono font-bold uppercase tracking-tight max-w-xl text-foreground leading-[0.95]">
-            Start deploying in minutes.
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-mono font-bold uppercase tracking-tight max-w-2xl text-foreground leading-[0.95]">
+            Deploy your full stack today.
           </h2>
 
           <p className="mt-4 text-muted-foreground max-w-md leading-relaxed text-xs sm:text-sm font-mono">
-            Connect your repository and go live. No infrastructure to manage, no complexity to handle.
+            Web apps, databases, and everything in between. Start building with serverless infrastructure that scales with you.
           </p>
 
           <div className="mt-8 flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">

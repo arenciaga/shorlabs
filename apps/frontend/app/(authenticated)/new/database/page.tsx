@@ -180,7 +180,7 @@ function NewDatabaseContent() {
                     {/* Max ACU */}
                     <div>
                         <label className="block text-sm font-medium text-zinc-900 mb-2">
-                            Database Size
+                            Database Compute
                         </label>
                         <p className="text-xs text-zinc-500 mb-3">
                             How much compute your database can use at peak. It always scales down to zero when idle.

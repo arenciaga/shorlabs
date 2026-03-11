@@ -86,11 +86,11 @@ export function DatabaseConfigTab({ service, projectId, onRefresh }: DatabaseCon
     return (
         <>
             <div className="space-y-6">
-                {/* Database Size */}
+                {/* Database Compute */}
                 <div className="bg-white border border-zinc-200 overflow-hidden">
                     <div className="flex items-center gap-3 px-5 py-3.5 border-b border-zinc-100">
                         <Database className="h-4 w-4 text-zinc-400" />
-                        <h3 className="font-semibold text-zinc-900 text-sm">Database Size</h3>
+                        <h3 className="font-semibold text-zinc-900 text-sm">Database Compute</h3>
                     </div>
                     <div className="p-5">
                         <p className="text-xs text-zinc-500 mb-4">

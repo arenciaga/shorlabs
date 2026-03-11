@@ -36,6 +36,7 @@ export function DatabaseConfigTab({ service, projectId, onRefresh }: DatabaseCon
     const [saving, setSaving] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [success, setSuccess] = useState(false)
+    const [modifying, setModifying] = useState(false)
 
     const hasChanged = selectedAcu !== (currentTier?.value ?? 2)
 
@@ -66,10 +67,17 @@ export function DatabaseConfigTab({ service, projectId, onRefresh }: DatabaseCon
             }
 
             setSuccess(true)
+            setModifying(true)
             onRefresh()
             setTimeout(() => setSuccess(false), 3000)
+            setTimeout(() => setModifying(false), 30000)
         } catch (err: any) {
-            setError(err.message || "Failed to update database size")
+            const msg = err.message || "Failed to update database size"
+            if (msg.includes("currently")) {
+                setModifying(true)
+                setTimeout(() => setModifying(false), 30000)
+            }
+            setError(msg)
         } finally {
             setSaving(false)
         }
@@ -134,8 +142,8 @@ export function DatabaseConfigTab({ service, projectId, onRefresh }: DatabaseCon
                         <div className="mt-4 flex items-center gap-3">
                             <button
                                 onClick={handleSave}
-                                disabled={!hasChanged || saving}
-                                className={`px-4 py-2 text-sm font-medium transition-all ${hasChanged && !saving
+                                disabled={!hasChanged || saving || modifying}
+                                className={`px-4 py-2 text-sm font-medium transition-all ${hasChanged && !saving && !modifying
                                     ? "bg-zinc-900 text-white hover:bg-zinc-800 cursor-pointer"
                                     : "bg-zinc-100 text-zinc-400 cursor-not-allowed"
                                     }`}
@@ -144,6 +152,11 @@ export function DatabaseConfigTab({ service, projectId, onRefresh }: DatabaseCon
                                     <span className="flex items-center gap-2">
                                         <Loader2 className="h-3.5 w-3.5 animate-spin" />
                                         Applying...
+                                    </span>
+                                ) : modifying ? (
+                                    <span className="flex items-center gap-2">
+                                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                        Cluster modifying...
                                     </span>
                                 ) : "Save Changes"}
                             </button>

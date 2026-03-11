@@ -1692,6 +1692,14 @@ async def update_project_fields(
     if request.max_acu is not None and svc.get("service_type") == "database":
         cluster_id = svc.get("db_cluster_identifier")
         if cluster_id and svc.get("status") == "LIVE":
+            # Check cluster status before attempting modification
+            from deployer.aws.rds import get_cluster_status
+            cluster_info = get_cluster_status(cluster_id)
+            if cluster_info and cluster_info.get("status") != "available":
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"Cluster is currently {cluster_info.get('status')}. Please wait and try again.",
+                )
             try:
                 modify_aurora_cluster_scaling(
                     cluster_identifier=cluster_id,

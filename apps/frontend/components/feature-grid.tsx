@@ -25,7 +25,7 @@ const FEATURES = [
   {
     icon: Container,
     title: "Containerized",
-    description: "Auto-packaged in Docker. Zero config needed.",
+    description: "Auto-packaged in Docker. Zero config.",
   },
   {
     icon: Zap,
@@ -35,7 +35,7 @@ const FEATURES = [
   {
     icon: Globe,
     title: "Custom Domains",
-    description: "Add your domain with automatic SSL provisioning.",
+    description: "Add your domain with automatic SSL.",
   },
   {
     icon: Lock,
@@ -46,7 +46,7 @@ const FEATURES = [
 
 export function FeatureGrid() {
   return (
-    <section id="features" className="w-full px-4 pt-6 pb-14 sm:px-6 sm:pt-8 sm:pb-16 lg:px-12 lg:pt-10 lg:pb-20">
+    <section id="features" className="w-full px-4 pt-6 pb-8 sm:px-6 sm:pt-8 sm:pb-10 lg:px-12 lg:pt-10 lg:pb-12">
       <div className="mx-auto w-full max-w-7xl">
         <div className="flex items-center gap-3 sm:gap-4 mb-6 sm:mb-8">
           <span className="text-[10px] tracking-[0.2em] uppercase text-muted-foreground whitespace-nowrap">
@@ -62,14 +62,14 @@ export function FeatureGrid() {
             return (
               <div
                 key={feature.title}
-                className="flex flex-col justify-between p-3 sm:p-4 bg-background aspect-square"
+                className="flex flex-col gap-4 sm:gap-5 p-4 sm:p-5 bg-background"
               >
-                <Icon className="h-4 w-4 text-foreground" strokeWidth={1.5} />
-                <div className="flex flex-col gap-0.5 sm:gap-1">
-                  <h3 className="text-[10px] sm:text-xs font-mono font-bold tracking-tight uppercase text-foreground">
+                <Icon className="h-5 w-5 sm:h-6 sm:w-6 text-foreground" strokeWidth={1.5} />
+                <div className="flex flex-col gap-1 sm:gap-1.5">
+                  <h3 className="text-xs sm:text-sm font-mono font-bold tracking-tight uppercase text-foreground">
                     {feature.title}
                   </h3>
-                  <p className="text-[8px] sm:text-[10px] font-mono text-muted-foreground leading-snug">
+                  <p className="text-[10px] sm:text-xs font-mono text-muted-foreground leading-relaxed">
                     {feature.description}
                   </p>
                 </div>

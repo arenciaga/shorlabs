@@ -22,7 +22,7 @@ const CtaSection = () => {
             Get Started
           </span>
 
-          <h2 className="text-2xl sm:text-3xl md:text-4xl font-mono font-bold uppercase tracking-tight max-w-2xl text-foreground leading-[0.95]">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-mono font-bold uppercase tracking-tight text-foreground leading-[0.95] whitespace-nowrap">
             Deploy your full stack today.
           </h2>
 

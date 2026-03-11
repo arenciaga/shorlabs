@@ -187,10 +187,9 @@ function NewDatabaseContent() {
                         </p>
                         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
                             {ACU_OPTIONS.map((option) => {
-                                const isProRequired = option.minPlan === "pro" && currentPlan !== "pro";
                                 const isPlusRequired = option.minPlan === "plus" && currentPlan !== "pro" && currentPlan !== "plus";
-                                const locked = isProRequired || isPlusRequired;
-                                const lockText = isProRequired ? "Pro" : (isPlusRequired ? "Plus" : "");
+                                const locked = isPlusRequired;
+                                const lockText = isPlusRequired ? "Plus" : "";
 
                                 return (
                                     <button

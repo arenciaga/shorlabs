@@ -1039,6 +1039,31 @@ async def get_database_connection(
     }
 
 
+@router.get("/{project_id}/cluster-status")
+async def get_cluster_status_endpoint(
+    project_id: str,
+    user_id: str = Depends(get_current_user_id),
+    org_id: str = Query(...),
+    service_id: Optional[str] = Query(None),
+):
+    """Get live Aurora cluster status (available, modifying, etc.)."""
+    svc = _resolve_service(org_id, project_id, service_id, service_type="database")
+
+    cluster_id = svc.get("db_cluster_identifier")
+    if not cluster_id:
+        raise HTTPException(status_code=404, detail="Database not yet provisioned")
+
+    from deployer.aws.rds import get_cluster_status
+    cluster_info = get_cluster_status(cluster_id)
+    if not cluster_info:
+        raise HTTPException(status_code=404, detail="Cluster not found")
+
+    return {
+        "cluster_identifier": cluster_id,
+        "status": cluster_info["status"],
+    }
+
+
 # ─────────────────────────────────────────────────────────────
 # DATABASE EXPLORER ENDPOINTS
 # ─────────────────────────────────────────────────────────────
@@ -1662,13 +1687,11 @@ async def update_project_fields(
     if not updates:
         raise HTTPException(status_code=400, detail="No fields to update")
 
-    updated = update_service(svc["service_id"], updates)
-
-    # If max_acu changed on a live database, apply to the Aurora cluster immediately
+    # For database max_acu changes, modify the Aurora cluster BEFORE writing to DynamoDB
+    # so that on failure the stored value stays consistent with the actual cluster state.
     if request.max_acu is not None and svc.get("service_type") == "database":
         cluster_id = svc.get("db_cluster_identifier")
         if cluster_id and svc.get("status") == "LIVE":
-            # Check cluster status before attempting modification
             from deployer.aws.rds import get_cluster_status
             cluster_info = get_cluster_status(cluster_id)
             if cluster_info and cluster_info.get("status") != "available":
@@ -1687,8 +1710,10 @@ async def update_project_fields(
                 traceback.print_exc()
                 raise HTTPException(
                     status_code=500,
-                    detail=f"Saved to database but failed to apply to cluster: {str(e)}",
+                    detail=f"Failed to apply scaling to cluster: {str(e)}",
                 )
+
+    updated = update_service(svc["service_id"], updates)
 
     return {
         "project_id": project_id,

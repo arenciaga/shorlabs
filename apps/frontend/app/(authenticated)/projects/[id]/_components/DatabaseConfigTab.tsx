@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { useAuth } from "@clerk/nextjs"
 import { Database, Check, Loader2, Lock } from "lucide-react"
 import type { Service } from "./types"
@@ -30,21 +30,94 @@ export function DatabaseConfigTab({ service, projectId, onRefresh }: DatabaseCon
     const { isOpen, openUpgradeModal, closeUpgradeModal } = useUpgradeModal()
 
     const currentTier = resolveCurrentTier(service.max_acu)
-    const [selectedAcu, setSelectedAcu] = useState<number>(currentTier?.value ?? 0.5)
-    // Actually the default of 0.5 is Hobby now, so that's good.
+    const [selectedAcu, setSelectedAcu] = useState<number>(currentTier?.value ?? 1)
 
     const [saving, setSaving] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [success, setSuccess] = useState(false)
     const [modifying, setModifying] = useState(false)
+    const [loading, setLoading] = useState(!!service.db_cluster_identifier)
+    const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
     const hasChanged = selectedAcu !== (currentTier?.value ?? 2)
+    const disabled = saving || modifying || loading
+
+    const stopPolling = useCallback(() => {
+        if (pollRef.current) {
+            clearInterval(pollRef.current)
+            pollRef.current = null
+        }
+    }, [])
+
+    useEffect(() => {
+        return () => stopPolling()
+    }, [stopPolling])
+
+    const startPollingClusterStatus = useCallback(async () => {
+        stopPolling()
+        const poll = async () => {
+            try {
+                const token = await getToken()
+                const url = new URL(`${API_BASE_URL}/api/projects/${projectId}/cluster-status`)
+                if (orgId) url.searchParams.append("org_id", orgId)
+                url.searchParams.append("service_id", service.service_id)
+
+                const res = await fetch(url.toString(), {
+                    headers: { Authorization: `Bearer ${token}` },
+                })
+                if (!res.ok) return
+                const data = await res.json()
+                if (data.status === "available") {
+                    stopPolling()
+                    setModifying(false)
+                    onRefresh()
+                }
+            } catch {
+                // Silently retry on next interval
+            }
+        }
+        pollRef.current = setInterval(poll, 5000)
+    }, [getToken, orgId, projectId, service.service_id, stopPolling, onRefresh])
+
+    useEffect(() => {
+        let cancelled = false
+        const checkInitialStatus = async () => {
+            try {
+                const token = await getToken()
+                const url = new URL(`${API_BASE_URL}/api/projects/${projectId}/cluster-status`)
+                if (orgId) url.searchParams.append("org_id", orgId)
+                url.searchParams.append("service_id", service.service_id)
+
+                const res = await fetch(url.toString(), {
+                    headers: { Authorization: `Bearer ${token}` },
+                })
+                if (!res.ok || cancelled) return
+                const data = await res.json()
+                if (data.status !== "available") {
+                    setModifying(true)
+                    startPollingClusterStatus()
+                }
+            } catch {
+                // Ignore — cluster may not be provisioned yet
+            } finally {
+                if (!cancelled) setLoading(false)
+            }
+        }
+        if (service.db_cluster_identifier) {
+            checkInitialStatus()
+        } else {
+            setLoading(false)
+        }
+        return () => { cancelled = true }
+    }, [getToken, orgId, projectId, service.service_id, service.db_cluster_identifier, startPollingClusterStatus])
 
     const handleSave = async () => {
-        if (!hasChanged || saving) return
+        if (!hasChanged || disabled) return
         setSaving(true)
         setError(null)
         setSuccess(false)
+
+        const previousAcu = currentTier?.value ?? 2
 
         try {
             const token = await getToken()
@@ -70,12 +143,14 @@ export function DatabaseConfigTab({ service, projectId, onRefresh }: DatabaseCon
             setModifying(true)
             onRefresh()
             setTimeout(() => setSuccess(false), 3000)
-            setTimeout(() => setModifying(false), 30000)
+            startPollingClusterStatus()
         } catch (err: any) {
-            const msg = err.message || "Failed to update database size"
+            const msg = err.message || "Failed to update database compute"
             if (msg.includes("currently")) {
                 setModifying(true)
-                setTimeout(() => setModifying(false), 30000)
+                startPollingClusterStatus()
+            } else {
+                setSelectedAcu(previousAcu)
             }
             setError(msg)
         } finally {
@@ -105,7 +180,9 @@ export function DatabaseConfigTab({ service, projectId, onRefresh }: DatabaseCon
                                 return (
                                     <button
                                         key={option.value}
+                                        disabled={disabled && !locked}
                                         onClick={() => {
+                                            if (disabled) return
                                             if (locked) {
                                                 openUpgradeModal()
                                             } else {
@@ -116,7 +193,8 @@ export function DatabaseConfigTab({ service, projectId, onRefresh }: DatabaseCon
                                         className={`px-3 py-3 border text-center transition-colors relative ${selectedAcu === option.value
                                             ? "border-zinc-900 bg-zinc-900 text-white"
                                             : "border-zinc-200 hover:border-zinc-400 text-zinc-700 cursor-pointer"
-                                            } ${locked ? "opacity-60 bg-zinc-50 hover:bg-zinc-50 hover:border-zinc-200 cursor-pointer" : ""}`}
+                                            } ${locked ? "opacity-60 bg-zinc-50 hover:bg-zinc-50 hover:border-zinc-200 cursor-pointer" : ""}
+                                            ${disabled && !locked ? "opacity-50 cursor-not-allowed" : ""}`}
                                     >
                                         <div className="text-sm font-medium flex items-center justify-center gap-1.5">
                                             {locked && <Lock className="w-3.5 h-3.5 text-zinc-400" />}

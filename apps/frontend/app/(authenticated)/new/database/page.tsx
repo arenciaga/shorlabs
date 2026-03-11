@@ -10,6 +10,7 @@ import {
     AlertCircle,
     Rocket,
     Zap,
+    Lock,
 } from "lucide-react"
 import Link from "next/link"
 
@@ -18,6 +19,8 @@ import { Input } from "@/components/ui/input"
 import { createDatabaseProject } from "@/lib/api"
 import { trackEvent } from "@/lib/amplitude"
 import { ACU_OPTIONS } from "@/lib/database"
+import { useIsPro } from "@/hooks/use-is-pro"
+import { useUpgradeModal, UpgradeModal } from "@/components/upgrade-modal"
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 
@@ -35,9 +38,14 @@ function NewDatabaseContent() {
     const searchParams = useSearchParams()
     const existingProjectId = searchParams.get("project_id")
 
+    const { currentPlan } = useIsPro()
+    const { isOpen, openUpgradeModal, closeUpgradeModal } = useUpgradeModal()
+
     const [projectName, setProjectName] = useState("")
     const [dbName, setDbName] = useState("shorlabs")
-    const [maxAcu, setMaxAcu] = useState(2)
+
+    // Initial value is the smallest available option
+    const [maxAcu, setMaxAcu] = useState(0.5)
     const [deploying, setDeploying] = useState(false)
     const [error, setError] = useState<string | null>(null)
 
@@ -178,21 +186,44 @@ function NewDatabaseContent() {
                             How much compute your database can use at peak. It always scales down to zero when idle.
                         </p>
                         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
-                            {ACU_OPTIONS.map((option) => (
-                                <button
-                                    key={option.value}
-                                    onClick={() => setMaxAcu(option.value)}
-                                    className={`px-2 py-2.5 sm:px-3 sm:py-3 border text-center transition-colors ${maxAcu === option.value
+                            {ACU_OPTIONS.map((option) => {
+                                const isProRequired = option.minPlan === "pro" && currentPlan !== "pro";
+                                const isPlusRequired = option.minPlan === "plus" && currentPlan !== "pro" && currentPlan !== "plus";
+                                const locked = isProRequired || isPlusRequired;
+                                const lockText = isProRequired ? "Pro" : (isPlusRequired ? "Plus" : "");
+
+                                return (
+                                    <button
+                                        key={option.value}
+                                        onClick={() => {
+                                            if (locked) {
+                                                openUpgradeModal()
+                                            } else {
+                                                setMaxAcu(option.value)
+                                            }
+                                        }}
+                                        className={`px-2 py-2.5 sm:px-3 sm:py-3 border text-center transition-colors relative ${maxAcu === option.value
                                             ? "border-zinc-900 bg-zinc-900 text-white"
                                             : "border-zinc-200 hover:border-zinc-400 text-zinc-700"
-                                        }`}
-                                >
-                                    <div className="text-sm font-medium">{option.label}</div>
-                                    <div className={`text-xs mt-0.5 ${maxAcu === option.value ? "text-zinc-300" : "text-zinc-400"}`}>
-                                        {option.description}
-                                    </div>
-                                </button>
-                            ))}
+                                            } ${locked ? "opacity-60 bg-zinc-50 cursor-pointer" : ""}`}
+                                    >
+                                        <div className="text-sm font-medium flex items-center justify-center gap-1.5">
+                                            {locked && <Lock className="w-3.5 h-3.5 text-zinc-400" />}
+                                            {option.label}
+                                        </div>
+                                        <div className={`text-xs mt-0.5 ${maxAcu === option.value ? "text-zinc-300" : "text-zinc-400"}`}>
+                                            {option.description}
+                                        </div>
+                                        {locked && (
+                                            <div className="absolute -top-2 -right-2">
+                                                <span className="bg-zinc-800 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-sm uppercase tracking-wider shadow-sm">
+                                                    {lockText}
+                                                </span>
+                                            </div>
+                                        )}
+                                    </button>
+                                )
+                            })}
                         </div>
                     </div>
 
@@ -224,6 +255,8 @@ function NewDatabaseContent() {
                     </Button>
                 </div>
             </div>
+
+            <UpgradeModal isOpen={isOpen} onClose={closeUpgradeModal} />
         </div>
     )
 }

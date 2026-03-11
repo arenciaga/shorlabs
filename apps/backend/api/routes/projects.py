@@ -390,8 +390,8 @@ AURORA_SERVERLESS_V2_MIN_MAX_ACU = 1.0
 
 
 def _round_to_half_step(value: float) -> float:
-    """Aurora Serverless v2 values are expected in 0.5 ACU increments."""
-    return round(float(value) * 2) / 2
+    """Aurora Serverless v2 values are expected in 0.25 ACU increments."""
+    return round(float(value) * 4) / 4
 
 
 def _normalize_serverless_v2_capacity(min_acu: float, max_acu: float) -> tuple[float, float]:

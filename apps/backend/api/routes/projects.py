@@ -40,7 +40,7 @@ from deployer import provision_database, delete_database_resources
 from deployer.aws import (
     get_lambda_logs,
 )
-from deployer.aws.rds import get_cluster_secret, get_cluster_security_group_ids, get_security_group_rules, modify_aurora_cluster_scaling
+from deployer.aws.rds import get_cluster_secret, get_cluster_security_group_ids, get_security_group_rules, modify_aurora_cluster_scaling, _normalize_serverless_v2_capacity
 from api.db.pg_explorer import (
     list_schemas as pg_list_schemas,
     list_tables as pg_list_tables,
@@ -386,31 +386,7 @@ def send_deployment_to_sqs(
 # DATABASE PROVISIONING (BACKGROUND TASK)
 # ─────────────────────────────────────────────────────────────
 
-AURORA_SERVERLESS_V2_MIN_MAX_ACU = 1.0
-
-
-def _round_to_half_step(value: float) -> float:
-    """Aurora Serverless v2 values are expected in 0.25 ACU increments."""
-    return round(float(value) * 4) / 4
-
-
-def _normalize_serverless_v2_capacity(min_acu: float, max_acu: float) -> tuple[float, float]:
-    """Normalize min/max ACU values so they satisfy Aurora Serverless v2 constraints."""
-    try:
-        parsed_min = float(min_acu)
-    except (TypeError, ValueError):
-        parsed_min = 0.0
-
-    try:
-        parsed_max = float(max_acu)
-    except (TypeError, ValueError):
-        parsed_max = 2.0
-
-    normalized_min = max(0.0, _round_to_half_step(parsed_min))
-    normalized_max = max(AURORA_SERVERLESS_V2_MIN_MAX_ACU, _round_to_half_step(parsed_max))
-    if normalized_max < normalized_min:
-        normalized_max = normalized_min
-    return normalized_min, normalized_max
+# _normalize_serverless_v2_capacity is imported from deployer.aws.rds
 
 
 def _run_database_provision_sync(

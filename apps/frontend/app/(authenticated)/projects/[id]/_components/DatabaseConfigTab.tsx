@@ -96,7 +96,7 @@ export function DatabaseConfigTab({ service, projectId, onRefresh }: DatabaseCon
                         <p className="text-xs text-zinc-500 mb-4">
                             How much compute your database can use at peak. It always scales down to zero when idle.
                         </p>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+                        <div className="grid grid-cols-3 gap-3">
                             {ACU_OPTIONS.map((option) => {
                                 const isPlusRequired = option.minPlan === "plus" && currentPlan !== "pro" && currentPlan !== "plus";
                                 const locked = isPlusRequired;

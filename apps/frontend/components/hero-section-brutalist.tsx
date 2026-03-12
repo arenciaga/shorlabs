@@ -20,7 +20,7 @@ export function HeroSection() {
             className="font-mono sm:text-xl lg:text-2xl xl:text-4xl tracking-tight text-foreground mb-5 font-bold uppercase leading-[0.95]"
             style={{ letterSpacing: "-0.01em" }}
           >
-            Stop paying for idle time.
+           Your Full Stack. Fully Serverless.
           </h1>
           <p className="text-xs sm:text-base text-muted-foreground max-w-2xl mb-8 sm:mb-9 leading-relaxed font-mono px-0">
             Shorlabs provides the infrastructure to deploy serverless web apps and databases, scale instantly, and only pay for what you use.

@@ -2,6 +2,7 @@
 import { ArrowRight } from "lucide-react"
 import { useAuth } from "@clerk/nextjs"
 import Link from "next/link"
+import { useEffect, useRef } from "react"
 import { GoogleSignInButton } from "@/components/GoogleSignInButton"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -9,6 +10,40 @@ import { Card } from "@/components/ui/card"
 
 export function HeroSection() {
   const { isLoaded, isSignedIn } = useAuth()
+  const videoRef = useRef<HTMLVideoElement>(null)
+
+  useEffect(() => {
+    const video = videoRef.current
+    if (!video) return
+
+    const startTime = 30
+    const endTime = 54
+
+    const handleTimeUpdate = () => {
+      if (video.currentTime >= endTime) {
+        video.currentTime = startTime
+      }
+    }
+
+    const handleLoadedMetadata = () => {
+      video.currentTime = startTime
+      video.play()
+    }
+
+    if (video.readyState >= 1) {
+      video.currentTime = startTime
+      video.play()
+    } else {
+      video.addEventListener("loadedmetadata", handleLoadedMetadata, { once: true })
+    }
+
+    video.addEventListener("timeupdate", handleTimeUpdate)
+
+    return () => {
+      video.removeEventListener("timeupdate", handleTimeUpdate)
+      video.removeEventListener("loadedmetadata", handleLoadedMetadata)
+    }
+  }, [])
   return (
     <section className="relative w-full px-4 pt-6 pb-10 sm:px-6 sm:pt-8 sm:pb-12 md:px-8 lg:px-12 lg:pt-10 lg:pb-16 xl:px-16">
       <div className="mx-auto w-full max-w-6xl">
@@ -53,14 +88,13 @@ export function HeroSection() {
           </div>
           <Card className="w-full max-w-5xl mt-8 sm:mt-10 lg:mt-12 rounded-none border-2 border-foreground bg-transparent py-0 px-0 shadow-none gap-0 overflow-hidden">
             <video
+              ref={videoRef}
               className="w-full h-auto block"
-              autoPlay
-              loop
               muted
               playsInline
               preload="metadata"
             >
-              <source src="/demo.mp4#t=30,54" type="video/mp4" />
+              <source src="/demo.mp4" type="video/mp4" />
               Your browser does not support the video tag.
             </video>
           </Card>

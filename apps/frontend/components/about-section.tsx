@@ -10,23 +10,23 @@ const STEPS = [
     description:
       "Start with a web app, database, or both. Connect GitHub or provision PostgreSQL—your choice, one click.",
     start: 4,
-    end: 7,
+    end: 11,
   },
   {
     number: "02",
     title: "Configure & deploy",
     description:
       "Set environment variables, choose compute resources, and deploy. Your app containerizes automatically, your database scales on demand.",
-    start: 8,
-    end: 22,
+    start: 11,
+    end: 26,
   },
   {
     number: "03",
     title: "Manage everything",
     description:
       "Get instant production URLs. Add custom domains, stream real-time logs, manage database tables—all from one dashboard.",
-    start: 103,
-    end: 108,
+    start: 57,
+    end: 999,
   },
 ]
 
@@ -145,7 +145,7 @@ export function AboutSection() {
               playsInline
               preload="auto"
             >
-              <source src="/Shorlabs-Demo.mp4" type="video/mp4" />
+              <source src="/demo.mp4" type="video/mp4" />
             </video>
           </div>
         </div>

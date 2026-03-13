@@ -5,6 +5,7 @@ import { Amplitude } from "@/lib/amplitude";
 import { AmplitudeProvider } from "@/components/AmplitudeProvider";
 import { AutumnProviderWrapper } from "@/components/AutumnProviderWrapper";
 import { Toaster } from "@/components/ui/sonner";
+import { homepageTitle, homepageDescription } from "@/lib/seo";
 import "./globals.css";
 
 // Geist Sans - clean, modern sans-serif by Vercel
@@ -21,12 +22,8 @@ const geistMono = Geist_Mono({
   display: "swap",
 });
 
-const homepageTitle = "Shorlabs: The infra for serverless web apps and data storage.";
-const homepageDescription =
-  "Shorlabs provides the infrastructure to deploy serverless web apps and databases, scale instantly, and only pay for what you use.";
-
 export const metadata: Metadata = {
-  metadataBase: new URL("https://shorlabs.com"),
+  metadataBase: new URL("https://www.shorlabs.com"),
   title: {
     template: "%s | Shorlabs",
     default: homepageTitle,
@@ -35,7 +32,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: homepageTitle,
     description: homepageDescription,
-    url: "https://shorlabs.com",
+    url: "https://www.shorlabs.com",
     siteName: "Shorlabs",
     locale: "en_US",
     type: "website",

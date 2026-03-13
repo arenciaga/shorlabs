@@ -2,7 +2,7 @@ import { getAllPosts } from "@/lib/blog";
 
 export async function GET() {
   const posts = getAllPosts();
-  const siteUrl = "https://shorlabs.com";
+  const siteUrl = "https://www.shorlabs.com";
 
   const items = posts
     .map(

@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import Image from "next/image"
 import { useAuth } from "@clerk/nextjs"
 import { BookDemoButton } from "@/components/BookDemoButton"
 import { Button } from "@/components/ui/button"
@@ -29,7 +30,7 @@ export function Navbar() {
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2 sm:gap-3 min-w-0">
             <Link href="/" className="flex items-center gap-2 sm:gap-2.5">
-              <img src="/favicon.ico" alt="Shorlabs" className="h-5 w-5 sm:h-6 sm:w-6 rounded-full" />
+              <Image src="/favicon.ico" alt="Shorlabs" width={24} height={24} className="h-5 w-5 sm:h-6 sm:w-6 rounded-full" />
               <span className="text-sm sm:text-base font-mono tracking-[0.15em] uppercase font-bold">
                 SHORLABS
               </span>

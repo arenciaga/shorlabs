@@ -7,16 +7,28 @@ import { PricingSection } from "@/components/pricing-section-brutalist";
 import { GlitchMarquee } from "@/components/glitch-marquee";
 import { CtaSection } from "@/components/cta-section-brutalist";
 import { Footer } from "@/components/footer-brutalist";
-
-const homepageTitle = "Shorlabs: The infra for serverless web apps and data storage.";
-const homepageDescription =
-  "Shorlabs provides the infrastructure to deploy serverless web apps and databases, scale instantly, and only pay for what you use.";
+import { homepageTitle, homepageDescription } from "@/lib/seo";
 
 export const metadata: Metadata = {
   title: {
     absolute: homepageTitle,
   },
   description: homepageDescription,
+  keywords: [
+    "serverless deployment",
+    "serverless web apps",
+    "serverless database",
+    "serverless PostgreSQL",
+    "full stack deployment",
+    "deploy web app",
+    "cloud infrastructure",
+    "auto-scaling",
+    "pay per use hosting",
+    "GitHub deploy",
+    "containerized deployment",
+    "custom domains",
+    "Shorlabs",
+  ],
   alternates: {
     canonical: "/",
   },

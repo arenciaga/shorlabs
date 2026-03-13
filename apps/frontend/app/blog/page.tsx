@@ -15,7 +15,7 @@ export const metadata: Metadata = {
     title: "Shorlabs Blog | Deployment, Cloud Cost Optimization, and Growth Playbooks",
     description:
       "Practical guides for indie builders, startups, and enterprise teams to reduce cloud costs, deploy faster, and scale reliably with modern backend and full-stack workflows.",
-    url: "https://shorlabs.com/blog",
+    url: "https://www.shorlabs.com/blog",
     type: "website",
     siteName: "Shorlabs",
   },
@@ -58,11 +58,11 @@ export default function Blog() {
     name: "Shorlabs Blog",
     description:
       "Practical guides for indie builders, startups, and enterprise teams to reduce cloud costs, deploy faster, and scale reliably with modern backend and full-stack workflows.",
-    url: "https://shorlabs.com/blog",
+    url: "https://www.shorlabs.com/blog",
     publisher: {
       "@type": "Organization",
       name: "Shorlabs",
-      url: "https://shorlabs.com",
+      url: "https://www.shorlabs.com",
     },
   };
 

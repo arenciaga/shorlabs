@@ -1,21 +1,10 @@
 import { ImageResponse } from "next/og";
-import { getPostBySlug } from "@/lib/blog";
 
 export const alt = "Shorlabs Blog";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
-export default async function Image({
-  params,
-}: {
-  params: Promise<{ slug: string }>;
-}) {
-  const { slug } = await params;
-  const post = getPostBySlug(slug);
-
-  const title = post?.meta.title ?? "Shorlabs Blog";
-  const author = post?.meta.author ?? "Shorlabs";
-
+export default function Image() {
   return new ImageResponse(
     (
       <div
@@ -35,30 +24,35 @@ export default async function Image({
             color: "#888",
             marginBottom: 24,
             display: "flex",
+            letterSpacing: "0.15em",
+            textTransform: "uppercase" as const,
           }}
         >
           www.shorlabs.com
         </div>
         <div
           style={{
-            fontSize: 56,
+            fontSize: 64,
             fontWeight: 700,
             color: "#ffffff",
-            lineHeight: 1.2,
+            lineHeight: 1.1,
             marginBottom: 32,
             display: "flex",
           }}
         >
-          {title}
+          Shorlabs Blog
         </div>
         <div
           style={{
             fontSize: 24,
             color: "#aaa",
             display: "flex",
+            lineHeight: 1.5,
+            maxWidth: "800px",
           }}
         >
-          By {author}
+          Practical guides for deployment, cloud cost optimization, and growth
+          playbooks.
         </div>
       </div>
     ),

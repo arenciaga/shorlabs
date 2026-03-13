@@ -169,13 +169,13 @@ export default async function BlogPost({ params }: Props) {
     publisher: {
       "@type": "Organization",
       name: "Shorlabs",
-      url: "https://shorlabs.com",
+      url: "https://www.shorlabs.com",
     },
     wordCount: post.content.trim().split(/\s+/).length,
     timeRequired: `PT${post.meta.readingTime}M`,
   };
 
-  const shareUrl = `https://shorlabs.com/blog/${slug}`;
+  const shareUrl = `https://www.shorlabs.com/blog/${slug}`;
 
   return (
     <>

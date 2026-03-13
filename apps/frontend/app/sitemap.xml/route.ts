@@ -1,6 +1,6 @@
 import { getAllPosts } from "@/lib/blog";
 
-const BASE = "https://shorlabs.com";
+const BASE = "https://www.shorlabs.com";
 
 function escapeXml(unsafe: string): string {
   return unsafe

@@ -2101,6 +2101,7 @@ class UpdateServiceRequest(BaseModel):
     memory: Optional[int] = None
     timeout: Optional[int] = None
     ephemeral_storage: Optional[int] = None
+    cpu: Optional[int] = None
     max_acu: Optional[float] = None
 
 
@@ -2129,6 +2130,8 @@ async def update_project_fields(
         updates["timeout"] = request.timeout
     if request.ephemeral_storage is not None:
         updates["ephemeral_storage"] = request.ephemeral_storage
+    if request.cpu is not None:
+        updates["cpu"] = request.cpu
     if request.max_acu is not None:
         from decimal import Decimal
         updates["max_acu"] = Decimal(str(request.max_acu))

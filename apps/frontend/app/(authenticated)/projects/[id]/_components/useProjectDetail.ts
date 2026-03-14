@@ -62,6 +62,7 @@ export function useProjectDetail(id: string) {
     const [memoryValue, setMemoryValue] = useState(1024)
     const [timeoutValue, setTimeoutValue] = useState(30)
     const [ephemeralStorageValue, setEphemeralStorageValue] = useState(512)
+    const [cpuValue, setCpuValue] = useState(256)
     const [savingCompute, setSavingCompute] = useState(false)
 
     // Logs state
@@ -360,12 +361,31 @@ export function useProjectDetail(id: string) {
         }
     }
 
-    const startEditingCompute = (overrides?: { memory?: number, timeout?: number, ephemeral_storage?: number }) => {
+    const startEditingCompute = (overrides?: { memory?: number, timeout?: number, ephemeral_storage?: number, cpu?: number }) => {
         const svc = _getActiveService()
         if (!svc) return
-        setMemoryValue(overrides?.memory ?? svc.memory ?? 1024)
+
+        const newCpu = overrides?.cpu ?? svc.cpu ?? 256
+        let newMemory = overrides?.memory ?? svc.memory ?? (svc.service_type === "web-service" ? 512 : 1024)
+
+        // For web-services, validate that memory is valid for the selected CPU
+        if (svc.service_type === "web-service") {
+            const validMemoryByCpu: Record<number, number[]> = {
+                256: [512, 1024, 2048],
+                512: [1024, 2048, 4096],
+                1024: [2048, 4096, 8192],
+                2048: [4096, 8192, 16384],
+            }
+            const validOptions = validMemoryByCpu[newCpu] || validMemoryByCpu[256]
+            if (!validOptions.includes(newMemory)) {
+                newMemory = validOptions[0]
+            }
+        }
+
+        setMemoryValue(newMemory)
         setTimeoutValue(overrides?.timeout ?? svc.timeout ?? 30)
         setEphemeralStorageValue(overrides?.ephemeral_storage ?? svc.ephemeral_storage ?? 512)
+        setCpuValue(newCpu)
         setEditingCompute(true)
     }
 
@@ -379,17 +399,18 @@ export function useProjectDetail(id: string) {
             if (orgId) url.searchParams.append("org_id", orgId)
             url.searchParams.append("service_id", svc.service_id)
 
+            const isWebService = svc.service_type === "web-service"
+            const body = isWebService
+                ? { cpu: cpuValue, memory: memoryValue }
+                : { memory: memoryValue, timeout: timeoutValue, ephemeral_storage: ephemeralStorageValue }
+
             const response = await fetch(url.toString(), {
                 method: "PATCH",
                 headers: {
                     Authorization: `Bearer ${token}`,
                     "Content-Type": "application/json",
                 },
-                body: JSON.stringify({
-                    memory: memoryValue,
-                    timeout: timeoutValue,
-                    ephemeral_storage: ephemeralStorageValue,
-                }),
+                body: JSON.stringify(body),
             })
 
             if (!response.ok) {
@@ -689,6 +710,8 @@ export function useProjectDetail(id: string) {
         setTimeoutValue,
         ephemeralStorageValue,
         setEphemeralStorageValue,
+        cpuValue,
+        setCpuValue,
         savingCompute,
         startEditingCompute,
         saveCompute,

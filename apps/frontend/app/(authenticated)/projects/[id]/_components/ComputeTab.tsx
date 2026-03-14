@@ -1,20 +1,24 @@
 import { Loader2, Cpu } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ComputeSettings } from "@/components/ComputeSettings"
+import { FargateComputeSettings } from "@/components/FargateComputeSettings"
 import type { ProjectCompat } from "./types"
 
 interface ComputeTabProps {
     project: ProjectCompat
+    serviceType: "web-app" | "web-service"
     editingCompute: boolean
     memoryValue: number
     timeoutValue: number
     ephemeralStorageValue: number
+    cpuValue: number
     savingCompute: boolean
     currentPlan: string | null
     onMemoryChange: (value: number) => void
     onTimeoutChange: (value: number) => void
     onEphemeralStorageChange: (value: number) => void
-    onStartEditing: (overrides?: { memory?: number; timeout?: number; ephemeral_storage?: number }) => void
+    onCpuChange: (value: number) => void
+    onStartEditing: (overrides?: { memory?: number; timeout?: number; ephemeral_storage?: number; cpu?: number }) => void
     onSave: () => void
     onCancel: () => void
     onUpgradeClick: () => void
@@ -22,50 +26,70 @@ interface ComputeTabProps {
 
 export function ComputeTab({
     project,
+    serviceType,
     editingCompute,
     memoryValue,
     timeoutValue,
     ephemeralStorageValue,
+    cpuValue,
     savingCompute,
     currentPlan,
     onMemoryChange,
     onTimeoutChange,
     onEphemeralStorageChange,
+    onCpuChange,
     onStartEditing,
     onSave,
     onCancel,
     onUpgradeClick,
 }: ComputeTabProps) {
+    const isWebService = serviceType === "web-service"
+
     return (
         <div className="space-y-6">
-            <ComputeSettings
-                memory={editingCompute ? memoryValue : (project.memory || 1024)}
-                timeout={editingCompute ? timeoutValue : (project.timeout || 30)}
-                ephemeralStorage={editingCompute ? ephemeralStorageValue : (project.ephemeral_storage || 1024)}
-                onMemoryChange={(value) => {
-                    if (!editingCompute) {
-                        onStartEditing({ memory: value })
-                    } else {
-                        onMemoryChange(value)
-                    }
-                }}
-                onTimeoutChange={(value) => {
-                    if (!editingCompute) {
-                        onStartEditing({ timeout: value })
-                    } else {
-                        onTimeoutChange(value)
-                    }
-                }}
-                onEphemeralStorageChange={(value) => {
-                    if (!editingCompute) {
-                        onStartEditing({ ephemeral_storage: value })
-                    } else {
-                        onEphemeralStorageChange(value)
-                    }
-                }}
-                plan={currentPlan as "hobby" | "plus" | "pro" ?? "hobby"}
-                onUpgradeClick={onUpgradeClick}
-            />
+            {isWebService ? (
+                <FargateComputeSettings
+                    cpu={editingCompute ? cpuValue : (project.cpu || 256)}
+                    memory={editingCompute ? memoryValue : (project.memory || 512)}
+                    onSelect={(cpu, memory) => {
+                        if (!editingCompute) {
+                            onStartEditing({ cpu, memory })
+                        } else {
+                            onCpuChange(cpu)
+                            onMemoryChange(memory)
+                        }
+                    }}
+                />
+            ) : (
+                <ComputeSettings
+                    memory={editingCompute ? memoryValue : (project.memory || 1024)}
+                    timeout={editingCompute ? timeoutValue : (project.timeout || 30)}
+                    ephemeralStorage={editingCompute ? ephemeralStorageValue : (project.ephemeral_storage || 1024)}
+                    onMemoryChange={(value) => {
+                        if (!editingCompute) {
+                            onStartEditing({ memory: value })
+                        } else {
+                            onMemoryChange(value)
+                        }
+                    }}
+                    onTimeoutChange={(value) => {
+                        if (!editingCompute) {
+                            onStartEditing({ timeout: value })
+                        } else {
+                            onTimeoutChange(value)
+                        }
+                    }}
+                    onEphemeralStorageChange={(value) => {
+                        if (!editingCompute) {
+                            onStartEditing({ ephemeral_storage: value })
+                        } else {
+                            onEphemeralStorageChange(value)
+                        }
+                    }}
+                    plan={currentPlan as "hobby" | "plus" | "pro" ?? "hobby"}
+                    onUpgradeClick={onUpgradeClick}
+                />
+            )}
 
             {/* Save Button */}
             {editingCompute && (

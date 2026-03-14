@@ -24,6 +24,7 @@ const WEB_APP_TABS = [
 const WEB_SERVICE_TABS = [
     { key: "deployments", label: "Deployments" },
     { key: "logs", label: "Logs" },
+    { key: "compute", label: "Compute" },
     { key: "settings", label: "Settings" },
 ]
 
@@ -115,15 +116,18 @@ export function WebAppServiceView({
                 {hook.activeTab === "compute" && (
                     <ComputeTab
                         project={projectCompat}
+                        serviceType={service.service_type as "web-app" | "web-service"}
                         editingCompute={hook.editingCompute}
                         memoryValue={hook.memoryValue}
                         timeoutValue={hook.timeoutValue}
                         ephemeralStorageValue={hook.ephemeralStorageValue}
+                        cpuValue={hook.cpuValue}
                         savingCompute={hook.savingCompute}
                         currentPlan={hook.currentPlan ?? null}
                         onMemoryChange={hook.setMemoryValue}
                         onTimeoutChange={hook.setTimeoutValue}
                         onEphemeralStorageChange={hook.setEphemeralStorageValue}
+                        onCpuChange={hook.setCpuValue}
                         onStartEditing={hook.startEditingCompute}
                         onSave={hook.saveCompute}
                         onCancel={() => hook.setEditingCompute(false)}

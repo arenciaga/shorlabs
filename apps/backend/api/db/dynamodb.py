@@ -412,7 +412,7 @@ def create_service(
     memory: int = 1024,
     timeout: int = 30,
     ephemeral_storage: int = 512,
-    # Fargate (web-service) fields
+    # ECS (web-service) fields
     cpu: int = None,
     # Database fields
     db_name: str = None,

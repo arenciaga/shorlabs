@@ -37,7 +37,7 @@ from api.db.dynamodb import (
 # Import from deployer package
 from deployer import deploy_project, delete_project_resources, extract_project_name
 from deployer import provision_database, delete_database_resources
-from deployer import deploy_fargate_project, delete_fargate_resources
+from deployer import deploy_ecs_project, delete_ecs_resources
 from deployer.aws import (
     get_lambda_logs,
     get_ecs_logs,
@@ -98,7 +98,7 @@ class CreateDatabaseProjectRequest(BaseModel):
     max_acu: Optional[float] = 2
 
 class CreateWebServiceProjectRequest(BaseModel):
-    """Create a project with an initial web-service (Fargate) service."""
+    """Create a project with an initial web-service (ECS) service."""
     name: str
     organization_id: str
     description: Optional[str] = ""
@@ -125,7 +125,7 @@ class AddServiceRequest(BaseModel):
     db_name: Optional[str] = "shorlabs"
     min_acu: Optional[float] = 0
     max_acu: Optional[float] = 2
-    # Web-service (Fargate) fields
+    # Web-service (ECS) fields
     cpu: Optional[int] = 256
 
 
@@ -557,11 +557,11 @@ def send_database_delete_to_sqs(service_id: str):
 
 
 # ─────────────────────────────────────────────────────────────
-# FARGATE DEPLOYMENT (BACKGROUND TASK)
+# ECS DEPLOYMENT (BACKGROUND TASK)
 # ─────────────────────────────────────────────────────────────
 
 
-def _run_fargate_deployment_sync(
+def _run_ecs_deployment_sync(
     service_id: str,
     github_url: str,
     github_token: Optional[str],
@@ -576,8 +576,9 @@ def _run_fargate_deployment_sync(
     commit_author_username: Optional[str] = None,
     branch: Optional[str] = None,
     org_id: Optional[str] = None,
+    instance_type: Optional[str] = None,
 ):
-    """Synchronous Fargate deployment function - runs in thread pool or via SQS."""
+    """Synchronous ECS deployment function - runs in thread pool or via SQS."""
     from datetime import datetime
 
     deployment = None
@@ -594,7 +595,7 @@ def _run_fargate_deployment_sync(
             commit_author_username=commit_author_username,
             branch=branch,
         )
-        print(f"📝 Fargate deployment record created: {deployment['deploy_id']} (build: {build_id})")
+        print(f"📝 ECS deployment record created: {deployment['deploy_id']} (build: {build_id})")
 
     try:
         update_service(service_id, {"status": "BUILDING"})
@@ -609,7 +610,7 @@ def _run_fargate_deployment_sync(
         svc = get_service(service_id)
         subdomain = svc.get("subdomain") if svc else None
 
-        result = deploy_fargate_project(
+        result = deploy_ecs_project(
             github_url=github_url,
             github_token=github_token,
             root_directory=root_directory,
@@ -622,6 +623,7 @@ def _run_fargate_deployment_sync(
             codebuild_compute_type=codebuild_compute_type,
             subdomain=subdomain,
             org_id=org_id,
+            instance_type=instance_type,
         )
 
         if deployment:
@@ -641,7 +643,7 @@ def _run_fargate_deployment_sync(
             "listener_rule_arn": result.get("listener_rule_arn"),
         })
 
-        print(f"✅ Fargate deployment complete: {result['service_url']}")
+        print(f"✅ ECS deployment complete: {result['service_url']}")
 
     except Exception as e:
         if deployment:
@@ -650,11 +652,11 @@ def _run_fargate_deployment_sync(
                 "finished_at": datetime.utcnow().isoformat(),
             })
         update_service(service_id, {"status": "FAILED"})
-        print(f"❌ Fargate deployment failed: {e}")
+        print(f"❌ ECS deployment failed: {e}")
         traceback.print_exc()
 
 
-def send_fargate_deployment_to_sqs(
+def send_ecs_deployment_to_sqs(
     service_id: str,
     github_url: str,
     github_token: Optional[str],
@@ -669,43 +671,44 @@ def send_fargate_deployment_to_sqs(
     commit_author_username: Optional[str] = None,
     branch: Optional[str] = None,
     org_id: Optional[str] = None,
+    instance_type: Optional[str] = None,
 ):
-    """Send Fargate deployment task to SQS queue for background processing."""
+    """Send ECS deployment task to SQS queue for background processing."""
     import time
 
     if not os.environ.get("AWS_LAMBDA_FUNCTION_NAME"):
         def run_in_thread():
-            _run_fargate_deployment_sync(
+            _run_ecs_deployment_sync(
                 service_id, github_url, github_token, root_directory, start_command,
                 env_vars, cpu, memory,
                 commit_sha=commit_sha, commit_message=commit_message,
                 commit_author_name=commit_author_name,
                 commit_author_username=commit_author_username, branch=branch,
-                org_id=org_id,
+                org_id=org_id, instance_type=instance_type,
             )
         thread = threading.Thread(target=run_in_thread)
         thread.start()
-        print(f"📤 Local: Fargate deployment started in background thread for service {service_id}")
+        print(f"📤 Local: ECS deployment started in background thread for service {service_id}")
         return
 
     sqs_client = boto3.client("sqs")
     queue_url = os.environ.get("DEPLOY_QUEUE_URL")
     if not queue_url:
         def run_in_thread():
-            _run_fargate_deployment_sync(
+            _run_ecs_deployment_sync(
                 service_id, github_url, github_token, root_directory, start_command,
                 env_vars, cpu, memory,
                 commit_sha=commit_sha, commit_message=commit_message,
                 commit_author_name=commit_author_name,
                 commit_author_username=commit_author_username, branch=branch,
-                org_id=org_id,
+                org_id=org_id, instance_type=instance_type,
             )
         thread = threading.Thread(target=run_in_thread)
         thread.start()
         return
 
     message_body = {
-        "message_type": "fargate_deploy",
+        "message_type": "ecs_deploy",
         "service_id": service_id,
         "github_url": github_url,
         "github_token": github_token,
@@ -720,54 +723,55 @@ def send_fargate_deployment_to_sqs(
         "commit_author_username": commit_author_username,
         "branch": branch,
         "org_id": org_id,
+        "instance_type": instance_type,
     }
 
     response = sqs_client.send_message(
         QueueUrl=queue_url,
         MessageBody=json.dumps(message_body),
         MessageGroupId=service_id,
-        MessageDeduplicationId=f"{service_id}-fargate-{int(time.time())}",
+        MessageDeduplicationId=f"{service_id}-ecs-{int(time.time())}",
     )
 
-    print(f"📤 Fargate deployment queued for service {service_id}, MessageId: {response['MessageId']}")
+    print(f"📤 ECS deployment queued for service {service_id}, MessageId: {response['MessageId']}")
 
 
-def _run_fargate_delete_sync(service_id: str, org_id: Optional[str] = None):
-    """Synchronous Fargate service deletion."""
+def _run_ecs_delete_sync(service_id: str, org_id: Optional[str] = None):
+    """Synchronous ECS service deletion."""
     try:
         svc = get_service(service_id)
         if not svc:
-            print(f"⚠️ Service {service_id} not found for Fargate deletion")
+            print(f"⚠️ Service {service_id} not found for ECS deletion")
             return
 
         # Use org_id from param, fallback to service record
         effective_org_id = org_id or svc.get("organization_id")
 
-        result = delete_fargate_resources(
+        result = delete_ecs_resources(
             github_url=svc.get("github_url", ""),
             function_name=svc.get("function_name"),
             target_group_arn=svc.get("target_group_arn"),
             listener_rule_arn=svc.get("listener_rule_arn"),
             org_id=effective_org_id,
         )
-        print(f"✅ Fargate resources deleted for service {service_id}: {result}")
+        print(f"✅ ECS resources deleted for service {service_id}: {result}")
 
         delete_service(service_id)
         print(f"✅ Service record deleted for {service_id}")
 
     except Exception as e:
         update_service(service_id, {"status": "FAILED"})
-        print(f"❌ Fargate deletion failed for {service_id}: {e}")
+        print(f"❌ ECS deletion failed for {service_id}: {e}")
         traceback.print_exc()
 
 
-def send_fargate_delete_to_sqs(service_id: str, org_id: Optional[str] = None):
-    """Send Fargate deletion task to SQS queue for background processing."""
+def send_ecs_delete_to_sqs(service_id: str, org_id: Optional[str] = None):
+    """Send ECS deletion task to SQS queue for background processing."""
     import time
 
     if not os.environ.get("AWS_LAMBDA_FUNCTION_NAME"):
         def run_in_thread():
-            _run_fargate_delete_sync(service_id, org_id=org_id)
+            _run_ecs_delete_sync(service_id, org_id=org_id)
         thread = threading.Thread(target=run_in_thread)
         thread.start()
         return
@@ -776,13 +780,13 @@ def send_fargate_delete_to_sqs(service_id: str, org_id: Optional[str] = None):
     queue_url = os.environ.get("DEPLOY_QUEUE_URL")
     if not queue_url:
         def run_in_thread():
-            _run_fargate_delete_sync(service_id, org_id=org_id)
+            _run_ecs_delete_sync(service_id, org_id=org_id)
         thread = threading.Thread(target=run_in_thread)
         thread.start()
         return
 
     message_body = {
-        "message_type": "fargate_delete",
+        "message_type": "ecs_delete",
         "service_id": service_id,
         "org_id": org_id,
     }
@@ -791,10 +795,10 @@ def send_fargate_delete_to_sqs(service_id: str, org_id: Optional[str] = None):
         QueueUrl=queue_url,
         MessageBody=json.dumps(message_body),
         MessageGroupId=service_id,
-        MessageDeduplicationId=f"{service_id}-fargate-delete-{int(time.time())}",
+        MessageDeduplicationId=f"{service_id}-ecs-delete-{int(time.time())}",
     )
 
-    print(f"📤 Fargate deletion queued for service {service_id}, MessageId: {response['MessageId']}")
+    print(f"📤 ECS deletion queued for service {service_id}, MessageId: {response['MessageId']}")
 
 
 # ─────────────────────────────────────────────────────────────
@@ -964,7 +968,7 @@ async def create_web_service_project(
     request: CreateWebServiceProjectRequest,
     user_id: str = Depends(get_current_user_id),
 ):
-    """Create a new project container with an initial web-service (Fargate) service."""
+    """Create a new project container with an initial web-service (ECS) service."""
     from api.routes.github import get_or_refresh_token, fetch_latest_commit
 
     if not request.organization_id or not request.organization_id.strip():
@@ -1010,8 +1014,8 @@ async def create_web_service_project(
         memory=memory,
     )
 
-    # 3. Start Fargate deployment via SQS
-    send_fargate_deployment_to_sqs(
+    # 3. Start ECS deployment via SQS
+    send_ecs_deployment_to_sqs(
         service["service_id"],
         github_url,
         github_token,
@@ -1101,7 +1105,7 @@ async def add_service_to_project(
             cpu=cpu,
             memory=memory,
         )
-        send_fargate_deployment_to_sqs(
+        send_ecs_deployment_to_sqs(
             service["service_id"],
             github_url,
             github_token,
@@ -2029,7 +2033,7 @@ async def get_runtime_logs(
     org_id: str = Query(...),
     service_id: Optional[str] = Query(None),
 ):
-    """Fetch runtime logs for a service (Lambda web-app or Fargate web-service)."""
+    """Fetch runtime logs for a service (Lambda web-app or ECS web-service)."""
     # Resolve service without forcing type — so it works for both web-app and web-service
     if service_id:
         svc = _resolve_service(org_id, project_id, service_id)
@@ -2046,7 +2050,7 @@ async def get_runtime_logs(
     print(f"🔍 RUNTIME LOGS: function_name from DB = '{function_name}'")
 
     if svc_type == "web-service":
-        # Fargate services: logs live in /ecs/<service-prefix>-<project_name>
+        # ECS services: logs live in /ecs/<service-prefix>-<project_name>
         # function_name stores the project_name used when registering the task definition
         project_name = function_name or extract_project_name(svc.get("github_url", ""))
         print(f"🔍 RUNTIME LOGS (ECS): project_name = '{project_name}'")
@@ -2082,7 +2086,7 @@ async def update_project_env_vars(
     service_id: Optional[str] = Query(None),
 ):
     """Update service environment variables."""
-    svc = _resolve_service(org_id, project_id, service_id, service_type="web-app")
+    svc = _resolve_service(org_id, project_id, service_id)
     
     updated = update_service(svc["service_id"], {"env_vars": request.env_vars})
     
@@ -2213,7 +2217,7 @@ async def redeploy_project(
     if svc_type == "web-service":
         cpu = int(svc.get("cpu", 256))
         memory = int(svc.get("memory", 512))
-        send_fargate_deployment_to_sqs(
+        send_ecs_deployment_to_sqs(
             sid,
             svc["github_url"],
             github_token,
@@ -2262,7 +2266,7 @@ def _delete_single_service(svc: dict):
         return "async"
     elif svc_type == "web-service":
         update_service(sid, {"status": "DELETING"})
-        send_fargate_delete_to_sqs(sid, org_id=svc.get("organization_id"))
+        send_ecs_delete_to_sqs(sid, org_id=svc.get("organization_id"))
         return "async"
     else:
         function_name = svc.get("function_name")

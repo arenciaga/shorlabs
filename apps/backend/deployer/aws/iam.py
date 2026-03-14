@@ -8,7 +8,7 @@ import json
 import time
 
 from ..clients import get_iam_client
-from ..config import CODEBUILD_ROLE_NAME, LAMBDA_ROLE_NAME, ECS_TASK_EXECUTION_ROLE_NAME
+from ..config import CODEBUILD_ROLE_NAME, LAMBDA_ROLE_NAME, ECS_TASK_EXECUTION_ROLE_NAME, ECS_INSTANCE_ROLE_NAME, ECS_INSTANCE_PROFILE_NAME
 
 
 def get_or_create_codebuild_role() -> str:
@@ -134,7 +134,7 @@ def get_or_create_lambda_role() -> str:
 
 def get_or_create_ecs_task_execution_role() -> str:
     """
-    Get or create the ECS task execution role for Fargate.
+    Get or create the ECS task execution role.
 
     This role allows ECS to pull images from ECR and write logs to CloudWatch.
 
@@ -187,7 +187,101 @@ def get_or_create_ecs_task_execution_role() -> str:
     for policy_arn in REQUIRED_POLICIES:
         iam_client.attach_role_policy(RoleName=ECS_TASK_EXECUTION_ROLE_NAME, PolicyArn=policy_arn)
 
-    print("⏳ Waiting for IAM role to propagate...")
+    print("⏳ Waiting for IAM task execution role to propagate...")
     time.sleep(10)
 
     return role_arn
+
+
+def get_or_create_ecs_instance_role() -> str:
+    """
+    Get or create the IAM role and instance profile for EC2 instances joining ECS clusters.
+
+    The role allows EC2 instances to:
+    - Register with ECS clusters
+    - Pull images from ECR
+    - Write logs to CloudWatch
+
+    Returns:
+        The instance profile ARN
+    """
+    iam_client = get_iam_client()
+
+    REQUIRED_POLICIES = [
+        "arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceforEC2Role",
+        "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly",
+        "arn:aws:iam::aws:policy/CloudWatchLogsFullAccess",
+    ]
+
+    # Check if instance profile already exists
+    try:
+        response = iam_client.get_instance_profile(InstanceProfileName=ECS_INSTANCE_PROFILE_NAME)
+        profile_arn = response["InstanceProfile"]["Arn"]
+
+        # Ensure role exists and has all policies
+        try:
+            iam_client.get_role(RoleName=ECS_INSTANCE_ROLE_NAME)
+            for policy_arn in REQUIRED_POLICIES:
+                try:
+                    iam_client.attach_role_policy(
+                        RoleName=ECS_INSTANCE_ROLE_NAME,
+                        PolicyArn=policy_arn,
+                    )
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+        print(f"✅ ECS instance profile exists: {ECS_INSTANCE_PROFILE_NAME}")
+        return profile_arn
+    except iam_client.exceptions.NoSuchEntityException:
+        pass
+
+    # Create the role
+    print("🔐 Creating ECS instance IAM role...")
+
+    trust_policy = {
+        "Version": "2012-10-17",
+        "Statement": [
+            {
+                "Effect": "Allow",
+                "Principal": {"Service": "ec2.amazonaws.com"},
+                "Action": "sts:AssumeRole",
+            }
+        ],
+    }
+
+    try:
+        iam_client.create_role(
+            RoleName=ECS_INSTANCE_ROLE_NAME,
+            AssumeRolePolicyDocument=json.dumps(trust_policy),
+        )
+    except iam_client.exceptions.EntityAlreadyExistsException:
+        pass
+
+    for policy_arn in REQUIRED_POLICIES:
+        iam_client.attach_role_policy(RoleName=ECS_INSTANCE_ROLE_NAME, PolicyArn=policy_arn)
+
+    # Create instance profile and attach role
+    try:
+        response = iam_client.create_instance_profile(
+            InstanceProfileName=ECS_INSTANCE_PROFILE_NAME,
+        )
+        profile_arn = response["InstanceProfile"]["Arn"]
+    except iam_client.exceptions.EntityAlreadyExistsException:
+        response = iam_client.get_instance_profile(InstanceProfileName=ECS_INSTANCE_PROFILE_NAME)
+        profile_arn = response["InstanceProfile"]["Arn"]
+
+    # Attach role to instance profile (idempotent — ignores if already attached)
+    try:
+        iam_client.add_role_to_instance_profile(
+            InstanceProfileName=ECS_INSTANCE_PROFILE_NAME,
+            RoleName=ECS_INSTANCE_ROLE_NAME,
+        )
+    except iam_client.exceptions.LimitExceededException:
+        pass  # Role already attached
+
+    print("⏳ Waiting for IAM instance profile to propagate...")
+    time.sleep(10)
+
+    return profile_arn

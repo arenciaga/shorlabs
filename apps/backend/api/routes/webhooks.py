@@ -25,7 +25,7 @@ def _json_safe_env_vars(env_vars: dict) -> dict:
 
 from api.db.dynamodb import get_org_id_by_installation_id, list_all_org_services
 from api.routes.github import get_or_refresh_token_for_org
-from api.routes.projects import send_deployment_to_sqs, send_fargate_deployment_to_sqs
+from api.routes.projects import send_deployment_to_sqs, send_ecs_deployment_to_sqs
 
 router = APIRouter(prefix="/webhooks", tags=["webhooks"])
 
@@ -149,10 +149,10 @@ async def github_webhook(request: Request):
 
         # Route to appropriate deployment function based on service type
         if service_type == "web-service":
-            # Fargate deployment
+            # ECS deployment
             cpu = int(svc.get("cpu", 256))
             memory = int(svc.get("memory", 512))
-            send_fargate_deployment_to_sqs(
+            send_ecs_deployment_to_sqs(
                 service_id=service_id,
                 github_url=github_url,
                 github_token=github_token,
@@ -168,7 +168,7 @@ async def github_webhook(request: Request):
                 branch=pushed_branch,
                 org_id=org_id,
             )
-            print(f"[webhook] push {full_name}@{pushed_branch}: triggered Fargate deploy for service_id={service_id}")
+            print(f"[webhook] push {full_name}@{pushed_branch}: triggered ECS deploy for service_id={service_id}")
         else:
             # Lambda deployment (web-app)
             memory = int(svc.get("memory", 1024))

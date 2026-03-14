@@ -73,6 +73,7 @@ def start_build(
     root_directory: str = "./",
     env_vars: Optional[dict] = None,
     compute_type_override: Optional[str] = None,
+    arm_build: bool = False,
 ) -> str:
     """
     Start a CodeBuild build and return the build ID.
@@ -87,6 +88,7 @@ def start_build(
         root_directory: Root directory for monorepos
         env_vars: Optional user environment variables for the build
         compute_type_override: Override CodeBuild compute type (e.g. BUILD_GENERAL1_SMALL for hobby plans)
+        arm_build: If True, override build environment to ARM for t4g instances
 
     Returns:
         The build ID
@@ -193,6 +195,11 @@ def start_build(
         "buildspecOverride": buildspec,
         "environmentVariablesOverride": env_overrides,
     }
+
+    if arm_build:
+        start_build_kwargs["environmentTypeOverride"] = "ARM_CONTAINER"
+        start_build_kwargs["imageOverride"] = "aws/codebuild/amazonlinux-aarch64-standard:3.0"
+        print(f"   ARM64 build enabled (t4g target)")
 
     if compute_type_override:
         start_build_kwargs["computeTypeOverride"] = compute_type_override

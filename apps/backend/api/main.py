@@ -91,7 +91,7 @@ def _handle_sqs_event(event: dict) -> dict:
     Handle SQS events for deployments, database provisioning, and database deletion.
     Routes based on message_type field.
     """
-    from api.routes.projects import _run_deployment_sync, _run_database_provision_sync, _run_database_delete_sync, _run_fargate_deployment_sync, _run_fargate_delete_sync
+    from api.routes.projects import _run_deployment_sync, _run_database_provision_sync, _run_database_delete_sync, _run_ecs_deployment_sync, _run_ecs_delete_sync
 
     records = event.get("Records", [])
     print(f"📥 Received {len(records)} SQS message(s)")
@@ -141,8 +141,8 @@ def _handle_sqs_event(event: dict) -> dict:
                 _run_database_delete_sync(
                     service_id=sid,
                 )
-            elif message_type == "fargate_deploy":
-                _run_fargate_deployment_sync(
+            elif message_type == "ecs_deploy":
+                _run_ecs_deployment_sync(
                     service_id=sid,
                     github_url=body["github_url"],
                     github_token=body.get("github_token"),
@@ -157,9 +157,10 @@ def _handle_sqs_event(event: dict) -> dict:
                     commit_author_username=body.get("commit_author_username"),
                     branch=body.get("branch"),
                     org_id=body.get("org_id"),
+                    instance_type=body.get("instance_type"),
                 )
-            elif message_type == "fargate_delete":
-                _run_fargate_delete_sync(
+            elif message_type == "ecs_delete":
+                _run_ecs_delete_sync(
                     service_id=sid,
                     org_id=body.get("org_id"),
                 )

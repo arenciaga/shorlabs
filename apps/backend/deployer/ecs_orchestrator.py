@@ -1,8 +1,8 @@
 """
-Fargate Deployment Orchestrator
+ECS EC2 Deployment Orchestrator
 
-Main deployment logic for ECS Fargate services (WebSocket/persistent connection workloads).
-Mirrors orchestrator.py but deploys to Fargate instead of Lambda.
+Main deployment logic for ECS EC2-backed services using t4g (ARM64) instances.
+Mirrors orchestrator.py but deploys to ECS EC2 instead of Lambda.
 """
 
 from typing import Optional
@@ -16,6 +16,7 @@ from .aws import (
     start_build,
     wait_for_build,
     get_or_create_ecs_task_execution_role,
+    get_or_create_ecs_instance_role,
     get_cluster_name,
     ensure_ecs_cluster,
     register_task_definition,
@@ -23,7 +24,12 @@ from .aws import (
     wait_for_service_stable,
     delete_ecs_service,
     delete_ecs_log_group,
+    delete_service_infra,
     ensure_ecs_security_group,
+    ensure_ec2_security_group,
+    ensure_launch_template,
+    ensure_auto_scaling_group,
+    ensure_ec2_capacity_provider,
     get_default_vpc_and_subnets,
     get_ecs_service_name,
     ensure_shared_alb,
@@ -36,10 +42,10 @@ from .aws import (
     get_target_group_for_host,
 )
 from .aws.ecr import get_ecr_repo_name
-from .config import DEFAULT_FARGATE_CPU, DEFAULT_FARGATE_MEMORY
+from .config import DEFAULT_TASK_CPU, DEFAULT_TASK_MEMORY, DEFAULT_INSTANCE_TYPE
 
 
-def deploy_fargate_project(
+def deploy_ecs_project(
     github_url: str,
     github_token: Optional[str] = None,
     root_directory: str = "./",
@@ -52,12 +58,13 @@ def deploy_fargate_project(
     codebuild_compute_type: Optional[str] = None,
     subdomain: Optional[str] = None,
     org_id: Optional[str] = None,
+    instance_type: Optional[str] = None,
 ) -> dict:
     """
-    Deploy a project from GitHub to ECS Fargate.
+    Deploy a project from GitHub to ECS backed by EC2 t4g (ARM64) instances.
 
     Uses the same CodeBuild→ECR pipeline as Lambda deployments,
-    but deploys the container to Fargate instead of Lambda.
+    but deploys the container to ECS EC2 instead of Lambda.
 
     Args:
         github_url: GitHub repository URL
@@ -65,12 +72,13 @@ def deploy_fargate_project(
         root_directory: Root directory for monorepos
         start_command: Command to start the application
         env_vars: Environment variables for the container
-        cpu: Fargate CPU units (256, 512, 1024, 2048, 4096)
-        memory: Fargate memory in MB (512, 1024, 2048, 4096, 8192)
+        cpu: Task CPU units (256, 512, 1024, 2048, 4096)
+        memory: Task memory in MB (512, 1024, 2048, 4096, 8192)
         on_build_start: Optional callback(build_id) called when build starts
         project_id: Unique project identifier for naming
         codebuild_compute_type: CodeBuild compute type override
         subdomain: Subdomain for ALB routing (e.g., "my-project-abc123")
+        instance_type: EC2 instance type (default from config)
 
     Returns:
         Dict with service_url, build_id, ecs_service_name, task_definition_arn,
@@ -79,8 +87,8 @@ def deploy_fargate_project(
     if not github_token:
         raise ValueError("github_token is required for authentication")
 
-    cpu = cpu or DEFAULT_FARGATE_CPU
-    memory = memory or DEFAULT_FARGATE_MEMORY
+    cpu = cpu or DEFAULT_TASK_CPU
+    memory = memory or DEFAULT_TASK_MEMORY
 
     # Use project_id for unique naming if provided
     repo_name = extract_project_name(github_url)
@@ -89,11 +97,14 @@ def deploy_fargate_project(
     else:
         project_name = repo_name
 
-    print(f"\n🔧 Shorlabs Deployer (ECS Fargate)")
+    instance_type = instance_type or DEFAULT_INSTANCE_TYPE
+
+    print(f"\n🔧 Shorlabs Deployer (ECS EC2 / {instance_type})")
     print(f"   Repository: {github_url}")
     print(f"   Project Name: {project_name}")
     print(f"   Start Command: {start_command}")
-    print(f"   CPU: {cpu}, Memory: {memory}MB\n")
+    print(f"   CPU: {cpu}, Memory: {memory}MB")
+    print(f"   Instance Type: {instance_type}\n")
 
     # Step 1: Detect runtime
     print("🔍 Detecting runtime...")
@@ -121,6 +132,7 @@ def deploy_fargate_project(
         root_directory=root_directory,
         env_vars=env_vars,
         compute_type_override=codebuild_compute_type,
+        arm_build=True,
     )
     print(f"🔨 Build started: {build_id}")
 
@@ -132,13 +144,46 @@ def deploy_fargate_project(
         raise Exception("Build failed")
     print("✅ Build completed")
 
-    # Step 5: Setup ECS infrastructure
-    print("🚀 Deploying to ECS Fargate...")
+    # Step 5: Setup ECS EC2 infrastructure
+    print("🚀 Deploying to ECS EC2...")
 
-    # 5a: IAM role for ECS task execution
+    # 5a: IAM roles
     execution_role_arn = get_or_create_ecs_task_execution_role()
+    instance_profile_arn = get_or_create_ecs_instance_role()
 
-    # 5b: Register task definition
+    # 5b: Get VPC and subnets (same default VPC as Aurora)
+    if not org_id:
+        raise ValueError("org_id is required for ECS EC2 deployment")
+    vpc_id, subnet_ids = get_default_vpc_and_subnets()
+
+    # 5c: Setup security groups
+    alb_sg_id = ensure_alb_security_group(vpc_id)
+    ecs_sg_id = ensure_ecs_security_group(vpc_id, alb_sg_id)
+    ec2_sg_id = ensure_ec2_security_group(vpc_id, alb_sg_id)
+
+    # 5d: Setup per-service EC2 infrastructure (launch template → ASG → capacity provider)
+    cluster_name = get_cluster_name(org_id)
+    launch_template_id = ensure_launch_template(
+        project_name=project_name,
+        cluster_name=cluster_name,
+        instance_profile_arn=instance_profile_arn,
+        security_group_id=ec2_sg_id,
+        instance_type=instance_type,
+    )
+    asg_name = ensure_auto_scaling_group(
+        project_name=project_name,
+        launch_template_id=launch_template_id,
+        subnet_ids=subnet_ids,
+    )
+    capacity_provider_name = ensure_ec2_capacity_provider(
+        project_name=project_name,
+        asg_name=asg_name,
+    )
+
+    # 5e: Ensure ECS cluster with capacity provider
+    cluster_arn = ensure_ecs_cluster(org_id, capacity_provider_name=capacity_provider_name)
+
+    # 5f: Register task definition
     image_uri = f"{ecr_repo_uri}:latest"
     task_def_arn = register_task_definition(
         project_name=project_name,
@@ -148,18 +193,6 @@ def deploy_fargate_project(
         execution_role_arn=execution_role_arn,
         env_vars=env_vars,
     )
-
-    # 5c: Ensure ECS cluster exists (per-org)
-    if not org_id:
-        raise ValueError("org_id is required for Fargate deployment")
-    cluster_arn = ensure_ecs_cluster(org_id)
-
-    # 5d: Get VPC and subnets (same default VPC as Aurora)
-    vpc_id, subnet_ids = get_default_vpc_and_subnets()
-
-    # 5e: Setup security groups
-    alb_sg_id = ensure_alb_security_group(vpc_id)
-    ecs_sg_id = ensure_ecs_security_group(vpc_id, alb_sg_id)
 
     # 5f: Create target group
     target_group_arn = create_target_group(project_name, vpc_id)
@@ -182,8 +215,7 @@ def deploy_fargate_project(
         print(f"🧹 Cleaning up old target group from previous deployment...")
         delete_target_group(old_target_group_arn)
 
-    # 5h: Create or update ECS service
-    cluster_name = get_cluster_name(org_id)
+    # 5i: Create or update ECS service
     service_arn = create_or_update_ecs_service(
         project_name=project_name,
         cluster_name=cluster_name,
@@ -191,6 +223,7 @@ def deploy_fargate_project(
         target_group_arn=target_group_arn,
         subnets=subnet_ids,
         security_group_id=ecs_sg_id,
+        capacity_provider_name=capacity_provider_name,
     )
 
     # Step 6: Wait for service to stabilize
@@ -199,7 +232,7 @@ def deploy_fargate_project(
 
     service_url = f"https://{host_header}"
 
-    print(f"\n✅ Fargate deployment successful!")
+    print(f"\n✅ ECS EC2 deployment successful!")
     print(f"🌐 Your service is live at: {service_url}")
 
     return {
@@ -214,7 +247,7 @@ def deploy_fargate_project(
     }
 
 
-def delete_fargate_resources(
+def delete_ecs_resources(
     github_url: str,
     function_name: Optional[str] = None,
     target_group_arn: Optional[str] = None,
@@ -222,7 +255,7 @@ def delete_fargate_resources(
     org_id: Optional[str] = None,
 ) -> dict:
     """
-    Delete all AWS resources for a Fargate project.
+    Delete all AWS resources for an ECS project.
 
     Args:
         github_url: GitHub repository URL
@@ -235,10 +268,10 @@ def delete_fargate_resources(
     """
     if function_name:
         project_name = function_name
-        print(f"🗑️ Deleting Fargate resources using stored name: {project_name}")
+        print(f"🗑️ Deleting ECS resources using stored name: {project_name}")
     else:
         project_name = extract_project_name(github_url)
-        print(f"🗑️ Deleting Fargate resources using derived name: {project_name}")
+        print(f"🗑️ Deleting ECS resources using derived name: {project_name}")
 
     # Delete listener rule first (before target group)
     rule_deleted = False
@@ -248,7 +281,7 @@ def delete_fargate_resources(
     # Delete ECS service (scales down then deletes)
     print("🗑️ Deleting ECS service...")
     if not org_id:
-        raise ValueError("org_id is required for Fargate resource deletion")
+        raise ValueError("org_id is required for ECS resource deletion")
     ecs_deleted = delete_ecs_service(project_name, org_id)
 
     # Delete target group (after ECS service is gone)
@@ -264,8 +297,13 @@ def delete_fargate_resources(
     print("🗑️ Deleting ECS log group...")
     logs_deleted = delete_ecs_log_group(project_name)
 
+    # Clean up per-service infra (capacity provider, ASG, launch template)
+    print("🧹 Cleaning up service infrastructure...")
+    infra_cleanup = delete_service_infra(project_name, org_id)
+
     print(f"🗑️ Deletion complete - ECS: {ecs_deleted}, ECR: {ecr_deleted}, "
-          f"TG: {tg_deleted}, Rule: {rule_deleted}, Logs: {logs_deleted}")
+          f"TG: {tg_deleted}, Rule: {rule_deleted}, Logs: {logs_deleted}, "
+          f"Infra cleanup: {infra_cleanup}")
 
     return {
         "ecs_deleted": ecs_deleted,
@@ -273,4 +311,5 @@ def delete_fargate_resources(
         "target_group_deleted": tg_deleted,
         "listener_rule_deleted": rule_deleted,
         "logs_deleted": logs_deleted,
+        "infra_cleanup": infra_cleanup,
     }

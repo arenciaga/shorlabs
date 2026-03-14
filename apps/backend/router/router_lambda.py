@@ -90,11 +90,11 @@ def handler(event, context):
 
 
 def _route_to_origin(request: dict, project: dict, original_host: str) -> dict:
-    """Route request to the correct origin based on service type (Lambda or Fargate ALB)."""
+    """Route request to the correct origin based on service type (Lambda or ECS ALB)."""
     service_type = project.get('service_type', 'web-app')
 
     if service_type == 'web-service':
-        # Fargate: route to the ALB using its DNS name
+        # ECS: route to the ALB using its DNS name
         alb_domain = project.get('alb_dns_name')
         if not alb_domain:
             return _error_response(503, "Not Ready", "Web service deployment not complete")

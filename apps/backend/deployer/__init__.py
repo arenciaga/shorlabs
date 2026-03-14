@@ -16,7 +16,7 @@ Usage:
 
 from .orchestrator import deploy_project, delete_project_resources
 from .database_orchestrator import provision_database, delete_database_resources
-from .fargate_orchestrator import deploy_fargate_project, delete_fargate_resources
+from .ecs_orchestrator import deploy_ecs_project, delete_ecs_resources
 from .utils import extract_project_name
 
 __all__ = [
@@ -24,7 +24,7 @@ __all__ = [
     "delete_project_resources",
     "provision_database",
     "delete_database_resources",
-    "deploy_fargate_project",
-    "delete_fargate_resources",
+    "deploy_ecs_project",
+    "delete_ecs_resources",
     "extract_project_name",
 ]

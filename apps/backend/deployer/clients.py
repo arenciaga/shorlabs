@@ -83,3 +83,15 @@ def get_ecs_client():
 def get_elbv2_client():
     """Get the Elastic Load Balancing v2 client (cached)."""
     return boto3.client("elbv2")
+
+
+@lru_cache()
+def get_autoscaling_client():
+    """Get the Auto Scaling client (cached)."""
+    return boto3.client("autoscaling")
+
+
+@lru_cache()
+def get_ssm_client():
+    """Get the Systems Manager client (cached)."""
+    return boto3.client("ssm")

@@ -308,7 +308,7 @@ def delete_lambda_logs(function_name: str) -> bool:
 
 def get_ecs_logs(project_name: str, limit: int = 100, hours_back: int = 24) -> list[dict]:
     """
-    Fetch recent logs from an ECS Fargate service.
+    Fetch recent logs from an ECS service.
 
     Args:
         project_name: The project name (used to derive log group)

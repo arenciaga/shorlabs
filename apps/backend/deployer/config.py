@@ -40,13 +40,21 @@ DEFAULT_MIN_ACU = 0       # Scale to zero
 DEFAULT_MAX_ACU = 2       # Default max capacity
 AURORA_ENGINE_VERSION = "16.1"  # PostgreSQL 16.1 (Aurora Serverless v2, supports scale-to-zero)
 
-# ECS Fargate Configuration
+# ECS EC2 Configuration
 ECS_CLUSTER_PREFIX = "shorlabs"
 ECS_SERVICE_PREFIX = "shorlabs"
 ECS_TASK_EXECUTION_ROLE_NAME = "shorlabs-ecs-task-execution-role"
+ECS_INSTANCE_ROLE_NAME = "shorlabs-ecs-instance-role"
+ECS_INSTANCE_PROFILE_NAME = "shorlabs-ecs-instance-profile"
 ALB_NAME = "shorlabs-alb"
 ALB_SECURITY_GROUP_NAME = "shorlabs-alb-sg"
 ECS_SECURITY_GROUP_NAME = "shorlabs-ecs-sg"
-DEFAULT_FARGATE_CPU = 256      # 0.25 vCPU
-DEFAULT_FARGATE_MEMORY = 512   # 512 MB
-FARGATE_CONTAINER_PORT = 8080
+ECS_EC2_SECURITY_GROUP_NAME = "shorlabs-ecs-ec2-sg"
+ECS_LAUNCH_TEMPLATE_PREFIX = "shorlabs-ecs-lt"
+ECS_ASG_PREFIX = "shorlabs-ecs-asg"
+ECS_CAPACITY_PROVIDER_PREFIX = "shorlabs-ecs-cp"
+DEFAULT_INSTANCE_TYPE = "t4g.micro"
+ALLOWED_INSTANCE_TYPES = ["t4g.nano", "t4g.micro", "t4g.small", "t4g.medium"]
+DEFAULT_TASK_CPU = 256         # 0.25 vCPU
+DEFAULT_TASK_MEMORY = 512      # 512 MB
+ECS_CONTAINER_PORT = 8080

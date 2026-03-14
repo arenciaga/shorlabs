@@ -5,7 +5,7 @@ AWS service operations for deployment.
 """
 
 from .ecr import create_ecr_repository, delete_ecr_repository
-from .iam import get_or_create_codebuild_role, get_or_create_lambda_role, get_or_create_ecs_task_execution_role
+from .iam import get_or_create_codebuild_role, get_or_create_lambda_role, get_or_create_ecs_task_execution_role, get_or_create_ecs_instance_role
 from .codebuild import create_or_update_codebuild_project, start_build, wait_for_build
 from .lambda_service import create_or_update_lambda, delete_lambda
 from .cloudwatch import get_build_logs, get_lambda_logs, delete_lambda_logs, get_ecs_logs, delete_ecs_logs
@@ -29,7 +29,13 @@ from .ecs_service import (
     wait_for_service_stable,
     delete_ecs_service,
     delete_ecs_log_group,
+    delete_service_infra,
     ensure_ecs_security_group,
+    ensure_ec2_security_group,
+    ensure_launch_template,
+    ensure_auto_scaling_group,
+    ensure_ec2_capacity_provider,
+    get_ecs_optimized_ami,
     get_default_vpc_and_subnets,
     get_ecs_service_name,
 )
@@ -52,6 +58,7 @@ __all__ = [
     "get_or_create_codebuild_role",
     "get_or_create_lambda_role",
     "get_or_create_ecs_task_execution_role",
+    "get_or_create_ecs_instance_role",
     # CodeBuild
     "create_or_update_codebuild_project",
     "start_build",
@@ -76,7 +83,7 @@ __all__ = [
     "delete_aurora_cluster",
     "get_cluster_security_group_ids",
     "get_security_group_rules",
-    # ECS Fargate
+    # ECS EC2
     "get_cluster_name",
     "ensure_ecs_cluster",
     "register_task_definition",
@@ -84,7 +91,13 @@ __all__ = [
     "wait_for_service_stable",
     "delete_ecs_service",
     "delete_ecs_log_group",
+    "delete_service_infra",
     "ensure_ecs_security_group",
+    "ensure_ec2_security_group",
+    "ensure_launch_template",
+    "ensure_auto_scaling_group",
+    "ensure_ec2_capacity_provider",
+    "get_ecs_optimized_ami",
     "get_default_vpc_and_subnets",
     "get_ecs_service_name",
     # ALB

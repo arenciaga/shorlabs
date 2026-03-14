@@ -7,7 +7,7 @@ Manages the shared ALB, per-service target groups, and host-based listener rules
 import os
 
 from ..clients import get_elbv2_client, get_ec2_client
-from ..config import ALB_NAME, ALB_SECURITY_GROUP_NAME, FARGATE_CONTAINER_PORT
+from ..config import ALB_NAME, ALB_SECURITY_GROUP_NAME, ECS_CONTAINER_PORT
 
 
 def ensure_alb_security_group(vpc_id: str) -> str:
@@ -188,9 +188,9 @@ def ensure_shared_alb(subnets: list, security_group_id: str) -> dict:
     }
 
 
-def create_target_group(project_name: str, vpc_id: str, port: int = FARGATE_CONTAINER_PORT) -> str:
+def create_target_group(project_name: str, vpc_id: str, port: int = ECS_CONTAINER_PORT) -> str:
     """
-    Create an ALB target group for a Fargate service.
+    Create an ALB target group for an ECS service.
 
     Target type is 'ip' (required for awsvpc network mode).
 

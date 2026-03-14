@@ -121,47 +121,66 @@ def ensure_ecs_cluster(org_id: str, capacity_provider_name: str = None) -> str:
         pass
 
     print(f"🔧 Creating ECS cluster: {cluster_name}")
-    create_kwargs = {"clusterName": cluster_name}
-    if capacity_provider_name:
-        create_kwargs["capacityProviders"] = [capacity_provider_name]
-        create_kwargs["defaultCapacityProviderStrategy"] = [
-            {
-                "capacityProvider": capacity_provider_name,
-                "weight": 1,
-                "base": 1,
-            }
-        ]
-
-    response = ecs_client.create_cluster(**create_kwargs)
+    # Create cluster WITHOUT capacity provider first to avoid
+    # InvalidParameterException when an INACTIVE cluster with different
+    # params still lingers.  We associate the CP separately afterwards.
+    response = ecs_client.create_cluster(clusterName=cluster_name)
     cluster_arn = response["cluster"]["clusterArn"]
     print(f"📝 Cluster created, waiting for ACTIVE status...")
 
-    # When a cluster is created with a capacity provider, AWS needs time to
-    # process the attachments before the cluster is fully active. Poll until
-    # the cluster is confirmed ACTIVE before returning.
+    # Poll until the cluster is confirmed ACTIVE before associating the
+    # capacity provider.
     for i in range(24):  # up to ~2 minutes
         try:
             desc = ecs_client.describe_clusters(clusters=[cluster_name])
             cl = desc.get("clusters", [])
             if cl and cl[0].get("status") == "ACTIVE":
-                # Also check that attachments are done processing
-                attachments = cl[0].get("attachments", [])
-                all_ready = all(
-                    a.get("status") in ("CREATED", "PRECREATED")
-                    for a in attachments
-                ) if attachments else True
-                if all_ready:
-                    print(f"✅ ECS cluster active: {cluster_name}")
-                    return cluster_arn
-                print(f"  ⏳ Cluster active but attachments still processing ({i+1}/24)...")
+                print(f"✅ ECS cluster active: {cluster_name}")
+                break
             else:
                 status = cl[0].get("status") if cl else "NOT_FOUND"
                 print(f"  ⏳ Cluster status: {status} ({i+1}/24)...")
         except Exception as e:
             print(f"  ⚠️ Error checking cluster status: {e}")
         time.sleep(5)
+    else:
+        print(f"⚠️ Cluster may not be fully active yet, proceeding anyway")
 
-    print(f"⚠️ Cluster may not be fully active yet, proceeding anyway")
+    # Now associate the capacity provider separately — this avoids the
+    # InvalidParameterException when create_cluster is idempotent-matched
+    # against a lingering INACTIVE cluster with different params.
+    if capacity_provider_name:
+        print(f"🔧 Associating capacity provider {capacity_provider_name} with cluster {cluster_name}")
+        ecs_client.put_cluster_capacity_providers(
+            cluster=cluster_name,
+            capacityProviders=[capacity_provider_name],
+            defaultCapacityProviderStrategy=[
+                {
+                    "capacityProvider": capacity_provider_name,
+                    "weight": 1,
+                    "base": 1,
+                }
+            ],
+        )
+        # Wait for attachment to settle
+        for i in range(24):
+            try:
+                desc = ecs_client.describe_clusters(clusters=[cluster_name])
+                cl = desc.get("clusters", [])
+                if cl:
+                    attachments = cl[0].get("attachments", [])
+                    all_ready = all(
+                        a.get("status") in ("CREATED", "PRECREATED")
+                        for a in attachments
+                    ) if attachments else True
+                    if all_ready:
+                        print(f"✅ Capacity provider attached to cluster")
+                        return cluster_arn
+                    print(f"  ⏳ Capacity provider attachments still processing ({i+1}/24)...")
+            except Exception as e:
+                print(f"  ⚠️ Error checking attachment status: {e}")
+            time.sleep(5)
+
     return cluster_arn
 
 

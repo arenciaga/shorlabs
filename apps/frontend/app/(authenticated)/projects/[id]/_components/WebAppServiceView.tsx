@@ -21,6 +21,12 @@ const WEB_APP_TABS = [
     { key: "settings", label: "Settings" },
 ]
 
+const WEB_SERVICE_TABS = [
+    { key: "deployments", label: "Deployments" },
+    { key: "logs", label: "Logs" },
+    { key: "settings", label: "Settings" },
+]
+
 export function WebAppServiceView({
     service,
     project,
@@ -38,7 +44,7 @@ export function WebAppServiceView({
     const activeCustomDomain = service.custom_domains?.find(d => d.is_active)
     const displayUrl = activeCustomDomain
         ? `https://${activeCustomDomain.domain}`
-        : (service.custom_url || service.function_url || null)
+        : (service.custom_url || service.function_url || service.service_url || null)
 
     const projectCompat = {
         ...project,
@@ -70,7 +76,7 @@ export function WebAppServiceView({
             {isBuilding && <BuildProgress currentStatus={service.status} />}
 
             <TabNavigation
-                tabs={WEB_APP_TABS}
+                tabs={service.service_type === "web-service" ? WEB_SERVICE_TABS : WEB_APP_TABS}
                 activeTab={hook.activeTab}
                 onTabChange={(tab) => hook.setActiveTab(tab as "deployments" | "domains" | "logs" | "compute" | "settings")}
             />

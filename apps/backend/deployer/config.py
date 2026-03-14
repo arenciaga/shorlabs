@@ -39,3 +39,14 @@ DEFAULT_DB_PORT = 5432
 DEFAULT_MIN_ACU = 0       # Scale to zero
 DEFAULT_MAX_ACU = 2       # Default max capacity
 AURORA_ENGINE_VERSION = "16.1"  # PostgreSQL 16.1 (Aurora Serverless v2, supports scale-to-zero)
+
+# ECS Fargate Configuration
+ECS_CLUSTER_PREFIX = "shorlabs"
+ECS_SERVICE_PREFIX = "shorlabs"
+ECS_TASK_EXECUTION_ROLE_NAME = "shorlabs-ecs-task-execution-role"
+ALB_NAME = "shorlabs-alb"
+ALB_SECURITY_GROUP_NAME = "shorlabs-alb-sg"
+ECS_SECURITY_GROUP_NAME = "shorlabs-ecs-sg"
+DEFAULT_FARGATE_CPU = 256      # 0.25 vCPU
+DEFAULT_FARGATE_MEMORY = 512   # 512 MB
+FARGATE_CONTAINER_PORT = 8080

@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, Suspense } from 'react'
 import { useAuth, useUser } from '@clerk/nextjs'
 import { useCustomer } from 'autumn-js/react'
+import { useSearchParams, useRouter } from 'next/navigation'
 import { Github, Loader2, ExternalLink, Unplug, RefreshCw, AlertCircle, CreditCard, ArrowUpRight } from 'lucide-react'
 import { useIsPro } from '@/hooks/use-is-pro'
 import { PLANS } from '@/lib/plans'
@@ -31,9 +32,11 @@ interface GitHubConnection {
     installation_id?: string
 }
 
-export default function SettingsPage() {
+function SettingsPageInner() {
     const { getToken, orgId, isLoaded: authLoaded } = useAuth()
     const { isLoaded: userLoaded } = useUser()
+    const searchParams = useSearchParams()
+    const router = useRouter()
     const { openBillingPortal, isLoading: isCustomerLoading } = useCustomer()
     const { isPro, isCanceling, currentPlan, planLabel, activeProduct, scheduledPlanLabel, isLoaded: isPlanLoaded } = useIsPro()
     const planPrice = currentPlan ? PLANS.find((p) => p.id === currentPlan)?.price ?? "$0" : "$0"
@@ -80,6 +83,57 @@ export default function SettingsPage() {
             fetchStatus()
         }
     }, [authLoaded, userLoaded, orgId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+    // Handle GitHub App installation callback from URL params (direct redirect)
+    useEffect(() => {
+        const installation_id = searchParams.get('installation_id')
+        const setup_action = searchParams.get('setup_action')
+
+        if (installation_id && authLoaded && orgId) {
+            const handleCallback = async () => {
+                try {
+                    const token = await getToken()
+                    if (!token) return
+
+                    const connectUrl = new URL(`${API_BASE_URL}/api/github/connect`)
+                    connectUrl.searchParams.append('org_id', orgId)
+                    const response = await fetch(connectUrl.toString(), {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ installation_id, setup_action: setup_action || 'install' }),
+                    })
+
+                    if (!response.ok) {
+                        const data = await response.json()
+                        throw new Error(data.detail || 'Failed to connect GitHub')
+                    }
+
+                    // If opened as popup, notify parent and close
+                    if (window.opener) {
+                        window.opener.postMessage({ type: 'github-connected' }, window.location.origin)
+                        window.close()
+                        return
+                    }
+
+                    // Otherwise, clean URL and refresh status
+                    router.replace('/settings')
+                    fetchStatus()
+                } catch (err) {
+                    console.error('GitHub connection failed:', err)
+                    if (window.opener) {
+                        window.opener.postMessage({ type: 'github-connection-failed' }, window.location.origin)
+                        window.close()
+                        return
+                    }
+                    setError(err instanceof Error ? err.message : 'Failed to connect GitHub')
+                }
+            }
+            handleCallback()
+        }
+    }, [searchParams, authLoaded, orgId, getToken, router, fetchStatus])
 
     // Listen for GitHub popup callback (reuse existing flow)
     useEffect(() => {
@@ -466,5 +520,17 @@ export default function SettingsPage() {
                 <UpgradeModal isOpen={upgradeOpen} onClose={closeUpgradeModal} />
             </div>
         </div>
+    )
+}
+
+export default function SettingsPage() {
+    return (
+        <Suspense fallback={
+            <div className="min-h-screen bg-white flex items-center justify-center">
+                <Loader2 className="h-6 w-6 animate-spin text-zinc-400" />
+            </div>
+        }>
+            <SettingsPageInner />
+        </Suspense>
     )
 }

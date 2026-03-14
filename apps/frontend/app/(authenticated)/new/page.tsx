@@ -4,9 +4,11 @@ import { Suspense, useState } from "react"
 import Link from "next/link"
 import { useSearchParams, useRouter } from "next/navigation"
 import { useAuth } from "@clerk/nextjs"
-import { ArrowLeft, ArrowRight, Loader2, FolderOpen } from "lucide-react"
+import { ArrowLeft, ArrowRight, Loader2, FolderOpen, Lock } from "lucide-react"
 import { createBlankProject } from "@/lib/api"
-import { GitHubIcon, PostgreSQLIcon } from "@/components/service-icons"
+import { GitHubIcon, PostgreSQLIcon, ContainerIcon } from "@/components/service-icons"
+import { useIsPro } from "@/hooks/use-is-pro"
+import { UpgradeModal, useUpgradeModal } from "@/components/upgrade-modal"
 
 function NewProjectPageInner() {
     const searchParams = useSearchParams()
@@ -15,6 +17,8 @@ function NewProjectPageInner() {
     const projectId = searchParams.get("project_id")
     const isAddService = !!projectId
     const [creatingBlank, setCreatingBlank] = useState(false)
+    const { isPro, isLoaded: isPlanLoaded } = useIsPro()
+    const { isOpen: isUpgradeOpen, openUpgradeModal, closeUpgradeModal } = useUpgradeModal()
 
     const PROJECT_TYPES = [
         {
@@ -22,6 +26,12 @@ function NewProjectPageInner() {
             name: "Web App",
             description: "Deploy a web application from a Git repository",
             href: projectId ? `/new/web-app?project_id=${projectId}` : "/new/web-app",
+        },
+        {
+            id: "web-service",
+            name: "Web Service",
+            description: "Deploy a long-running container with WebSocket & persistent connections",
+            href: projectId ? `/new/web-service?project_id=${projectId}` : "/new/web-service",
         },
         {
             id: "database",
@@ -44,6 +54,9 @@ function NewProjectPageInner() {
             setCreatingBlank(false)
         }
     }
+
+    /** True when the web-service option should be locked (hobby plan). */
+    const isWebServiceLocked = isPlanLoaded && !isPro
 
     return (
         <div className="min-h-screen bg-white">
@@ -71,33 +84,70 @@ function NewProjectPageInner() {
 
                 {/* Project Type List */}
                 <div className="border border-zinc-200 divide-y divide-zinc-200">
-                    {PROJECT_TYPES.map((type) => (
-                        <Link
-                            key={type.id}
-                            href={type.href}
-                            className="flex items-center gap-4 px-4 sm:px-6 py-4 hover:bg-zinc-50 transition-colors group"
-                        >
-                            <div className="w-10 h-10 rounded-none bg-zinc-900 flex items-center justify-center shrink-0">
-                                {type.id === "database" ? (
-                                    <PostgreSQLIcon className="h-6 w-6" />
-                                ) : (
-                                    <GitHubIcon className="h-5 w-5 text-white" />
-                                )}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2">
-                                    <p className="font-medium text-zinc-900">{type.name}</p>
-                                    {type.id === "database" && (
-                                        <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-amber-800">
-                                            Beta
-                                        </span>
+                    {PROJECT_TYPES.map((type) => {
+                        const isLocked = type.id === "web-service" && isWebServiceLocked
+
+                        if (isLocked) {
+                            return (
+                                <button
+                                    key={type.id}
+                                    type="button"
+                                    onClick={openUpgradeModal}
+                                    className="w-full flex items-center gap-4 px-4 sm:px-6 py-4 hover:bg-zinc-50 transition-colors group text-left"
+                                >
+                                    <div className="w-10 h-10 rounded-none bg-zinc-900 flex items-center justify-center shrink-0">
+                                        <ContainerIcon className="h-5 w-5 text-white" />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2">
+                                            <p className="font-medium text-zinc-900">{type.name}</p>
+                                            <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-blue-800">
+                                                <Lock className="h-3 w-3" />
+                                                Plus
+                                            </span>
+                                        </div>
+                                        <p className="text-sm text-zinc-500">{type.description}</p>
+                                    </div>
+                                    <ArrowRight className="h-4 w-4 text-zinc-400 group-hover:text-zinc-900 transition-colors shrink-0" />
+                                </button>
+                            )
+                        }
+
+                        return (
+                            <Link
+                                key={type.id}
+                                href={type.href}
+                                className="flex items-center gap-4 px-4 sm:px-6 py-4 hover:bg-zinc-50 transition-colors group"
+                            >
+                                <div className="w-10 h-10 rounded-none bg-zinc-900 flex items-center justify-center shrink-0">
+                                    {type.id === "database" ? (
+                                        <PostgreSQLIcon className="h-6 w-6" />
+                                    ) : type.id === "web-service" ? (
+                                        <ContainerIcon className="h-5 w-5 text-white" />
+                                    ) : (
+                                        <GitHubIcon className="h-5 w-5 text-white" />
                                     )}
                                 </div>
-                                <p className="text-sm text-zinc-500">{type.description}</p>
-                            </div>
-                            <ArrowRight className="h-4 w-4 text-zinc-400 group-hover:text-zinc-900 transition-colors shrink-0" />
-                        </Link>
-                    ))}
+                                <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2">
+                                        <p className="font-medium text-zinc-900">{type.name}</p>
+                                        {type.id === "database" && (
+                                            <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-amber-800">
+                                                Beta
+                                            </span>
+                                        )}
+                                        {type.id === "web-service" && (
+                                            <span className="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-blue-800">
+                                                Plus
+                                            </span>
+                                        )}
+                                    </div>
+                                    <p className="text-sm text-zinc-500">{type.description}</p>
+                                </div>
+                                <ArrowRight className="h-4 w-4 text-zinc-400 group-hover:text-zinc-900 transition-colors shrink-0" />
+                            </Link>
+                        )
+                    })}
                 </div>
 
                 {/* Blank Project — only when creating a new project, not adding a service */}
@@ -124,6 +174,8 @@ function NewProjectPageInner() {
                     </button>
                 )}
             </div>
+
+            <UpgradeModal isOpen={isUpgradeOpen} onClose={closeUpgradeModal} />
         </div>
     )
 }

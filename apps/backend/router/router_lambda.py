@@ -79,18 +79,43 @@ def handler(event, context):
         if not project:
             return _error_response(404, "Not Found", f"No project found for subdomain: {subdomain}")
 
-        return _route_to_lambda(request, project, host)
+        return _route_to_origin(request, project, host)
 
     # ── Route 2: Custom domain routing ───────────────────────────
     project = _lookup_project_by_custom_domain(host)
     if project:
-        return _route_to_lambda(request, project, host)
+        return _route_to_origin(request, project, host)
 
     return _error_response(404, "Not Found", f"No project found for domain: {host}")
 
 
-def _route_to_lambda(request: dict, project: dict, original_host: str) -> dict:
-    """Rewrite CloudFront origin to a project's Lambda function."""
+def _route_to_origin(request: dict, project: dict, original_host: str) -> dict:
+    """Route request to the correct origin based on service type (Lambda or Fargate ALB)."""
+    service_type = project.get('service_type', 'web-app')
+
+    if service_type == 'web-service':
+        # Fargate: route to the ALB using its DNS name
+        alb_domain = project.get('alb_dns_name')
+        if not alb_domain:
+            return _error_response(503, "Not Ready", "Web service deployment not complete")
+
+        request['origin'] = {
+            'custom': {
+                'domainName': alb_domain,
+                'port': 443,
+                'protocol': 'https',
+                'sslProtocols': ['TLSv1.2'],
+                'readTimeout': 60,
+                'keepaliveTimeout': 60,
+                'customHeaders': {}
+            }
+        }
+        # ALB uses host-based routing, so keep the original host header
+        request['headers']['host'] = [{'key': 'Host', 'value': original_host}]
+        request['headers']['x-forwarded-host'] = [{'key': 'X-Forwarded-Host', 'value': original_host}]
+        return request
+
+    # Lambda (web-app): existing flow
     lambda_url = project.get('function_url')
     if not lambda_url:
         return _error_response(503, "Not Ready", "Project deployment not complete")
@@ -146,7 +171,7 @@ def _lookup_project_by_subdomain(subdomain: str) -> dict | None:
                 ":sd": subdomain,
                 ":sk_prefix": "PROJECT#",
             },
-            ProjectionExpression="function_url, subdomain, #st",
+            ProjectionExpression="function_url, subdomain, #st, service_type, alb_dns_name",
             ExpressionAttributeNames={"#st": "status"},
         )
 
@@ -176,7 +201,7 @@ def _lookup_project_by_custom_domain(domain: str) -> dict | None:
                 'domain': domain_lower,
                 'SK': DOMAIN_ITEM_SK,
             },
-            ProjectionExpression="function_url, #st, project_id",
+            ProjectionExpression="function_url, #st, project_id, service_type, alb_dns_name",
             ExpressionAttributeNames={"#st": "status"},
         )
 

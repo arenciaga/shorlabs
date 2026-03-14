@@ -8,7 +8,7 @@ import json
 import time
 
 from ..clients import get_iam_client
-from ..config import CODEBUILD_ROLE_NAME, LAMBDA_ROLE_NAME
+from ..config import CODEBUILD_ROLE_NAME, LAMBDA_ROLE_NAME, ECS_TASK_EXECUTION_ROLE_NAME
 
 
 def get_or_create_codebuild_role() -> str:
@@ -125,8 +125,69 @@ def get_or_create_lambda_role() -> str:
     # Attach all required policies
     for policy_arn in REQUIRED_POLICIES:
         iam_client.attach_role_policy(RoleName=LAMBDA_ROLE_NAME, PolicyArn=policy_arn)
-    
+
     print("⏳ Waiting for IAM role to propagate...")
     time.sleep(10)
-    
+
+    return role_arn
+
+
+def get_or_create_ecs_task_execution_role() -> str:
+    """
+    Get or create the ECS task execution role for Fargate.
+
+    This role allows ECS to pull images from ECR and write logs to CloudWatch.
+
+    Returns:
+        The role ARN
+    """
+    iam_client = get_iam_client()
+
+    REQUIRED_POLICIES = [
+        "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy",
+        "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly",
+    ]
+
+    try:
+        response = iam_client.get_role(RoleName=ECS_TASK_EXECUTION_ROLE_NAME)
+        role_arn = response["Role"]["Arn"]
+
+        print("🔐 Ensuring ECS task execution role has all required policies...")
+        for policy_arn in REQUIRED_POLICIES:
+            try:
+                iam_client.attach_role_policy(
+                    RoleName=ECS_TASK_EXECUTION_ROLE_NAME,
+                    PolicyArn=policy_arn
+                )
+            except Exception:
+                pass
+        return role_arn
+    except iam_client.exceptions.NoSuchEntityException:
+        pass
+
+    print("🔐 Creating ECS task execution IAM role...")
+
+    trust_policy = {
+        "Version": "2012-10-17",
+        "Statement": [
+            {
+                "Effect": "Allow",
+                "Principal": {"Service": "ecs-tasks.amazonaws.com"},
+                "Action": "sts:AssumeRole"
+            }
+        ]
+    }
+
+    response = iam_client.create_role(
+        RoleName=ECS_TASK_EXECUTION_ROLE_NAME,
+        AssumeRolePolicyDocument=json.dumps(trust_policy),
+    )
+    role_arn = response["Role"]["Arn"]
+
+    for policy_arn in REQUIRED_POLICIES:
+        iam_client.attach_role_policy(RoleName=ECS_TASK_EXECUTION_ROLE_NAME, PolicyArn=policy_arn)
+
+    print("⏳ Waiting for IAM role to propagate...")
+    time.sleep(10)
+
     return role_arn

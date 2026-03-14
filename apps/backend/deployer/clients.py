@@ -71,3 +71,15 @@ def get_ec2_client():
 def get_secretsmanager_client():
     """Get the Secrets Manager client (cached)."""
     return boto3.client("secretsmanager")
+
+
+@lru_cache()
+def get_ecs_client():
+    """Get the ECS client (cached)."""
+    return boto3.client("ecs")
+
+
+@lru_cache()
+def get_elbv2_client():
+    """Get the Elastic Load Balancing v2 client (cached)."""
+    return boto3.client("elbv2")

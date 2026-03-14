@@ -10,6 +10,7 @@ from datetime import datetime, timedelta
 from ..clients import get_logs_client, get_codebuild_client
 from ..config import CODEBUILD_PROJECT_NAME
 from .lambda_service import get_lambda_function_name
+from .ecs_service import get_ecs_log_group
 
 
 def get_build_logs(build_id: str, limit: int = 200) -> list[dict]:
@@ -302,4 +303,106 @@ def delete_lambda_logs(function_name: str) -> bool:
 
     except Exception as e:
         print(f"❌ Unexpected error deleting log group {log_group}: {type(e).__name__}: {e}")
+        return False
+
+
+def get_ecs_logs(project_name: str, limit: int = 100, hours_back: int = 24) -> list[dict]:
+    """
+    Fetch recent logs from an ECS Fargate service.
+
+    Args:
+        project_name: The project name (used to derive log group)
+        limit: Maximum number of log events to return
+        hours_back: How many hours back to search for logs
+
+    Returns:
+        List of log entries with timestamp, message, and level
+    """
+    logs_client = get_logs_client()
+    log_group = get_ecs_log_group(project_name)
+
+    end_time = int(datetime.utcnow().timestamp() * 1000)
+    start_time = int((datetime.utcnow() - timedelta(hours=hours_back)).timestamp() * 1000)
+
+    try:
+        streams_response = logs_client.describe_log_streams(
+            logGroupName=log_group,
+            orderBy="LastEventTime",
+            descending=True,
+            limit=5,
+        )
+
+        log_streams = streams_response.get("logStreams", [])
+        if not log_streams:
+            return [{"timestamp": datetime.utcnow().isoformat(), "message": "No logs available yet", "level": "INFO"}]
+
+        all_events = []
+        remaining = limit
+
+        for stream in log_streams:
+            if remaining <= 0:
+                break
+
+            try:
+                events_response = logs_client.get_log_events(
+                    logGroupName=log_group,
+                    logStreamName=stream["logStreamName"],
+                    startTime=start_time,
+                    endTime=end_time,
+                    limit=remaining,
+                    startFromHead=False,
+                )
+
+                events = events_response.get("events", [])
+                all_events.extend(events)
+                remaining -= len(events)
+
+            except Exception:
+                continue
+
+        all_events.sort(key=lambda x: x["timestamp"])
+
+        return [
+            {
+                "timestamp": datetime.utcfromtimestamp(e["timestamp"] / 1000).isoformat(),
+                "message": e["message"].rstrip("\n"),
+                "level": _detect_log_level(e["message"]),
+            }
+            for e in all_events[-limit:]
+        ]
+
+    except logs_client.exceptions.ResourceNotFoundException:
+        return [{"timestamp": datetime.utcnow().isoformat(), "message": "No logs available - service has not started yet", "level": "INFO"}]
+    except Exception as e:
+        return [{"timestamp": datetime.utcnow().isoformat(), "message": f"Error fetching logs: {e}", "level": "ERROR"}]
+
+
+def delete_ecs_logs(project_name: str) -> bool:
+    """
+    Delete CloudWatch log group for an ECS service.
+
+    Returns:
+        True if deleted, False otherwise
+    """
+    from botocore.exceptions import ClientError
+
+    logs_client = get_logs_client()
+    log_group = get_ecs_log_group(project_name)
+
+    print(f"🗑️ Attempting to delete ECS log group: {log_group}")
+
+    try:
+        logs_client.delete_log_group(logGroupName=log_group)
+        print(f"✅ Deleted ECS log group: {log_group}")
+        return True
+    except ClientError as e:
+        error_code = e.response.get("Error", {}).get("Code", "Unknown")
+        if error_code == "ResourceNotFoundException":
+            print(f"⚠️ ECS log group not found (already deleted?): {log_group}")
+            return True
+        else:
+            print(f"❌ Failed to delete ECS log group: {e}")
+            return False
+    except Exception as e:
+        print(f"❌ Unexpected error deleting ECS log group: {e}")
         return False

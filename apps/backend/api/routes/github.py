@@ -246,7 +246,7 @@ async def get_auth_url():
     # If using GitHub App with a known slug, use the installation flow
     # This enables the "Only select repositories" UI
     if GITHUB_APP_SLUG:
-        # Note: The GitHub App must have its "Setup URL" configured to FRONTEND_URL/new
+        # Note: The GitHub App must have its "Setup URL" configured to FRONTEND_URL/settings
         # in the GitHub App settings for the redirect to work after installation
         return {
             "url": f"https://github.com/apps/{GITHUB_APP_SLUG}/installations/new"

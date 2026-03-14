@@ -37,8 +37,10 @@ from api.db.dynamodb import (
 # Import from deployer package
 from deployer import deploy_project, delete_project_resources, extract_project_name
 from deployer import provision_database, delete_database_resources
+from deployer import deploy_fargate_project, delete_fargate_resources
 from deployer.aws import (
     get_lambda_logs,
+    get_ecs_logs,
 )
 from deployer.aws.rds import get_cluster_secret, get_cluster_security_group_ids, get_security_group_rules, modify_aurora_cluster_scaling, _normalize_serverless_v2_capacity
 from api.db.pg_explorer import (
@@ -95,10 +97,22 @@ class CreateDatabaseProjectRequest(BaseModel):
     min_acu: Optional[float] = 0
     max_acu: Optional[float] = 2
 
+class CreateWebServiceProjectRequest(BaseModel):
+    """Create a project with an initial web-service (Fargate) service."""
+    name: str
+    organization_id: str
+    description: Optional[str] = ""
+    github_repo: str
+    root_directory: Optional[str] = "./"
+    env_vars: Optional[dict] = None
+    start_command: str
+    cpu: Optional[int] = 256
+    memory: Optional[int] = 512
+
 class AddServiceRequest(BaseModel):
     """Add a new service to an existing project."""
     name: str
-    service_type: str  # "web-app" or "database"
+    service_type: str  # "web-app", "database", or "web-service"
     # Web-app fields
     github_repo: Optional[str] = None
     root_directory: Optional[str] = "./"
@@ -111,6 +125,8 @@ class AddServiceRequest(BaseModel):
     db_name: Optional[str] = "shorlabs"
     min_acu: Optional[float] = 0
     max_acu: Optional[float] = 2
+    # Web-service (Fargate) fields
+    cpu: Optional[int] = 256
 
 
 class ProjectResponse(BaseModel):
@@ -541,12 +557,244 @@ def send_database_delete_to_sqs(service_id: str):
 
 
 # ─────────────────────────────────────────────────────────────
-# API ENDPOINTS
+# FARGATE DEPLOYMENT (BACKGROUND TASK)
 # ─────────────────────────────────────────────────────────────
 
 
+def _run_fargate_deployment_sync(
+    service_id: str,
+    github_url: str,
+    github_token: Optional[str],
+    root_directory: str = "./",
+    start_command: str = "uvicorn main:app --host 0.0.0.0 --port 8080",
+    env_vars: Optional[dict] = None,
+    cpu: int = 256,
+    memory: int = 512,
+    commit_sha: Optional[str] = None,
+    commit_message: Optional[str] = None,
+    commit_author_name: Optional[str] = None,
+    commit_author_username: Optional[str] = None,
+    branch: Optional[str] = None,
+    org_id: Optional[str] = None,
+):
+    """Synchronous Fargate deployment function - runs in thread pool or via SQS."""
+    from datetime import datetime
+
+    deployment = None
+    build_id_holder = [None]
+
+    def on_build_start(build_id: str):
+        nonlocal deployment
+        build_id_holder[0] = build_id
+        deployment = create_deployment(
+            service_id, build_id,
+            commit_sha=commit_sha,
+            commit_message=commit_message,
+            commit_author_name=commit_author_name,
+            commit_author_username=commit_author_username,
+            branch=branch,
+        )
+        print(f"📝 Fargate deployment record created: {deployment['deploy_id']} (build: {build_id})")
+
+    try:
+        update_service(service_id, {"status": "BUILDING"})
+
+        codebuild_compute_type = "BUILD_GENERAL1_LARGE"
+        if org_id:
+            from api.lambda_warmer import _is_paid_org
+            if not _is_paid_org(org_id):
+                codebuild_compute_type = "BUILD_GENERAL1_SMALL"
+
+        # Get subdomain from the service record
+        svc = get_service(service_id)
+        subdomain = svc.get("subdomain") if svc else None
+
+        result = deploy_fargate_project(
+            github_url=github_url,
+            github_token=github_token,
+            root_directory=root_directory,
+            start_command=start_command,
+            env_vars=env_vars,
+            cpu=cpu,
+            memory=memory,
+            on_build_start=on_build_start,
+            project_id=service_id,
+            codebuild_compute_type=codebuild_compute_type,
+            subdomain=subdomain,
+            org_id=org_id,
+        )
+
+        if deployment:
+            update_deployment(service_id, deployment["deploy_id"], {
+                "status": "SUCCEEDED",
+                "finished_at": datetime.utcnow().isoformat(),
+            })
+
+        update_service(service_id, {
+            "status": "LIVE",
+            "service_url": result["service_url"],
+            "alb_dns_name": result.get("alb_dns_name"),
+            "function_name": result.get("function_name"),
+            "ecs_service_name": result.get("ecs_service_name"),
+            "task_definition_arn": result.get("task_definition_arn"),
+            "target_group_arn": result.get("target_group_arn"),
+            "listener_rule_arn": result.get("listener_rule_arn"),
+        })
+
+        print(f"✅ Fargate deployment complete: {result['service_url']}")
+
+    except Exception as e:
+        if deployment:
+            update_deployment(service_id, deployment["deploy_id"], {
+                "status": "FAILED",
+                "finished_at": datetime.utcnow().isoformat(),
+            })
+        update_service(service_id, {"status": "FAILED"})
+        print(f"❌ Fargate deployment failed: {e}")
+        traceback.print_exc()
 
 
+def send_fargate_deployment_to_sqs(
+    service_id: str,
+    github_url: str,
+    github_token: Optional[str],
+    root_directory: str = "./",
+    start_command: str = "uvicorn main:app --host 0.0.0.0 --port 8080",
+    env_vars: Optional[dict] = None,
+    cpu: int = 256,
+    memory: int = 512,
+    commit_sha: Optional[str] = None,
+    commit_message: Optional[str] = None,
+    commit_author_name: Optional[str] = None,
+    commit_author_username: Optional[str] = None,
+    branch: Optional[str] = None,
+    org_id: Optional[str] = None,
+):
+    """Send Fargate deployment task to SQS queue for background processing."""
+    import time
+
+    if not os.environ.get("AWS_LAMBDA_FUNCTION_NAME"):
+        def run_in_thread():
+            _run_fargate_deployment_sync(
+                service_id, github_url, github_token, root_directory, start_command,
+                env_vars, cpu, memory,
+                commit_sha=commit_sha, commit_message=commit_message,
+                commit_author_name=commit_author_name,
+                commit_author_username=commit_author_username, branch=branch,
+                org_id=org_id,
+            )
+        thread = threading.Thread(target=run_in_thread)
+        thread.start()
+        print(f"📤 Local: Fargate deployment started in background thread for service {service_id}")
+        return
+
+    sqs_client = boto3.client("sqs")
+    queue_url = os.environ.get("DEPLOY_QUEUE_URL")
+    if not queue_url:
+        def run_in_thread():
+            _run_fargate_deployment_sync(
+                service_id, github_url, github_token, root_directory, start_command,
+                env_vars, cpu, memory,
+                commit_sha=commit_sha, commit_message=commit_message,
+                commit_author_name=commit_author_name,
+                commit_author_username=commit_author_username, branch=branch,
+                org_id=org_id,
+            )
+        thread = threading.Thread(target=run_in_thread)
+        thread.start()
+        return
+
+    message_body = {
+        "message_type": "fargate_deploy",
+        "service_id": service_id,
+        "github_url": github_url,
+        "github_token": github_token,
+        "root_directory": root_directory,
+        "start_command": start_command,
+        "env_vars": env_vars or {},
+        "cpu": cpu,
+        "memory": memory,
+        "commit_sha": commit_sha,
+        "commit_message": commit_message,
+        "commit_author_name": commit_author_name,
+        "commit_author_username": commit_author_username,
+        "branch": branch,
+        "org_id": org_id,
+    }
+
+    response = sqs_client.send_message(
+        QueueUrl=queue_url,
+        MessageBody=json.dumps(message_body),
+        MessageGroupId=service_id,
+        MessageDeduplicationId=f"{service_id}-fargate-{int(time.time())}",
+    )
+
+    print(f"📤 Fargate deployment queued for service {service_id}, MessageId: {response['MessageId']}")
+
+
+def _run_fargate_delete_sync(service_id: str, org_id: Optional[str] = None):
+    """Synchronous Fargate service deletion."""
+    try:
+        svc = get_service(service_id)
+        if not svc:
+            print(f"⚠️ Service {service_id} not found for Fargate deletion")
+            return
+
+        # Use org_id from param, fallback to service record
+        effective_org_id = org_id or svc.get("organization_id")
+
+        result = delete_fargate_resources(
+            github_url=svc.get("github_url", ""),
+            function_name=svc.get("function_name"),
+            target_group_arn=svc.get("target_group_arn"),
+            listener_rule_arn=svc.get("listener_rule_arn"),
+            org_id=effective_org_id,
+        )
+        print(f"✅ Fargate resources deleted for service {service_id}: {result}")
+
+        delete_service(service_id)
+        print(f"✅ Service record deleted for {service_id}")
+
+    except Exception as e:
+        update_service(service_id, {"status": "FAILED"})
+        print(f"❌ Fargate deletion failed for {service_id}: {e}")
+        traceback.print_exc()
+
+
+def send_fargate_delete_to_sqs(service_id: str, org_id: Optional[str] = None):
+    """Send Fargate deletion task to SQS queue for background processing."""
+    import time
+
+    if not os.environ.get("AWS_LAMBDA_FUNCTION_NAME"):
+        def run_in_thread():
+            _run_fargate_delete_sync(service_id, org_id=org_id)
+        thread = threading.Thread(target=run_in_thread)
+        thread.start()
+        return
+
+    sqs_client = boto3.client("sqs")
+    queue_url = os.environ.get("DEPLOY_QUEUE_URL")
+    if not queue_url:
+        def run_in_thread():
+            _run_fargate_delete_sync(service_id, org_id=org_id)
+        thread = threading.Thread(target=run_in_thread)
+        thread.start()
+        return
+
+    message_body = {
+        "message_type": "fargate_delete",
+        "service_id": service_id,
+        "org_id": org_id,
+    }
+
+    response = sqs_client.send_message(
+        QueueUrl=queue_url,
+        MessageBody=json.dumps(message_body),
+        MessageGroupId=service_id,
+        MessageDeduplicationId=f"{service_id}-fargate-delete-{int(time.time())}",
+    )
+
+    print(f"📤 Fargate deletion queued for service {service_id}, MessageId: {response['MessageId']}")
 
 
 # ─────────────────────────────────────────────────────────────
@@ -711,6 +959,83 @@ async def create_database_project(
     }
 
 
+@router.post("/web-service")
+async def create_web_service_project(
+    request: CreateWebServiceProjectRequest,
+    user_id: str = Depends(get_current_user_id),
+):
+    """Create a new project container with an initial web-service (Fargate) service."""
+    from api.routes.github import get_or_refresh_token, fetch_latest_commit
+
+    if not request.organization_id or not request.organization_id.strip():
+        raise HTTPException(status_code=400, detail="organization_id is required")
+
+    # Plan gate: web-service requires Plus or Pro plan
+    from api.lambda_warmer import _is_paid_org
+    if not _is_paid_org(request.organization_id):
+        raise HTTPException(status_code=403, detail="Web Service requires a Plus or Pro plan")
+
+    github_url = f"https://github.com/{request.github_repo}"
+    github_token = await get_or_refresh_token(request.organization_id, user_id)
+
+    commit_info = {}
+    if github_token:
+        commit_info = await fetch_latest_commit(github_token, request.github_repo)
+
+    root_directory = request.root_directory or "./"
+    cpu = request.cpu or 256
+    memory = request.memory or 512
+
+    # 1. Create project container
+    project = create_project(
+        user_id=user_id,
+        organization_id=request.organization_id,
+        name=generate_project_name(),
+        description=request.description or "",
+    )
+
+    # 2. Create web-service inside the project
+    service = create_service(
+        user_id=user_id,
+        organization_id=request.organization_id,
+        project_id=project["project_id"],
+        name=request.name,
+        service_type="web-service",
+        github_url=github_url,
+        github_repo=request.github_repo,
+        env_vars=request.env_vars,
+        root_directory=root_directory,
+        start_command=request.start_command,
+        cpu=cpu,
+        memory=memory,
+    )
+
+    # 3. Start Fargate deployment via SQS
+    send_fargate_deployment_to_sqs(
+        service["service_id"],
+        github_url,
+        github_token,
+        root_directory,
+        request.start_command,
+        request.env_vars,
+        cpu,
+        memory,
+        **commit_info,
+        org_id=request.organization_id,
+    )
+
+    return {
+        "project_id": project["project_id"],
+        "service_id": service["service_id"],
+        "organization_id": project.get("organization_id"),
+        "name": project["name"],
+        "service_type": "web-service",
+        "status": service["status"],
+        "subdomain": service.get("subdomain"),
+        "custom_url": service.get("custom_url"),
+    }
+
+
 @router.post("/{project_id}/services")
 async def add_service_to_project(
     project_id: str,
@@ -718,7 +1043,7 @@ async def add_service_to_project(
     user_id: str = Depends(get_current_user_id),
     org_id: str = Query(...),
 ):
-    """Add a new service (web-app or database) to an existing project."""
+    """Add a new service (web-app, database, or web-service) to an existing project."""
     project = get_project_by_key(org_id, project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
@@ -743,6 +1068,50 @@ async def add_service_to_project(
             request.db_name,
             normalized_min_acu,
             normalized_max_acu,
+        )
+    elif request.service_type == "web-service":
+        # Plan gate: web-service requires Plus or Pro plan
+        from api.lambda_warmer import _is_paid_org
+        if not _is_paid_org(org_id):
+            raise HTTPException(status_code=403, detail="Web Service requires a Plus or Pro plan")
+
+        from api.routes.github import get_or_refresh_token, fetch_latest_commit
+        if not request.github_repo:
+            raise HTTPException(status_code=400, detail="github_repo is required for web-service")
+        github_url = f"https://github.com/{request.github_repo}"
+        github_token = await get_or_refresh_token(org_id, user_id)
+        commit_info = {}
+        if github_token:
+            commit_info = await fetch_latest_commit(github_token, request.github_repo)
+
+        cpu = request.cpu or 256
+        memory = request.memory or 512
+
+        service = create_service(
+            user_id=user_id,
+            organization_id=org_id,
+            project_id=project_id,
+            name=request.name,
+            service_type="web-service",
+            github_url=github_url,
+            github_repo=request.github_repo,
+            env_vars=request.env_vars,
+            root_directory=request.root_directory or "./",
+            start_command=request.start_command,
+            cpu=cpu,
+            memory=memory,
+        )
+        send_fargate_deployment_to_sqs(
+            service["service_id"],
+            github_url,
+            github_token,
+            request.root_directory or "./",
+            request.start_command,
+            request.env_vars,
+            cpu,
+            memory,
+            **commit_info,
+            org_id=org_id,
         )
     else:
         from api.routes.github import get_or_refresh_token, fetch_latest_commit
@@ -818,8 +1187,23 @@ async def get_projects(
                 "service_type": svc.get("service_type", "web-app"),
                 "status": svc["status"],
             }
-            if svc.get("service_type", "web-app") != "database":
-                # Find active custom domain for the service
+            svc_type = svc.get("service_type", "web-app")
+            if svc_type == "database":
+                pass  # handled below
+            elif svc_type == "web-service":
+                svc_domains = list_project_domains(svc["service_id"])
+                active_domain = next(
+                    (d["domain"] for d in svc_domains if d.get("status") == "ACTIVE"),
+                    None,
+                )
+                svc_data.update({
+                    "subdomain": svc.get("subdomain"),
+                    "custom_url": svc.get("custom_url"),
+                    "service_url": svc.get("service_url"),
+                    "active_custom_domain": active_domain,
+                    "github_repo": svc.get("github_repo"),
+                })
+            else:
                 svc_domains = list_project_domains(svc["service_id"])
                 active_domain = next(
                     (d["domain"] for d in svc_domains if d.get("status") == "ACTIVE"),
@@ -832,7 +1216,7 @@ async def get_projects(
                     "active_custom_domain": active_domain,
                     "github_repo": svc.get("github_repo"),
                 })
-            else:
+            if svc_type == "database":
                 svc_data.update({
                     "db_endpoint": svc.get("db_endpoint"),
                     "db_port": svc.get("db_port"),
@@ -903,6 +1287,50 @@ async def get_project_details(
             })
             svc_response["deployments"] = []
             svc_response["custom_domains"] = []
+        elif svc_type == "web-service":
+            svc_response.update({
+                "github_url": svc.get("github_url"),
+                "github_repo": svc.get("github_repo"),
+                "service_url": svc.get("service_url"),
+                "subdomain": svc.get("subdomain"),
+                "custom_url": svc.get("custom_url"),
+                "ecr_repo": svc.get("ecr_repo"),
+                "env_vars": svc.get("env_vars", {}),
+                "start_command": svc.get("start_command", ""),
+                "root_directory": svc.get("root_directory", "./"),
+                "cpu": svc.get("cpu", 256),
+                "memory": svc.get("memory", 512),
+                "ecs_service_name": svc.get("ecs_service_name"),
+            })
+
+            deployments = list_deployments(sid)
+            custom_domains = list_project_domains(sid)
+
+            svc_response["deployments"] = [
+                {
+                    "deploy_id": d["deploy_id"],
+                    "build_id": d["build_id"],
+                    "status": d["status"],
+                    "started_at": d["started_at"],
+                    "finished_at": d.get("finished_at"),
+                    "commit_sha": d.get("commit_sha"),
+                    "commit_message": d.get("commit_message"),
+                    "commit_author_name": d.get("commit_author_name"),
+                    "commit_author_username": d.get("commit_author_username"),
+                    "branch": d.get("branch"),
+                }
+                for d in deployments
+            ]
+            svc_response["custom_domains"] = [
+                {
+                    "domain": d.get("domain"),
+                    "status": d.get("status"),
+                    "is_active": d.get("status") == "ACTIVE",
+                    "tenant_id": d.get("tenant_id"),
+                    "created_at": d.get("created_at"),
+                }
+                for d in custom_domains
+            ]
         else:
             svc_response.update({
                 "github_url": svc.get("github_url"),
@@ -1601,23 +2029,44 @@ async def get_runtime_logs(
     org_id: str = Query(...),
     service_id: Optional[str] = Query(None),
 ):
-    """Fetch runtime logs for a service's Lambda function."""
-    svc = _resolve_service(org_id, project_id, service_id, service_type="web-app")
-    
-    # Use stored function_name if available, otherwise derive from github_url
-    function_name = svc.get("function_name")
-    print(f"🔍 RUNTIME LOGS: service_id={svc.get('service_id')}")
-    print(f"🔍 RUNTIME LOGS: function_name from DB = '{function_name}'")
-    if not function_name:
-        function_name = extract_project_name(svc["github_url"])
-        print(f"🔍 RUNTIME LOGS: derived function_name = '{function_name}'")
-    logs = get_lambda_logs(function_name)
-    print(f"🔍 RUNTIME LOGS: got {len(logs)} log entries")
+    """Fetch runtime logs for a service (Lambda web-app or Fargate web-service)."""
+    # Resolve service without forcing type — so it works for both web-app and web-service
+    if service_id:
+        svc = _resolve_service(org_id, project_id, service_id)
+    else:
+        # Try web-app first (legacy default), fall back to web-service
+        try:
+            svc = _resolve_service(org_id, project_id, service_type="web-app")
+        except HTTPException:
+            svc = _resolve_service(org_id, project_id, service_type="web-service")
 
-    return {
-        "logs": logs,
-        "function_name": function_name,
-    }
+    svc_type = svc.get("service_type", "web-app")
+    function_name = svc.get("function_name")
+    print(f"🔍 RUNTIME LOGS: service_id={svc.get('service_id')} service_type={svc_type}")
+    print(f"🔍 RUNTIME LOGS: function_name from DB = '{function_name}'")
+
+    if svc_type == "web-service":
+        # Fargate services: logs live in /ecs/<service-prefix>-<project_name>
+        # function_name stores the project_name used when registering the task definition
+        project_name = function_name or extract_project_name(svc.get("github_url", ""))
+        print(f"🔍 RUNTIME LOGS (ECS): project_name = '{project_name}'")
+        logs = get_ecs_logs(project_name)
+        print(f"🔍 RUNTIME LOGS (ECS): got {len(logs)} log entries")
+        return {
+            "logs": logs,
+            "function_name": project_name,
+        }
+    else:
+        # Lambda web-app services
+        if not function_name:
+            function_name = extract_project_name(svc["github_url"])
+            print(f"🔍 RUNTIME LOGS: derived function_name = '{function_name}'")
+        logs = get_lambda_logs(function_name)
+        print(f"🔍 RUNTIME LOGS: got {len(logs)} log entries")
+        return {
+            "logs": logs,
+            "function_name": function_name,
+        }
 
 
 class UpdateEnvVarsRequest(BaseModel):
@@ -1730,46 +2179,67 @@ async def redeploy_project(
     org_id: str = Query(...),
     service_id: Optional[str] = Query(None),
 ):
-    """Trigger a redeployment of a web-app service."""
+    """Trigger a redeployment of a web-app or web-service."""
     from api.routes.github import get_or_refresh_token, fetch_latest_commit
 
-    svc = _resolve_service(org_id, project_id, service_id, service_type="web-app")
-    sid = svc["service_id"]
+    # Try to resolve by service_id first, then by type
+    if service_id:
+        svc = _resolve_service(org_id, project_id, service_id)
+    else:
+        # Try web-app first, then web-service
+        try:
+            svc = _resolve_service(org_id, project_id, service_type="web-app")
+        except HTTPException:
+            svc = _resolve_service(org_id, project_id, service_type="web-service")
 
-    # Mark as queued so the UI can reflect it immediately
+    sid = svc["service_id"]
+    svc_type = svc.get("service_type", "web-app")
+
     update_service(sid, {"status": "PENDING"})
 
-    # Get GitHub token for private repos
     github_token = await get_or_refresh_token(org_id, user_id)
 
-    # Fetch latest commit info from GitHub API
     commit_info = {}
     if github_token:
         commit_info = await fetch_latest_commit(github_token, svc.get("github_repo", ""))
 
-    # Get settings from stored service
     root_directory = svc.get("root_directory", "./")
     start_command = svc.get("start_command", "uvicorn main:app --host 0.0.0.0 --port 8080")
     env_vars = svc.get("env_vars", {})
-    memory = int(svc.get("memory", 1024))
-    timeout = int(svc.get("timeout", 30))
-    ephemeral_storage = int(svc.get("ephemeral_storage", 512))
 
-    # Start redeployment via SQS queue
-    send_deployment_to_sqs(
-        sid,
-        svc["github_url"],
-        github_token,
-        root_directory,
-        start_command,
-        env_vars,
-        memory,
-        timeout,
-        ephemeral_storage,
-        **commit_info,
-        org_id=org_id,
-    )
-    
+    if svc_type == "web-service":
+        cpu = int(svc.get("cpu", 256))
+        memory = int(svc.get("memory", 512))
+        send_fargate_deployment_to_sqs(
+            sid,
+            svc["github_url"],
+            github_token,
+            root_directory,
+            start_command,
+            env_vars,
+            cpu,
+            memory,
+            **commit_info,
+            org_id=org_id,
+        )
+    else:
+        memory = int(svc.get("memory", 1024))
+        timeout = int(svc.get("timeout", 30))
+        ephemeral_storage = int(svc.get("ephemeral_storage", 512))
+        send_deployment_to_sqs(
+            sid,
+            svc["github_url"],
+            github_token,
+            root_directory,
+            start_command,
+            env_vars,
+            memory,
+            timeout,
+            ephemeral_storage,
+            **commit_info,
+            org_id=org_id,
+        )
+
     return {
         "project_id": project_id,
         "service_id": sid,
@@ -1786,6 +2256,10 @@ def _delete_single_service(svc: dict):
     if svc_type == "database":
         update_service(sid, {"status": "DELETING"})
         send_database_delete_to_sqs(sid)
+        return "async"
+    elif svc_type == "web-service":
+        update_service(sid, {"status": "DELETING"})
+        send_fargate_delete_to_sqs(sid, org_id=svc.get("organization_id"))
         return "async"
     else:
         function_name = svc.get("function_name")

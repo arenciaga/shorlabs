@@ -12,7 +12,7 @@ export interface Service {
     service_id: string
     project_id: string
     name: string
-    service_type: "web-app" | "database"
+    service_type: "web-app" | "database" | "web-service"
     status: string
     created_at: string
     updated_at: string
@@ -30,6 +30,10 @@ export interface Service {
     timeout?: number
     ephemeral_storage?: number
     is_throttled?: boolean
+    // Web-service (Fargate) fields
+    service_url?: string | null
+    cpu?: number
+    ecs_service_name?: string | null
     // Database fields
     db_cluster_identifier?: string | null
     db_endpoint?: string | null
@@ -73,5 +77,6 @@ export interface ProjectDetails {
 export type ProjectCompat = Project & Partial<Service>
 
 export type WebAppTab = "deployments" | "domains" | "logs" | "compute" | "settings"
+export type WebServiceTab = "deployments" | "logs" | "compute" | "settings"
 export type DatabaseTab = "configuration" | "explorer" | "security" | "settings"
-export type ActiveTab = WebAppTab | DatabaseTab
+export type ActiveTab = WebAppTab | WebServiceTab | DatabaseTab

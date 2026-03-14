@@ -103,6 +103,8 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
         const svc = services.find(s => s.service_id === serviceId)
         if (svc?.service_type === "database") {
             hook.setActiveTab("configuration")
+        } else if (svc?.service_type === "web-service") {
+            hook.setActiveTab("deployments")
         } else {
             hook.setActiveTab("deployments")
         }

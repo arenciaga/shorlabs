@@ -412,6 +412,8 @@ def create_service(
     memory: int = 1024,
     timeout: int = 30,
     ephemeral_storage: int = 512,
+    # Fargate (web-service) fields
+    cpu: int = None,
     # Database fields
     db_name: str = None,
     min_acu: float = None,
@@ -473,6 +475,8 @@ def create_service(
             "timeout": timeout,
             "ephemeral_storage": ephemeral_storage,
         })
+        if cpu is not None:
+            item["cpu"] = cpu
 
     table.put_item(Item=item)
     return item

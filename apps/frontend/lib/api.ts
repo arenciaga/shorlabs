@@ -89,7 +89,7 @@ export interface Service {
     service_id: string;
     project_id: string;
     name: string;
-    service_type: "web-app" | "database";
+    service_type: "web-app" | "database" | "web-service";
     status: string;
     created_at: string;
     updated_at: string;
@@ -106,6 +106,10 @@ export interface Service {
     memory?: number;
     timeout?: number;
     ephemeral_storage?: number;
+    // Web-service (Fargate) fields
+    service_url?: string | null;
+    cpu?: number;
+    ecs_service_name?: string | null;
     // Database fields
     db_endpoint?: string | null;
     db_port?: number | null;
@@ -334,6 +338,45 @@ export async function fetchDatabaseConnection(
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
         },
+    });
+
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ detail: "Unknown error" }));
+        throw new Error(error.detail || `HTTP ${response.status}`);
+    }
+
+    return response.json();
+}
+
+// ─────────────────────────────────────────────────────────────
+// WEB SERVICE (FARGATE) API
+// ─────────────────────────────────────────────────────────────
+
+export interface CreateWebServiceProjectRequest {
+    name: string;
+    github_repo: string;
+    root_directory?: string;
+    env_vars?: Record<string, string>;
+    start_command: string;
+    cpu?: number;
+    memory?: number;
+}
+
+export async function createWebServiceProject(
+    token: string,
+    orgId: string,
+    data: CreateWebServiceProjectRequest,
+): Promise<{ project_id: string; name: string; status: string }> {
+    const url = new URL(`${API_BASE_URL}/api/projects/web-service`);
+    url.searchParams.append("org_id", orgId);
+
+    const response = await fetch(url.toString(), {
+        method: "POST",
+        headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ ...data, organization_id: orgId }),
     });
 
     if (!response.ok) {

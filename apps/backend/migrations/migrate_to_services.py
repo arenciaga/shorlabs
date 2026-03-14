@@ -2,10 +2,13 @@
 Data migration script: Convert legacy flat projects into project-container + service model.
 
 For each existing DynamoDB item with SK=PROJECT#{project_id}:
-1. Create a new project container item with entity_type="project"
-2. Create a new service item with entity_type="service" and SK=PROJECT#{project_id}#SERVICE#{service_id}
-3. Copy all resource-specific fields to the service item
-4. Clean up the original item to only contain container fields
+1. Create a new service item with entity_type="service" and SK=PROJECT#{project_id}#SERVICE#{project_id}
+2. Copy all resource-specific fields to the service item
+3. Clean up the original item to only contain container fields
+
+IMPORTANT: Uses project_id as service_id so existing deployments and custom
+domains (keyed by project_id) continue to resolve without any data changes
+to those tables.
 
 Run modes:
 - DRY_RUN=true (default): Print what would happen, no writes
@@ -17,9 +20,7 @@ Usage:
 """
 import os
 import sys
-import uuid
 from datetime import datetime
-from decimal import Decimal
 
 import boto3
 from boto3.dynamodb.conditions import Key
@@ -36,7 +37,7 @@ table = dynamodb.Table(TABLE_NAME)
 
 # Fields that belong to web-app services (not project containers)
 WEB_APP_FIELDS = {
-    "github_url", "github_repo", "function_url", "ecr_repo",
+    "github_url", "github_repo", "github_raw_url", "function_url", "ecr_repo",
     "env_vars", "root_directory", "start_command", "subdomain",
     "custom_url", "memory", "timeout", "ephemeral_storage",
     "function_name",
@@ -51,12 +52,13 @@ DATABASE_FIELDS = {
 # Fields that stay on the project container
 CONTAINER_FIELDS = {
     "PK", "SK", "project_id", "organization_id", "created_by",
-    "name", "created_at", "updated_at",
+    "name", "created_at", "updated_at", "entity_type", "description",
 }
 
-
-def generate_service_id() -> str:
-    return uuid.uuid4().hex[:12]
+# Stale fields to remove from the container (leftover from old model)
+STALE_FIELDS = {
+    "project_type", "status", "migrated_at", "is_throttled", "billing_period",
+}
 
 
 def get_all_legacy_projects():
@@ -92,7 +94,9 @@ def migrate_project(item: dict):
     sk = item["SK"]
     project_id = item["project_id"]
     project_type = item.get("project_type", "web-app")
-    service_id = generate_service_id()
+
+    # Use project_id as service_id so deployments/domains keep working
+    service_id = project_id
     now = datetime.utcnow().isoformat()
 
     print(f"\n{'='*60}")
@@ -100,6 +104,7 @@ def migrate_project(item: dict):
     print(f"  Type:    {project_type}")
     print(f"  Org:     {item.get('organization_id', 'unknown')}")
     print(f"  Status:  {item.get('status', 'unknown')}")
+    print(f"  Service ID: {service_id} (= project_id)")
 
     # 1. Build the service item
     service_item = {
@@ -111,48 +116,46 @@ def migrate_project(item: dict):
         "created_by": item.get("created_by"),
         "entity_type": "service",
         "name": item.get("name", ""),
-        "service_type": project_type,
+        "service_type": project_type if project_type in ("web-app", "database") else "web-app",
         "status": item.get("status", "PENDING"),
         "created_at": item.get("created_at", now),
         "updated_at": now,
     }
 
     # Copy type-specific fields to the service
-    fields_to_copy = WEB_APP_FIELDS if project_type != "database" else DATABASE_FIELDS
+    fields_to_copy = DATABASE_FIELDS if project_type == "database" else WEB_APP_FIELDS
     for field in fields_to_copy:
         if field in item:
             service_item[field] = item[field]
 
-    print(f"  → Service ID: {service_id}")
-    print(f"  → Service SK: {service_item['SK']}")
-    print(f"  → Copied fields: {[f for f in fields_to_copy if f in item]}")
+    print(f"  -> Service SK: {service_item['SK']}")
+    print(f"  -> Copied fields: {[f for f in fields_to_copy if f in item]}")
 
-    # 2. Update the existing project item to become a container
-    container_updates = {
-        "entity_type": "project",
-        "description": "",
-        "updated_at": now,
-    }
-
-    # Remove resource-specific fields from the container
-    all_resource_fields = WEB_APP_FIELDS | DATABASE_FIELDS | {"project_type", "status"}
+    # 2. Determine fields to remove from the project container
+    all_resource_fields = WEB_APP_FIELDS | DATABASE_FIELDS | STALE_FIELDS
     fields_to_remove = [f for f in all_resource_fields if f in item]
 
-    print(f"  → Removing from container: {fields_to_remove}")
+    print(f"  -> Removing from container: {fields_to_remove}")
 
     if DRY_RUN:
-        print(f"  ✓ DRY RUN — no changes made")
+        print(f"  [DRY RUN] no changes made")
         return True
 
     # Write the new service item
     table.put_item(Item=service_item)
-    print(f"  ✓ Created service item")
+    print(f"  + Created service item")
 
     # Update the container: add entity_type + description, remove resource fields
     update_parts = []
     remove_parts = []
     expr_names = {}
     expr_values = {}
+
+    container_updates = {
+        "entity_type": "project",
+        "description": item.get("description", ""),
+        "updated_at": now,
+    }
 
     for k, v in container_updates.items():
         safe_key = k.replace("-", "_")
@@ -175,17 +178,18 @@ def migrate_project(item: dict):
         ExpressionAttributeNames=expr_names,
         ExpressionAttributeValues=expr_values,
     )
-    print(f"  ✓ Updated container item")
+    print(f"  + Updated container item")
 
     return True
 
 
 def main():
-    print(f"╔{'═'*58}╗")
-    print(f"║  Shorlabs Migration: Flat Projects → Containers + Services  ║")
-    print(f"║  Mode: {'DRY RUN' if DRY_RUN else '⚠️  LIVE MIGRATION'}{'                ' if DRY_RUN else '          '}║")
-    print(f"║  Table: {TABLE_NAME:<49}║")
-    print(f"╚{'═'*58}╝")
+    print(f"{'='*62}")
+    print(f"  Shorlabs Migration: Flat Projects -> Containers + Services")
+    print(f"  Mode: {'DRY RUN' if DRY_RUN else 'LIVE MIGRATION'}")
+    print(f"  Table: {TABLE_NAME}")
+    print(f"  Key:   service_id = project_id (preserves deployment/domain keys)")
+    print(f"{'='*62}")
 
     legacy_projects = get_all_legacy_projects()
     print(f"\nFound {len(legacy_projects)} legacy projects to migrate.\n")
@@ -203,7 +207,7 @@ def main():
                 success += 1
         except Exception as e:
             failed += 1
-            print(f"  ✗ ERROR: {e}")
+            print(f"  ERROR: {e}")
 
     print(f"\n{'='*60}")
     print(f"Migration complete: {success} succeeded, {failed} failed")

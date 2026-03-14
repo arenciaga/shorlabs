@@ -1,7 +1,7 @@
 "use client"
 
 import { Plus, ExternalLink } from "lucide-react"
-import { GitHubIcon, PostgreSQLIcon } from "@/components/service-icons"
+import { GitHubIcon, PostgreSQLIcon, ContainerIcon } from "@/components/service-icons"
 import Link from "next/link"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -21,6 +21,7 @@ export function MobileServiceGrid({ services, projectId, onSelectService }: Mobi
         <div className="px-4 py-4 space-y-3">
             {services.map((service) => {
                 const isDb = service.service_type === "database"
+                const isWebService = service.service_type === "web-service"
                 const statusConfig = STATUS_CONFIG[service.status] || STATUS_CONFIG.PENDING
                 const isBuilding = !["LIVE", "FAILED", "DELETING"].includes(service.status)
                 const latestDeploy = service.deployments?.[0]
@@ -42,20 +43,22 @@ export function MobileServiceGrid({ services, projectId, onSelectService }: Mobi
                             {/* Header: icon + name */}
                             <div className="flex items-center gap-3 mb-3">
                                 <div className={`w-9 h-9 flex items-center justify-center shrink-0 ${
-                                    isDb ? "bg-purple-50" : "bg-blue-50"
+                                    isDb ? "bg-purple-50" : isWebService ? "bg-emerald-50" : "bg-blue-50"
                                 }`}>
                                     {isDb ? (
                                         <PostgreSQLIcon className="h-5 w-5" />
+                                    ) : isWebService ? (
+                                        <ContainerIcon className="h-4.5 w-4.5 text-emerald-600" />
                                     ) : (
                                         <GitHubIcon className="h-4.5 w-4.5 text-blue-500" />
                                     )}
                                 </div>
                                 <div className="min-w-0 flex-1">
                                     <div className="text-sm font-semibold text-zinc-900 truncate">
-                                        {service.name || (isDb ? "Database" : "Web App")}
+                                        {service.name || (isDb ? "Database" : isWebService ? "Web Service" : "Web App")}
                                     </div>
                                     <div className="text-[11px] text-zinc-400 mt-0.5">
-                                        {isDb ? "PostgreSQL" : "Web App"}
+                                        {isDb ? "PostgreSQL" : isWebService ? "Fargate" : "Web App"}
                                     </div>
                                 </div>
                             </div>
@@ -76,17 +79,30 @@ export function MobileServiceGrid({ services, projectId, onSelectService }: Mobi
 
                             {/* Key metric */}
                             <div>
-                                {!isDb && service.function_url && (
+                                {isWebService && service.service_url && (
                                     <div className="text-[11px] font-mono text-zinc-400 truncate">
-                                        {service.function_url.replace("https://", "").split("/")[0]}
+                                        {service.service_url.replace("https://", "").split("/")[0]}
                                     </div>
                                 )}
-                                {!isDb && !service.function_url && latestDeploy && (
+                                {isWebService && !service.service_url && latestDeploy && (
                                     <div className="text-[11px] text-zinc-400 truncate">
                                         {latestDeploy.commit_message || latestDeploy.commit_sha?.slice(0, 7) || "No deployments"}
                                     </div>
                                 )}
-                                {!isDb && !service.function_url && !latestDeploy && (
+                                {isWebService && !service.service_url && !latestDeploy && (
+                                    <div className="text-[11px] text-zinc-400">No deployments yet</div>
+                                )}
+                                {!isDb && !isWebService && service.function_url && (
+                                    <div className="text-[11px] font-mono text-zinc-400 truncate">
+                                        {service.function_url.replace("https://", "").split("/")[0]}
+                                    </div>
+                                )}
+                                {!isDb && !isWebService && !service.function_url && latestDeploy && (
+                                    <div className="text-[11px] text-zinc-400 truncate">
+                                        {latestDeploy.commit_message || latestDeploy.commit_sha?.slice(0, 7) || "No deployments"}
+                                    </div>
+                                )}
+                                {!isDb && !isWebService && !service.function_url && !latestDeploy && (
                                     <div className="text-[11px] text-zinc-400">No deployments yet</div>
                                 )}
                                 {isDb && (

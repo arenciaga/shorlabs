@@ -8,6 +8,7 @@ import Link from "next/link"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { useIsPro } from "@/hooks/use-is-pro"
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 
@@ -20,7 +21,6 @@ interface GitHubRepo {
     updated_at: string
 }
 
-// State machine for page loading states - prevents UI flicker
 type PageState =
     | { status: 'initializing' }
     | { status: 'checking_connection' }
@@ -51,22 +51,25 @@ function ImportRepositoryPageInner() {
     const { getToken, orgId } = useAuth()
     const { signOut } = useClerk()
     const searchParams = useSearchParams()
+    const { isPro, isLoaded: isPlanLoaded } = useIsPro()
 
-    // Single state machine for the entire page
     const [pageState, setPageState] = useState<PageState>({ status: 'initializing' })
     const [searchQuery, setSearchQuery] = useState("")
 
-    // Consolidated initialization function - checks connection AND fetches repos in sequence
+    // Redirect hobby users back to /new
+    useEffect(() => {
+        if (isPlanLoaded && !isPro) {
+            router.replace("/new")
+        }
+    }, [isPlanLoaded, isPro, router])
+
     const initializePage = useCallback(async () => {
         if (!userLoaded || !orgId) {
             setPageState({ status: 'initializing' })
             return
         }
 
-        if (!user) {
-            // User not logged in - will be handled by auth middleware
-            return
-        }
+        if (!user) return
 
         setPageState({ status: 'checking_connection' })
 
@@ -77,16 +80,13 @@ function ImportRepositoryPageInner() {
                 return
             }
 
-            // Step 1: Check GitHub connection status
             const statusUrl = new URL(`${API_BASE_URL}/api/github/status`)
             if (orgId) statusUrl.searchParams.append("org_id", orgId)
             const statusRes = await fetch(statusUrl.toString(), {
                 headers: { Authorization: `Bearer ${token}` }
             })
 
-            if (!statusRes.ok) {
-                throw new Error('Failed to check connection status')
-            }
+            if (!statusRes.ok) throw new Error('Failed to check connection status')
 
             const statusData = await statusRes.json()
 
@@ -95,7 +95,6 @@ function ImportRepositoryPageInner() {
                 return
             }
 
-            // Step 2: Connected - now fetch repos before showing connected UI
             setPageState({ status: 'loading_repos' })
 
             const reposUrl = new URL(`${API_BASE_URL}/api/github/repos`)
@@ -125,18 +124,16 @@ function ImportRepositoryPageInner() {
         }
     }, [userLoaded, user, getToken, signOut, orgId])
 
-    // Run initialization when dependencies change
     useEffect(() => {
         initializePage()
     }, [initializePage])
 
     const handleImport = (repo: GitHubRepo) => {
-        const base = `/new/web-app/configure?repo=${encodeURIComponent(repo.full_name)}&private=${repo.private}`
+        const base = `/new/web-service/configure?repo=${encodeURIComponent(repo.full_name)}&private=${repo.private}`
         const existingProjectId = searchParams.get("project_id")
         router.push(existingProjectId ? `${base}&project_id=${existingProjectId}` : base)
     }
 
-    // Derive values from state for rendering
     const repos = pageState.status === 'ready' ? pageState.repos : []
     const filteredRepos = repos.filter(repo =>
         repo.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -171,17 +168,15 @@ function ImportRepositoryPageInner() {
                 {/* Header */}
                 <div className="mb-8">
                     <h1 className="text-2xl font-bold text-zinc-900 tracking-tight">Import Repository</h1>
-                    <p className="text-sm text-zinc-500 mt-1">Select a Git repository to deploy as a web app</p>
+                    <p className="text-sm text-zinc-500 mt-1">Select a Git repository to deploy as a web service</p>
                 </div>
 
-                {/* Main Content - State Machine Rendering */}
+                {/* Main Content */}
                 {(pageState.status === 'initializing' || pageState.status === 'checking_connection') ? (
-                    // Full page spinner while initializing or checking connection
                     <div className="flex items-center justify-center py-20">
                         <Loader2 className="h-6 w-6 animate-spin text-zinc-400" />
                     </div>
                 ) : pageState.status === 'error' ? (
-                    // Error state
                     pageState.message.toLowerCase().includes('token') ||
                         pageState.message.toLowerCase().includes('expired') ||
                         pageState.message.toLowerCase().includes('invalid') ||
@@ -191,9 +186,7 @@ function ImportRepositoryPageInner() {
                             <div className="w-16 h-16 rounded-none bg-zinc-900 flex items-center justify-center mx-auto mb-6">
                                 <Github className="h-8 w-8 text-white" />
                             </div>
-                            <h2 className="text-xl font-semibold text-zinc-900 mb-2">
-                                GitHub Connection Issue
-                            </h2>
+                            <h2 className="text-xl font-semibold text-zinc-900 mb-2">GitHub Connection Issue</h2>
                             <p className="text-sm text-zinc-500 mb-8 max-w-sm mx-auto">
                                 Your GitHub connection needs to be refreshed. Head to Settings to reconnect.
                             </p>
@@ -205,18 +198,13 @@ function ImportRepositoryPageInner() {
                             </Link>
                         </div>
                     ) : (
-                        // Generic error - show retry button
                         <div className="bg-white rounded-none border border-zinc-200 p-12 text-center">
                             <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-4">
                                 <AlertCircle className="h-6 w-6 text-red-500" />
                             </div>
                             <h2 className="text-lg font-semibold text-zinc-900 mb-2">Something went wrong</h2>
                             <p className="text-sm text-zinc-500 mb-6 max-w-sm mx-auto">{pageState.message}</p>
-                            <Button
-                                onClick={() => initializePage()}
-                                variant="outline"
-                                className="rounded-full"
-                            >
+                            <Button onClick={() => initializePage()} variant="outline" className="rounded-full">
                                 <RefreshCw className="h-4 w-4 mr-2" />
                                 Try Again
                             </Button>
@@ -228,9 +216,7 @@ function ImportRepositoryPageInner() {
                         <div className="w-16 h-16 rounded-none bg-zinc-900 flex items-center justify-center mx-auto mb-6">
                             <Github className="h-8 w-8 text-white" />
                         </div>
-                        <h2 className="text-xl font-semibold text-zinc-900 mb-2">
-                            Connect GitHub
-                        </h2>
+                        <h2 className="text-xl font-semibold text-zinc-900 mb-2">Connect GitHub</h2>
                         <p className="text-sm text-zinc-500 mb-8 max-w-sm mx-auto">
                             Connect your GitHub account in Settings to import repositories and deploy your projects.
                         </p>
@@ -242,9 +228,7 @@ function ImportRepositoryPageInner() {
                         </Link>
                     </div>
                 ) : (
-                    // Connected states: loading_repos OR ready
                     <div className="space-y-6">
-                        {/* GitHub Account Card */}
                         <div className="bg-white rounded-none border border-zinc-200 overflow-hidden hover:shadow-lg hover:shadow-zinc-900/5 transition-shadow">
                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 sm:px-6 py-4 border-b border-zinc-100">
                                 <div className="flex items-center gap-3">
@@ -269,7 +253,6 @@ function ImportRepositoryPageInner() {
                                 </a>
                             </div>
 
-                            {/* Search */}
                             <div className="px-4 sm:px-6 py-4 border-b border-zinc-100 bg-zinc-50/50">
                                 <div className="relative">
                                     <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
@@ -282,7 +265,6 @@ function ImportRepositoryPageInner() {
                                 </div>
                             </div>
 
-                            {/* Loading state - show skeleton when loading repos */}
                             {pageState.status === 'loading_repos' ? (
                                 <div className="divide-y divide-zinc-100">
                                     {[1, 2, 3, 4, 5].map(i => (
@@ -313,20 +295,15 @@ function ImportRepositoryPageInner() {
                                             key={repo.id}
                                             className="px-4 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 hover:bg-zinc-50 transition-colors group"
                                         >
-                                            {/* Icon with language color */}
                                             <div className="w-10 h-10 rounded-none bg-zinc-100 flex items-center justify-center shrink-0 relative self-start sm:self-center">
                                                 <GitBranch className="h-5 w-5 text-zinc-500" />
                                                 {repo.language && LANGUAGE_COLORS[repo.language] && (
                                                     <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full ${LANGUAGE_COLORS[repo.language]} border-2 border-white`} />
                                                 )}
                                             </div>
-
-                                            {/* Info */}
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex items-center gap-2">
-                                                    <span className="font-medium text-zinc-900 truncate">
-                                                        {repo.name}
-                                                    </span>
+                                                    <span className="font-medium text-zinc-900 truncate">{repo.name}</span>
                                                     {repo.private ? (
                                                         <span className="inline-flex items-center gap-1 text-xs text-zinc-500 bg-zinc-100 px-1.5 py-0.5 rounded">
                                                             <Lock className="h-3 w-3" />
@@ -352,8 +329,6 @@ function ImportRepositoryPageInner() {
                                                     <span>Updated {formatRelativeTime(repo.updated_at)}</span>
                                                 </div>
                                             </div>
-
-                                            {/* Import Button */}
                                             <Button
                                                 onClick={() => handleImport(repo)}
                                                 variant="outline"
@@ -367,7 +342,6 @@ function ImportRepositoryPageInner() {
                             )}
                         </div>
 
-                        {/* Help Text */}
                         <p className="text-center text-xs text-zinc-400">
                             Don&apos;t see your repository?{" "}
                             <Link

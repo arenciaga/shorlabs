@@ -244,23 +244,53 @@ def create_listener_rule(
     host_header: str,
 ) -> str:
     """
-    Create a host-based listener rule on the HTTPS listener.
+    Create or update a host-based listener rule on the HTTPS listener.
 
     Routes traffic for {subdomain}.shorlabs.com to the target group.
+    If a rule for this host_header already exists, updates it to point to the new target group.
 
     Returns:
         Listener rule ARN
     """
     elbv2 = get_elbv2_client()
 
-    # Auto-assign priority by checking existing rules
+    # Check for existing rules with the same host header
     response = elbv2.describe_rules(ListenerArn=listener_arn)
     existing_priorities = []
+    existing_rule_for_host = None
+    
     for rule in response.get("Rules", []):
         p = rule.get("Priority", "default")
         if p != "default":
             existing_priorities.append(int(p))
+            
+            # Check if this rule matches our host header
+            for condition in rule.get("Conditions", []):
+                if condition.get("Field") == "host-header":
+                    values = condition.get("HostHeaderConfig", {}).get("Values", [])
+                    if host_header in values:
+                        existing_rule_for_host = rule
+                        break
 
+    # If rule exists for this host, update it instead of creating a new one
+    if existing_rule_for_host:
+        rule_arn = existing_rule_for_host["RuleArn"]
+        print(f"🔄 Updating existing listener rule: {host_header} → target group")
+        
+        elbv2.modify_rule(
+            RuleArn=rule_arn,
+            Actions=[
+                {
+                    "Type": "forward",
+                    "TargetGroupArn": target_group_arn,
+                }
+            ],
+        )
+        
+        print(f"✅ Listener rule updated: {host_header}")
+        return rule_arn
+
+    # No existing rule, create a new one
     priority = max(existing_priorities) + 1 if existing_priorities else 1
 
     print(f"📝 Creating listener rule: {host_header} → target group (priority {priority})")
@@ -284,6 +314,35 @@ def create_listener_rule(
     rule_arn = response["Rules"][0]["RuleArn"]
     print(f"✅ Listener rule created: {host_header}")
     return rule_arn
+
+
+def get_target_group_for_host(listener_arn: str, host_header: str) -> str | None:
+    """
+    Get the target group ARN for an existing host-based listener rule.
+
+    Returns:
+        Target group ARN if found, None otherwise
+    """
+    elbv2 = get_elbv2_client()
+
+    try:
+        response = elbv2.describe_rules(ListenerArn=listener_arn)
+        
+        for rule in response.get("Rules", []):
+            # Check if this rule matches our host header
+            for condition in rule.get("Conditions", []):
+                if condition.get("Field") == "host-header":
+                    values = condition.get("HostHeaderConfig", {}).get("Values", [])
+                    if host_header in values:
+                        # Get the target group from the action
+                        for action in rule.get("Actions", []):
+                            if action.get("Type") == "forward":
+                                return action.get("TargetGroupArn")
+        
+        return None
+    except Exception as e:
+        print(f"⚠️ Failed to get target group for host {host_header}: {e}")
+        return None
 
 
 def delete_listener_rule(rule_arn: str) -> bool:

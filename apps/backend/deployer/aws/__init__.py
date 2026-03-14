@@ -41,6 +41,7 @@ from .alb import (
     delete_target_group,
     delete_listener_rule,
     get_alb_dns_name,
+    get_target_group_for_host,
 )
 
 __all__ = [
@@ -94,4 +95,5 @@ __all__ = [
     "delete_target_group",
     "delete_listener_rule",
     "get_alb_dns_name",
+    "get_target_group_for_host",
 ]

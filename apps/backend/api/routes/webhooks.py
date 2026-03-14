@@ -25,7 +25,7 @@ def _json_safe_env_vars(env_vars: dict) -> dict:
 
 from api.db.dynamodb import get_org_id_by_installation_id, list_all_org_services
 from api.routes.github import get_or_refresh_token_for_org
-from api.routes.projects import send_deployment_to_sqs
+from api.routes.projects import send_deployment_to_sqs, send_fargate_deployment_to_sqs
 
 router = APIRouter(prefix="/webhooks", tags=["webhooks"])
 
@@ -106,11 +106,15 @@ async def github_webhook(request: Request):
         print(f"[webhook] push {full_name}: no org for installation_id={installation_id}")
         return {"status": "ignored", "reason": "unknown_installation"}
 
-    services = list_all_org_services(org_id, service_type="web-app")
+    # Get both web-app and web-service services
+    web_apps = list_all_org_services(org_id, service_type="web-app")
+    web_services = list_all_org_services(org_id, service_type="web-service")
+    all_services = web_apps + web_services
+    
     # Match by github_repo (same format as full_name: "owner/repo")
-    matching = [s for s in services if (s.get("github_repo") or "").lower() == full_name.lower()]
+    matching = [s for s in all_services if (s.get("github_repo") or "").lower() == full_name.lower()]
     if not matching:
-        repo_list = [s.get("github_repo") for s in services[:5]]
+        repo_list = [s.get("github_repo") for s in all_services[:5]]
         print(f"[webhook] push {full_name}: no matching service in org. org services (sample): {repo_list}")
         return {"status": "ok", "deployments_triggered": 0, "reason": "no_matching_services"}
 
@@ -126,6 +130,7 @@ async def github_webhook(request: Request):
     skipped = 0
     for svc in matching:
         service_id = svc.get("service_id")
+        service_type = svc.get("service_type")
         if not service_id:
             continue
 
@@ -140,29 +145,54 @@ async def github_webhook(request: Request):
         root_directory = svc.get("root_directory") or "./"
         start_command = svc.get("start_command") or "uvicorn main:app --host 0.0.0.0 --port 8080"
         env_vars = _json_safe_env_vars(svc.get("env_vars") or {})
-        memory = int(svc.get("memory", 1024))
-        timeout = int(svc.get("timeout", 30))
-        ephemeral_storage = int(svc.get("ephemeral_storage", 512))
         github_url = svc.get("github_url") or f"https://github.com/{full_name}"
 
-        send_deployment_to_sqs(
-            service_id=service_id,
-            github_url=github_url,
-            github_token=github_token,
-            root_directory=root_directory,
-            start_command=start_command,
-            env_vars=env_vars,
-            memory=memory,
-            timeout=timeout,
-            ephemeral_storage=ephemeral_storage,
-            commit_sha=commit_sha,
-            commit_message=commit_message,
-            commit_author_name=commit_author_name,
-            commit_author_username=commit_author_username,
-            branch=pushed_branch,
-            org_id=org_id,
-        )
-        print(f"[webhook] push {full_name}@{pushed_branch}: triggered deploy for service_id={service_id}")
+        # Route to appropriate deployment function based on service type
+        if service_type == "web-service":
+            # Fargate deployment
+            cpu = int(svc.get("cpu", 256))
+            memory = int(svc.get("memory", 512))
+            send_fargate_deployment_to_sqs(
+                service_id=service_id,
+                github_url=github_url,
+                github_token=github_token,
+                root_directory=root_directory,
+                start_command=start_command,
+                env_vars=env_vars,
+                cpu=cpu,
+                memory=memory,
+                commit_sha=commit_sha,
+                commit_message=commit_message,
+                commit_author_name=commit_author_name,
+                commit_author_username=commit_author_username,
+                branch=pushed_branch,
+                org_id=org_id,
+            )
+            print(f"[webhook] push {full_name}@{pushed_branch}: triggered Fargate deploy for service_id={service_id}")
+        else:
+            # Lambda deployment (web-app)
+            memory = int(svc.get("memory", 1024))
+            timeout = int(svc.get("timeout", 30))
+            ephemeral_storage = int(svc.get("ephemeral_storage", 512))
+            send_deployment_to_sqs(
+                service_id=service_id,
+                github_url=github_url,
+                github_token=github_token,
+                root_directory=root_directory,
+                start_command=start_command,
+                env_vars=env_vars,
+                memory=memory,
+                timeout=timeout,
+                ephemeral_storage=ephemeral_storage,
+                commit_sha=commit_sha,
+                commit_message=commit_message,
+                commit_author_name=commit_author_name,
+                commit_author_username=commit_author_username,
+                branch=pushed_branch,
+                org_id=org_id,
+            )
+            print(f"[webhook] push {full_name}@{pushed_branch}: triggered Lambda deploy for service_id={service_id}")
+        
         triggered += 1
 
     return {

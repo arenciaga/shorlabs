@@ -33,6 +33,7 @@ from .aws import (
     delete_target_group,
     delete_listener_rule,
     delete_ecr_repository,
+    get_target_group_for_host,
 )
 from .aws.ecr import get_ecr_repo_name
 from .config import DEFAULT_FARGATE_CPU, DEFAULT_FARGATE_MEMORY
@@ -166,11 +167,20 @@ def deploy_fargate_project(
     # 5g: Setup ALB and listener rule
     alb_info = ensure_shared_alb(subnet_ids, alb_sg_id)
     host_header = f"{subdomain}.shorlabs.com" if subdomain else f"{project_name}.shorlabs.com"
+    
+    # Get the old target group ARN before updating the listener rule (for cleanup)
+    old_target_group_arn = get_target_group_for_host(alb_info["https_listener_arn"], host_header)
+    
     listener_rule_arn = create_listener_rule(
         listener_arn=alb_info["https_listener_arn"],
         target_group_arn=target_group_arn,
         host_header=host_header,
     )
+    
+    # Clean up old target group if this is a redeployment
+    if old_target_group_arn and old_target_group_arn != target_group_arn:
+        print(f"🧹 Cleaning up old target group from previous deployment...")
+        delete_target_group(old_target_group_arn)
 
     # 5h: Create or update ECS service
     cluster_name = get_cluster_name(org_id)

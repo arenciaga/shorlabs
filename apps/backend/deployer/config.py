@@ -68,6 +68,16 @@ INSTANCE_TYPE_MAP = {
     8192: "t4g.large",  # 8 GB
 }
 
+# ECS task memory reservation — the actual memory requested in the task
+# definition. Must be less than instance total RAM to leave room for the
+# ECS agent, Docker daemon, and OS kernel (~100-200MB overhead).
+TASK_MEMORY_MAP = {
+    1024: 900,    # t4g.micro  — 1 GB instance, ~916MB registered
+    2048: 1800,   # t4g.small  — 2 GB instance
+    4096: 3800,   # t4g.medium — 4 GB instance
+    8192: 7800,   # t4g.large  — 8 GB instance
+}
+
 
 def get_instance_type_from_memory(memory: int) -> str:
     """
@@ -76,10 +86,26 @@ def get_instance_type_from_memory(memory: int) -> str:
     All t4g instances have 2 vCPUs, so instance type is determined by memory.
 
     Args:
-        memory: Memory in MB (512, 1024, 2048, 4096)
+        memory: Memory in MB (1024, 2048, 4096, 8192)
 
     Returns:
         Instance type string (e.g., "t4g.micro")
     """
     return INSTANCE_TYPE_MAP.get(memory, DEFAULT_INSTANCE_TYPE)
+
+
+def get_task_memory(memory: int) -> int:
+    """
+    Get the actual ECS task definition memory for a given instance tier.
+
+    Returns a value lower than total instance RAM to account for
+    ECS agent, Docker daemon, and OS overhead.
+
+    Args:
+        memory: The user-selected memory tier in MB (1024, 2048, 4096, 8192)
+
+    Returns:
+        Task memory in MB safe for ECS placement
+    """
+    return TASK_MEMORY_MAP.get(memory, memory - 256)
 

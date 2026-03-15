@@ -82,19 +82,22 @@ def ensure_ecs_cluster(org_id: str, capacity_provider_name: str = None) -> str:
                 if capacity_provider_name:
                     existing_providers = cluster.get("capacityProviders", [])
                     if capacity_provider_name not in existing_providers:
-                        print(f"🔧 Associating capacity provider {capacity_provider_name} with cluster {cluster_name}")
-                        updated_providers = existing_providers + [capacity_provider_name]
-                        ecs_client.put_cluster_capacity_providers(
-                            cluster=cluster_name,
-                            capacityProviders=updated_providers,
-                            defaultCapacityProviderStrategy=[
-                                {
-                                    "capacityProvider": capacity_provider_name,
-                                    "weight": 1,
-                                    "base": 1,
-                                }
-                            ],
-                        )
+                        try:
+                            print(f"🔧 Associating capacity provider {capacity_provider_name} with cluster {cluster_name}")
+                            updated_providers = existing_providers + [capacity_provider_name]
+                            ecs_client.put_cluster_capacity_providers(
+                                cluster=cluster_name,
+                                capacityProviders=updated_providers,
+                                defaultCapacityProviderStrategy=[
+                                    {
+                                        "capacityProvider": capacity_provider_name,
+                                        "weight": 1,
+                                        "base": 1,
+                                    }
+                                ],
+                            )
+                        except Exception as e:
+                            print(f"⚠️ Failed to associate capacity provider: {e}")
                 return cluster["clusterArn"]
             elif status in ("INACTIVE", "DRAINING"):
                 # Stale cluster from a failed cleanup — delete and wait for

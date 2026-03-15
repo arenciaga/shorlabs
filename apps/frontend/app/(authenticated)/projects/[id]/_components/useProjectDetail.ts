@@ -366,10 +366,11 @@ export function useProjectDetail(id: string) {
         if (!svc) return
 
         const newCpu = overrides?.cpu ?? svc.cpu ?? 256
-        let newMemory = overrides?.memory ?? svc.memory ?? (svc.service_type === "web-service" ? 512 : 1024)
+        let newMemory = overrides?.memory ?? svc.memory ?? (svc.service_type === "web-service" ? 1024 : 1024)
 
-        // For web-services, validate that memory is valid for the selected CPU
-        if (svc.service_type === "web-service") {
+        // For web-apps (Lambda/Fargate), validate that memory is valid for the selected CPU
+        // Web-services use ECS EC2 where memory is independent of CPU (all t4g have 2 vCPUs)
+        if (svc.service_type === "web-app") {
             const validMemoryByCpu: Record<number, number[]> = {
                 256: [512, 1024, 2048],
                 512: [1024, 2048, 4096],

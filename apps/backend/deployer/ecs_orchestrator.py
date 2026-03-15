@@ -42,7 +42,7 @@ from .aws import (
     get_target_group_for_host,
 )
 from .aws.ecr import get_ecr_repo_name
-from .config import DEFAULT_TASK_CPU, DEFAULT_TASK_MEMORY, DEFAULT_INSTANCE_TYPE, get_instance_type_from_memory
+from .config import DEFAULT_TASK_CPU, DEFAULT_TASK_MEMORY, DEFAULT_INSTANCE_TYPE, get_instance_type_from_memory, get_task_memory
 
 
 def deploy_ecs_project(
@@ -94,6 +94,10 @@ def deploy_ecs_project(
     # All t4g instances have 2 vCPUs, so instance type is determined by memory
     if not instance_type:
         instance_type = get_instance_type_from_memory(memory)
+
+    # Task memory must be less than instance total RAM to leave room
+    # for ECS agent, Docker daemon, and OS overhead
+    task_memory = get_task_memory(memory)
     
     # Use project_id for unique naming if provided
     repo_name = extract_project_name(github_url)
@@ -192,7 +196,7 @@ def deploy_ecs_project(
         project_name=project_name,
         image_uri=image_uri,
         cpu=cpu,
-        memory=memory,
+        memory=task_memory,
         execution_role_arn=execution_role_arn,
         env_vars=env_vars,
     )

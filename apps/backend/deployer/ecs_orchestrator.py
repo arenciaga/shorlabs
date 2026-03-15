@@ -30,6 +30,7 @@ from .aws import (
     ensure_launch_template,
     ensure_auto_scaling_group,
     wait_for_instance_refresh,
+    wait_for_ecs_instance_ready,
     ensure_ec2_capacity_provider,
     get_default_vpc_and_subnets,
     get_ecs_service_name,
@@ -42,6 +43,8 @@ from .aws import (
     delete_ecr_repository,
     get_target_group_for_host,
 )
+from .clients import get_autoscaling_client
+from .config import ECS_ASG_PREFIX
 from .aws.ecr import get_ecr_repo_name
 from .config import DEFAULT_TASK_CPU, DEFAULT_TASK_MEMORY, DEFAULT_INSTANCE_TYPE, get_instance_type_from_memory, get_task_memory
 
@@ -186,9 +189,10 @@ def deploy_ecs_project(
     )
 
     # If instance type changed, wait for the new EC2 instance to be ready
-    # before updating the ECS service — otherwise the task can't be placed
+    # and registered with ECS before updating the service
     if instance_refresh_started:
         wait_for_instance_refresh(asg_name)
+        wait_for_ecs_instance_ready(cluster_name)
 
     capacity_provider_name = ensure_ec2_capacity_provider(
         project_name=project_name,
@@ -244,6 +248,21 @@ def deploy_ecs_project(
     # Step 6: Wait for service to stabilize
     ecs_service_name = get_ecs_service_name(project_name)
     wait_for_service_stable(cluster_name, ecs_service_name)
+
+    # Step 7: Restore ASG max_size if it was temporarily bumped for zero-downtime swap.
+    # MaxSize=1 is sufficient — AWS auto-adjusts DesiredCapacity down to match MaxSize.
+    # Do NOT set DesiredCapacity manually — ECS managed scaling owns that value and will
+    # fight manual overrides (AWS docs explicitly warn against this).
+    if instance_type_changed:
+        try:
+            asg_name_full = f"{ECS_ASG_PREFIX}-{project_name}"
+            get_autoscaling_client().update_auto_scaling_group(
+                AutoScalingGroupName=asg_name_full,
+                MaxSize=1,
+            )
+            print(f"✅ ASG max_size restored to 1")
+        except Exception as e:
+            print(f"⚠️ Could not restore ASG max_size: {e}")
 
     service_url = f"https://{host_header}"
 

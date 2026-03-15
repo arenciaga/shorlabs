@@ -1124,16 +1124,18 @@ def ensure_auto_scaling_group(
     return asg_name, False  # No instance refresh needed on fresh create
 
 
-def wait_for_instance_refresh(asg_name: str, timeout: int = 300):
+def wait_for_instance_refresh(asg_name: str, timeout: int = 600):
     """
     Wait for an ASG instance refresh to complete.
 
-    The new EC2 instance must be running and registered with ECS before
-    we can update the ECS service to use the new task definition.
+    With MinHealthyPercentage=100, the refresh launches the new instance
+    first, waits for it to be InService, then terminates the old one.
+    This takes longer than the old kill-first approach, so we use a
+    10-minute timeout.
 
     Args:
         asg_name: Auto Scaling Group name
-        timeout: Maximum wait time in seconds (default 5 minutes)
+        timeout: Maximum wait time in seconds (default 10 minutes)
     """
     autoscaling = get_autoscaling_client()
     start_time = time.time()
@@ -1169,6 +1171,50 @@ def wait_for_instance_refresh(asg_name: str, timeout: int = 300):
         time.sleep(15)
 
     print(f"⚠️ Instance refresh did not complete within {timeout}s, proceeding anyway")
+
+
+def wait_for_ecs_instance_ready(cluster_name: str, timeout: int = 180):
+    """
+    Wait for at least one ACTIVE container instance to register with the ECS cluster.
+
+    After an ASG instance refresh, the new EC2 instance is InService in the ASG
+    but still needs to boot, run user data, start the ECS agent, and register
+    with the cluster. This function polls until registration is confirmed,
+    ensuring the ECS service update won't fail due to missing capacity.
+
+    Args:
+        cluster_name: ECS cluster name
+        timeout: Maximum wait time in seconds (default 3 minutes)
+    """
+    ecs_client = get_ecs_client()
+    start_time = time.time()
+
+    print(f"⏳ Waiting for container instance to register with ECS cluster...")
+
+    while time.time() - start_time < timeout:
+        try:
+            ci_arns = ecs_client.list_container_instances(
+                cluster=cluster_name,
+                status="ACTIVE",
+            ).get("containerInstanceArns", [])
+
+            if ci_arns:
+                ci_details = ecs_client.describe_container_instances(
+                    cluster=cluster_name,
+                    containerInstances=ci_arns,
+                )
+                for ci in ci_details.get("containerInstances", []):
+                    if ci.get("agentConnected") and ci.get("status") == "ACTIVE":
+                        ec2_id = ci.get("ec2InstanceId", "unknown")
+                        print(f"✅ Container instance registered and agent connected: {ec2_id}")
+                        return
+        except Exception as e:
+            print(f"  ⚠️ Error checking container instances: {e}")
+
+        print(f"  ⏳ No active container instance yet...")
+        time.sleep(15)
+
+    print(f"⚠️ No container instance registered within {timeout}s, proceeding anyway")
 
 
 def ensure_ec2_capacity_provider(project_name: str, asg_name: str) -> str:

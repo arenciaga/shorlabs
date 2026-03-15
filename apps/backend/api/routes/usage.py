@@ -112,6 +112,8 @@ async def get_org_usage(
 
     inv = features.get("invocations") or {}
     comp = features.get("compute") or {}
+    vcpu = features.get("vcpu_time") or {}
+    mem = features.get("memory_time") or {}
     usd_credits = features.get("usd_credits") or {}
 
     # ── Credit system (Pro / Plus) ────────────────────────────────
@@ -162,6 +164,14 @@ async def get_org_usage(
         "gbSeconds": {
             "current": round(current_compute, 2),
             "limit": included_compute if not has_credit_system else None,
+        },
+        "vcpuSeconds": {
+            "current": float(vcpu.get("usage", 0) or 0),
+            "limit": None,
+        },
+        "memGbSeconds": {
+            "current": float(mem.get("usage", 0) or 0),
+            "limit": None,
         },
         "periodStart": period_start,
         "periodEnd": period_end,

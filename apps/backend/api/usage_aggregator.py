@@ -215,17 +215,32 @@ def get_gb_seconds(
     return gb_seconds
 
 
+def _get_ecs_uptime_metrics(service: Dict, window_seconds: int) -> tuple:
+    """
+    Calculate wall-clock vCPU-seconds and GB-seconds for an ECS service.
+
+    ECS services run on dedicated EC2 instances 24/7, so we bill for the
+    full aggregation window (no CloudWatch calls needed).
+    """
+    cpu_units = int(service.get("cpu", 2048))
+    memory_mb = int(service.get("memory", 1024))
+    vcpu_seconds = (cpu_units / 1024.0) * window_seconds
+    memory_gb_seconds = (memory_mb / 1024.0) * window_seconds
+    return vcpu_seconds, memory_gb_seconds
+
+
 def get_all_services() -> List[Dict]:
-    """Get all web-app service items from DynamoDB."""
+    """Get all web-app and web-service items from DynamoDB."""
     table = get_or_create_table()
     
     # Scan for service items only (not project containers)
     # In production with many users, use pagination
     response = table.scan(
-        FilterExpression="entity_type = :et AND service_type = :st",
+        FilterExpression="entity_type = :et AND service_type IN (:st1, :st2)",
         ExpressionAttributeValues={
             ":et": "service",
-            ":st": "web-app",
+            ":st1": "web-app",
+            ":st2": "web-service",
         },
     )
     
@@ -326,71 +341,113 @@ def aggregate_usage_metrics():
     total_requests = 0
     total_gb_seconds = 0.0
     total_build_seconds = 0.0
-    
+    total_vcpu_seconds = 0.0
+    total_memory_seconds = 0.0
+
     for org_id, org_svcs in orgs_services.items():
         org_requests = 0
         org_gb_seconds = 0.0
         org_build_seconds = 0.0
-        
+        org_vcpu_seconds = 0.0
+        org_memory_seconds = 0.0
+
         for svc in org_svcs:
             # Skip if service is not LIVE
             if svc.get("status") != "LIVE":
                 continue
-            # Get function name - prefer stored function_name, fallback to deriving from github_url
-            # for backwards compatibility with services that don't have function_name stored
-            stored_function_name = svc.get("function_name")
-            if stored_function_name:
-                # Apply shorlabs- prefix to get full Lambda function name
-                function_name = get_lambda_function_name(stored_function_name)
-            else:
-                # Fallback: derive from github_url and apply prefix
-                project_name = extract_project_name(svc.get("github_url", ""))
-                if not project_name:
-                    continue
-                function_name = get_lambda_function_name(project_name)
-            
-            memory_mb = int(svc.get("memory", 1024))
-            # Fetch metrics from CloudWatch
-            try:
-                invocations = get_invocations(
-                    function_name,
-                    window_seconds=window_seconds,
-                    window_end=window_end,
-                )
-                gb_seconds = get_gb_seconds(
-                    function_name,
-                    memory_mb,
-                    window_seconds=window_seconds,
-                    window_end=window_end,
-                )
 
-                # Deployment/build time (seconds) from deployments table
-                build_seconds = _get_build_seconds_for_service(
-                    svc.get("service_id"),
-                    window_seconds=window_seconds,
-                    window_end=window_end,
-                )
-                
-                if invocations > 0 or gb_seconds > 0 or build_seconds > 0:
-                    print(
-                        f"  📈 {function_name}: "
-                        f"{invocations} invocations, "
-                        f"{gb_seconds:.2f} GB-s, "
-                        f"{build_seconds:.1f} build-s"
+            service_type = svc.get("service_type", "web-app")
+
+            if service_type == "web-app":
+                # ── Lambda: fetch CloudWatch metrics ──────────────────
+                # Get function name - prefer stored function_name, fallback to deriving from github_url
+                # for backwards compatibility with services that don't have function_name stored
+                stored_function_name = svc.get("function_name")
+                if stored_function_name:
+                    # Apply shorlabs- prefix to get full Lambda function name
+                    function_name = get_lambda_function_name(stored_function_name)
+                else:
+                    # Fallback: derive from github_url and apply prefix
+                    project_name = extract_project_name(svc.get("github_url", ""))
+                    if not project_name:
+                        continue
+                    function_name = get_lambda_function_name(project_name)
+
+                memory_mb = int(svc.get("memory", 1024))
+                # Fetch metrics from CloudWatch
+                try:
+                    invocations = get_invocations(
+                        function_name,
+                        window_seconds=window_seconds,
+                        window_end=window_end,
                     )
-                    org_requests += invocations
-                    org_gb_seconds += gb_seconds
-                    org_build_seconds += build_seconds
-                    
-            except Exception as e:
-                print(f"  ❌ Error aggregating {function_name}: {e}")
-                continue
-        
+                    gb_seconds = get_gb_seconds(
+                        function_name,
+                        memory_mb,
+                        window_seconds=window_seconds,
+                        window_end=window_end,
+                    )
+
+                    # Deployment/build time (seconds) from deployments table
+                    build_seconds = _get_build_seconds_for_service(
+                        svc.get("service_id"),
+                        window_seconds=window_seconds,
+                        window_end=window_end,
+                    )
+
+                    if invocations > 0 or gb_seconds > 0 or build_seconds > 0:
+                        print(
+                            f"  📈 {function_name}: "
+                            f"{invocations} invocations, "
+                            f"{gb_seconds:.2f} GB-s, "
+                            f"{build_seconds:.1f} build-s"
+                        )
+                        org_requests += invocations
+                        org_gb_seconds += gb_seconds
+                        org_build_seconds += build_seconds
+
+                except Exception as e:
+                    print(f"  ❌ Error aggregating {function_name}: {e}")
+                    continue
+
+            elif service_type == "web-service":
+                # ── ECS: wall-clock uptime billing ────────────────────
+                svc_name = svc.get("function_name") or svc.get("name", "unknown")
+                try:
+                    vcpu_s, mem_s = _get_ecs_uptime_metrics(svc, window_seconds)
+
+                    build_seconds = _get_build_seconds_for_service(
+                        svc.get("service_id"),
+                        window_seconds=window_seconds,
+                        window_end=window_end,
+                    )
+
+                    if vcpu_s > 0 or mem_s > 0 or build_seconds > 0:
+                        print(
+                            f"  📈 ECS {svc_name}: "
+                            f"{vcpu_s:.0f} vCPU-s, "
+                            f"{mem_s:.2f} mem-GB-s, "
+                            f"{build_seconds:.1f} build-s"
+                        )
+                        org_vcpu_seconds += vcpu_s
+                        org_memory_seconds += mem_s
+                        org_build_seconds += build_seconds
+
+                except Exception as e:
+                    print(f"  ❌ Error aggregating ECS {svc_name}: {e}")
+                    continue
+
         # Sync usage to Autumn (sole source of truth for billing)
-        if org_requests > 0 or org_gb_seconds > 0 or org_build_seconds > 0:
+        has_lambda_usage = org_requests > 0 or org_gb_seconds > 0
+        has_ecs_usage = org_vcpu_seconds > 0 or org_memory_seconds > 0
+        has_build_usage = org_build_seconds > 0
+
+        if has_lambda_usage or has_ecs_usage or has_build_usage:
             total_requests += org_requests
             total_gb_seconds += org_gb_seconds
             total_build_seconds += org_build_seconds
+            total_vcpu_seconds += org_vcpu_seconds
+            total_memory_seconds += org_memory_seconds
 
             # Sync to Autumn (feature IDs must match the dashboard) using an
             # idempotency key per org/feature/window so repeated runs don't
@@ -416,6 +473,20 @@ def aggregate_usage_metrics():
                     value=float(org_build_seconds),
                     idempotency_key=f"{org_id}:build_seconds:{window_key}",
                 )
+            if org_vcpu_seconds > 0:
+                _autumn_track_usage(
+                    customer_id=org_id,
+                    feature_id="vcpu_time",
+                    value=float(org_vcpu_seconds),
+                    idempotency_key=f"{org_id}:vcpu_time:{window_key}",
+                )
+            if org_memory_seconds > 0:
+                _autumn_track_usage(
+                    customer_id=org_id,
+                    feature_id="memory_time",
+                    value=float(org_memory_seconds),
+                    idempotency_key=f"{org_id}:memory_time:{window_key}",
+                )
     
     # ── Quota enforcement for hobby orgs ─────────────────────────
     print("🛡️ Running quota enforcement pass...")
@@ -437,7 +508,9 @@ def aggregate_usage_metrics():
     print(
         f"   Total: {total_requests} requests, "
         f"{total_gb_seconds:.2f} GB-Seconds, "
-        f"{total_build_seconds:.1f} build-seconds"
+        f"{total_build_seconds:.1f} build-seconds, "
+        f"{total_vcpu_seconds:.0f} vCPU-seconds, "
+        f"{total_memory_seconds:.2f} mem-GB-seconds"
     )
     print(f"   Period: {period}")
     print(f"   Window: {window_seconds}s ending {window_key}")

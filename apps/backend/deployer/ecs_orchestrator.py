@@ -42,7 +42,7 @@ from .aws import (
     get_target_group_for_host,
 )
 from .aws.ecr import get_ecr_repo_name
-from .config import DEFAULT_TASK_CPU, DEFAULT_TASK_MEMORY, DEFAULT_INSTANCE_TYPE
+from .config import DEFAULT_TASK_CPU, DEFAULT_TASK_MEMORY, DEFAULT_INSTANCE_TYPE, get_instance_type_from_memory
 
 
 def deploy_ecs_project(
@@ -72,13 +72,13 @@ def deploy_ecs_project(
         root_directory: Root directory for monorepos
         start_command: Command to start the application
         env_vars: Environment variables for the container
-        cpu: Task CPU units (256, 512, 1024, 2048, 4096)
-        memory: Task memory in MB (512, 1024, 2048, 4096, 8192)
+        cpu: Task CPU units (2048 = 2 vCPUs, fixed for all t4g instances)
+        memory: Task memory in MB (512, 1024, 2048, 4096) - determines instance type
         on_build_start: Optional callback(build_id) called when build starts
         project_id: Unique project identifier for naming
         codebuild_compute_type: CodeBuild compute type override
         subdomain: Subdomain for ALB routing (e.g., "my-project-abc123")
-        instance_type: EC2 instance type (default from config)
+        instance_type: EC2 instance type (auto-determined from memory if not provided)
 
     Returns:
         Dict with service_url, build_id, ecs_service_name, task_definition_arn,
@@ -90,14 +90,17 @@ def deploy_ecs_project(
     cpu = cpu or DEFAULT_TASK_CPU
     memory = memory or DEFAULT_TASK_MEMORY
 
+    # Map memory to instance type if not explicitly provided
+    # All t4g instances have 2 vCPUs, so instance type is determined by memory
+    if not instance_type:
+        instance_type = get_instance_type_from_memory(memory)
+    
     # Use project_id for unique naming if provided
     repo_name = extract_project_name(github_url)
     if project_id:
         project_name = f"{repo_name}-{project_id[:8]}"
     else:
         project_name = repo_name
-
-    instance_type = instance_type or DEFAULT_INSTANCE_TYPE
 
     print(f"\n🔧 Shorlabs Deployer (ECS EC2 / {instance_type})")
     print(f"   Repository: {github_url}")

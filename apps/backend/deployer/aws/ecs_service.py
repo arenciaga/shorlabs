@@ -83,9 +83,10 @@ def ensure_ecs_cluster(org_id: str, capacity_provider_name: str = None) -> str:
                     existing_providers = cluster.get("capacityProviders", [])
                     if capacity_provider_name not in existing_providers:
                         print(f"🔧 Associating capacity provider {capacity_provider_name} with cluster {cluster_name}")
+                        updated_providers = existing_providers + [capacity_provider_name]
                         ecs_client.put_cluster_capacity_providers(
                             cluster=cluster_name,
-                            capacityProviders=[capacity_provider_name],
+                            capacityProviders=updated_providers,
                             defaultCapacityProviderStrategy=[
                                 {
                                     "capacityProvider": capacity_provider_name,
@@ -117,8 +118,8 @@ def ensure_ecs_cluster(org_id: str, capacity_provider_name: str = None) -> str:
                         break
                 else:
                     print(f"  ⚠️ Stale cluster still lingering, attempting create anyway")
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"⚠️ Error checking existing cluster: {e}")
 
     print(f"🔧 Creating ECS cluster: {cluster_name}")
     # Create cluster WITHOUT capacity provider first to avoid
@@ -213,8 +214,8 @@ def register_task_definition(
     Args:
         project_name: Project name for naming
         image_uri: Docker image URI from ECR
-        cpu: CPU units (256, 512, 1024, 2048, 4096)
-        memory: Memory in MB (512, 1024, 2048, 4096, 8192)
+        cpu: CPU units (2048 for all t4g instances = 2 vCPUs)
+        memory: Memory in MB (512, 1024, 2048, 4096)
         execution_role_arn: IAM role ARN for ECS task execution
         env_vars: Environment variables for the container
         port: Container port (default 8080)

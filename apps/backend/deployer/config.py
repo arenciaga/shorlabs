@@ -54,7 +54,32 @@ ECS_LAUNCH_TEMPLATE_PREFIX = "shorlabs-ecs-lt"
 ECS_ASG_PREFIX = "shorlabs-ecs-asg"
 ECS_CAPACITY_PROVIDER_PREFIX = "shorlabs-ecs-cp"
 DEFAULT_INSTANCE_TYPE = "t4g.micro"
-ALLOWED_INSTANCE_TYPES = ["t4g.nano", "t4g.micro", "t4g.small", "t4g.medium"]
-DEFAULT_TASK_CPU = 256         # 0.25 vCPU
-DEFAULT_TASK_MEMORY = 512      # 512 MB
+ALLOWED_INSTANCE_TYPES = ["t4g.micro", "t4g.small", "t4g.medium", "t4g.large"]
+DEFAULT_TASK_CPU = 2048        # 2 vCPU (all t4g instances have 2 vCPUs)
+DEFAULT_TASK_MEMORY = 1024     # 1 GB (t4g.micro default)
 ECS_CONTAINER_PORT = 8080
+
+# CPU/Memory to Instance Type Mapping
+# All t4g instances have 2 vCPUs, so we map based on memory
+INSTANCE_TYPE_MAP = {
+    1024: "t4g.micro",  # 1 GB
+    2048: "t4g.small",  # 2 GB
+    4096: "t4g.medium", # 4 GB
+    8192: "t4g.large",  # 8 GB
+}
+
+
+def get_instance_type_from_memory(memory: int) -> str:
+    """
+    Map memory (in MB) to the appropriate t4g instance type.
+
+    All t4g instances have 2 vCPUs, so instance type is determined by memory.
+
+    Args:
+        memory: Memory in MB (512, 1024, 2048, 4096)
+
+    Returns:
+        Instance type string (e.g., "t4g.micro")
+    """
+    return INSTANCE_TYPE_MAP.get(memory, DEFAULT_INSTANCE_TYPE)
+

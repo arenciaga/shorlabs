@@ -35,15 +35,9 @@ import { EnvironmentVariablesEditor, EnvironmentVariablesSecurityNote, type EnvV
 import { StartCommandInput } from "@/components/StartCommandInput"
 import { trackEvent } from "@/lib/amplitude"
 import { useIsPro } from "@/hooks/use-is-pro"
+import { EC2_COMPUTE_OPTIONS, DEFAULT_COMPUTE_INDEX } from "@/lib/compute-options"
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
-
-const FARGATE_COMPUTE_OPTIONS = [
-    { cpu: 256, memory: 512, label: "0.25 vCPU / 512 MB" },
-    { cpu: 512, memory: 1024, label: "0.5 vCPU / 1 GB" },
-    { cpu: 1024, memory: 2048, label: "1 vCPU / 2 GB" },
-    { cpu: 2048, memory: 4096, label: "2 vCPU / 4 GB" },
-]
 
 interface DirectoryItem {
     name: string
@@ -89,8 +83,8 @@ function ConfigureWebServiceContent() {
     const [detectingFramework, setDetectingFramework] = useState(true)
     const [detectionConfidence, setDetectionConfidence] = useState<"high" | "medium" | "low">("low")
 
-    // Fargate compute (default: 0.25 vCPU / 512 MB)
-    const [selectedCompute, setSelectedCompute] = useState(0)
+    // EC2 compute (default: t4g.micro - 2 vCPU / 1 GB)
+    const [selectedCompute, setSelectedCompute] = useState(DEFAULT_COMPUTE_INDEX)
 
     useEffect(() => {
         if (!repoFullName) router.push("/new/web-service")
@@ -231,7 +225,7 @@ function ConfigureWebServiceContent() {
         setError(null)
         try {
             const token = await getToken()
-            const compute = FARGATE_COMPUTE_OPTIONS[selectedCompute]
+            const compute = EC2_COMPUTE_OPTIONS[selectedCompute]
 
             // Determine API endpoint
             const serviceUrl = new URL(`${API_BASE_URL}/api/projects/${existingProjectId}/services`)
@@ -382,7 +376,7 @@ function ConfigureWebServiceContent() {
                 <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6 sm:mb-8">
                     <div>
                         <h1 className="text-xl sm:text-2xl font-bold text-zinc-900 tracking-tight">Configure Web Service</h1>
-                        <p className="text-sm text-zinc-500 mt-1">Review your settings before deploying to Fargate</p>
+                        <p className="text-sm text-zinc-500 mt-1">Review your settings before deploying</p>
                     </div>
                     <Button
                         onClick={handleDeploy}
@@ -506,7 +500,7 @@ function ConfigureWebServiceContent() {
                     </div>
                 )}
 
-                {/* Compute Section - Fargate-specific */}
+                {/* Compute Section */}
                 {activeSection === "compute" && (
                     <div className="bg-white rounded-none border border-zinc-200 overflow-hidden">
                         <div className="flex items-center gap-3 px-4 sm:px-6 py-4 border-b border-zinc-100">
@@ -518,7 +512,7 @@ function ConfigureWebServiceContent() {
                                 Choose the CPU and memory allocation for your container. Your app must listen on port 8080.
                             </p>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                {FARGATE_COMPUTE_OPTIONS.map((option, index) => (
+                                {EC2_COMPUTE_OPTIONS.map((option, index) => (
                                     <button
                                         key={index}
                                         onClick={() => setSelectedCompute(index)}
@@ -534,9 +528,8 @@ function ConfigureWebServiceContent() {
                                             {selectedCompute === index && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
                                         </div>
                                         <div>
-                                            <p className="text-sm font-medium text-zinc-900">{option.label}</p>
-                                            <p className="text-xs text-zinc-500 mt-0.5">
-                                                {option.cpu / 1024} vCPU &middot; {option.memory >= 1024 ? `${option.memory / 1024} GB` : `${option.memory} MB`} RAM
+                                            <p className="text-sm font-medium text-zinc-900">
+                                                {option.cpu / 1024} vCPU / {option.memory >= 1024 ? `${option.memory / 1024} GB` : `${option.memory} MB`}
                                             </p>
                                         </div>
                                     </button>

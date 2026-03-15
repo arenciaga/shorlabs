@@ -1,7 +1,7 @@
 import { Loader2, Cpu } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ComputeSettings } from "@/components/ComputeSettings"
-import { FargateComputeSettings } from "@/components/FargateComputeSettings"
+import { ECSComputeSettings } from "@/components/ECSComputeSettings"
 import type { ProjectCompat } from "./types"
 
 interface ComputeTabProps {
@@ -48,10 +48,10 @@ export function ComputeTab({
     return (
         <div className="space-y-6">
             {isWebService ? (
-                <FargateComputeSettings
-                    cpu={editingCompute ? cpuValue : (project.cpu || 256)}
-                    memory={editingCompute ? memoryValue : (project.memory || 512)}
-                    onSelect={(cpu, memory) => {
+                <ECSComputeSettings
+                    cpu={editingCompute ? cpuValue : (project.cpu || 2048)}
+                    memory={editingCompute ? memoryValue : (project.memory || 1024)}
+                    onSelect={(cpu: number, memory: number) => {
                         if (!editingCompute) {
                             onStartEditing({ cpu, memory })
                         } else {

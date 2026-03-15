@@ -58,7 +58,7 @@ export function MobileServiceGrid({ services, projectId, onSelectService }: Mobi
                                         {service.name || (isDb ? "Database" : isWebService ? "Web Service" : "Web App")}
                                     </div>
                                     <div className="text-[11px] text-zinc-400 mt-0.5">
-                                        {isDb ? "PostgreSQL" : isWebService ? "Fargate" : "Web App"}
+                                        {isDb ? "PostgreSQL" : isWebService ? "Web Service" : "Web App"}
                                     </div>
                                 </div>
                             </div>

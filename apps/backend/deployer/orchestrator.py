@@ -35,6 +35,7 @@ def deploy_project(
     timeout: Optional[int] = None,
     ephemeral_storage: Optional[int] = None,
     on_build_start: Optional[callable] = None,
+    on_status_change: Optional[callable] = None,
     project_id: Optional[str] = None,
     codebuild_compute_type: Optional[str] = None,
 ) -> str:
@@ -79,11 +80,15 @@ def deploy_project(
     print(f"   Start Command: {start_command}\n")
     
     # Step 1: Detect runtime via GitHub API
+    if on_status_change:
+        on_status_change("CLONING")
     print("🔍 Detecting runtime...")
     runtime = detect_runtime_from_github(github_url, github_token, root_directory)
     print(f"✅ Detected runtime: {runtime}")
     
     # Step 2: Create ECR repository
+    if on_status_change:
+        on_status_change("PREPARING")
     ecr_repo_name = get_ecr_repo_name(project_name)
     ecr_repo_uri = create_ecr_repository(ecr_repo_name)
     print(f"✅ ECR repository ready: {ecr_repo_name}")
@@ -94,6 +99,8 @@ def deploy_project(
     create_or_update_codebuild_project(codebuild_role)
     
     # Step 4: Start build directly from GitHub with detected runtime
+    if on_status_change:
+        on_status_change("UPLOADING")
     print("🚀 Starting build from GitHub...")
     build_id = start_build(
         github_url=github_url,
@@ -113,11 +120,15 @@ def deploy_project(
         on_build_start(build_id)
     
     # Step 5: Wait for build
+    if on_status_change:
+        on_status_change("BUILDING")
     if not wait_for_build(build_id):
         raise Exception("Build failed")
     print("✅ Build completed")
     
     # Step 6: Deploy to Lambda
+    if on_status_change:
+        on_status_change("DEPLOYING")
     print("🚀 Deploying to Lambda...")
     lambda_role = get_or_create_lambda_role()
     image_uri = f"{ecr_repo_uri}:latest"

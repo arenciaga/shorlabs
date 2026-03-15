@@ -185,11 +185,11 @@ def _run_deployment_sync(
             branch=branch,
         )
         print(f"📝 Deployment record created: {deployment['deploy_id']} (build: {build_id})")
-    
-    try:
-        # Update status to building
-        update_service(service_id, {"status": "BUILDING"})
 
+    def on_status_change(status: str):
+        update_service(service_id, {"status": status})
+
+    try:
         # Determine CodeBuild compute type based on org plan:
         #   Hobby/Free → BUILD_GENERAL1_SMALL
         #   Paid (Pro/Plus) → BUILD_GENERAL1_LARGE
@@ -213,8 +213,9 @@ def _run_deployment_sync(
             memory=memory,
             timeout=timeout,
             ephemeral_storage=ephemeral_storage,
-            on_build_start=on_build_start,  # Create deployment record immediately
-            project_id=service_id,  # Pass service_id for unique Lambda naming
+            on_build_start=on_build_start,
+            on_status_change=on_status_change,
+            project_id=service_id,
             codebuild_compute_type=codebuild_compute_type,
         )
         
@@ -597,9 +598,10 @@ def _run_ecs_deployment_sync(
         )
         print(f"📝 ECS deployment record created: {deployment['deploy_id']} (build: {build_id})")
 
-    try:
-        update_service(service_id, {"status": "BUILDING"})
+    def on_status_change(status: str):
+        update_service(service_id, {"status": status})
 
+    try:
         codebuild_compute_type = "BUILD_GENERAL1_LARGE"
         if org_id:
             from api.lambda_warmer import _is_paid_org
@@ -619,6 +621,7 @@ def _run_ecs_deployment_sync(
             cpu=cpu,
             memory=memory,
             on_build_start=on_build_start,
+            on_status_change=on_status_change,
             project_id=service_id,
             codebuild_compute_type=codebuild_compute_type,
             subdomain=subdomain,

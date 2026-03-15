@@ -58,6 +58,7 @@ def deploy_ecs_project(
     cpu: Optional[int] = None,
     memory: Optional[int] = None,
     on_build_start: Optional[callable] = None,
+    on_status_change: Optional[callable] = None,
     project_id: Optional[str] = None,
     codebuild_compute_type: Optional[str] = None,
     subdomain: Optional[str] = None,
@@ -118,11 +119,15 @@ def deploy_ecs_project(
     print(f"   Instance Type: {instance_type}\n")
 
     # Step 1: Detect runtime
+    if on_status_change:
+        on_status_change("CLONING")
     print("🔍 Detecting runtime...")
     runtime = detect_runtime_from_github(github_url, github_token, root_directory)
     print(f"✅ Detected runtime: {runtime}")
 
     # Step 2: Create ECR repository (reused from Lambda pipeline)
+    if on_status_change:
+        on_status_change("PREPARING")
     ecr_repo_name = get_ecr_repo_name(project_name)
     ecr_repo_uri = create_ecr_repository(ecr_repo_name)
     print(f"✅ ECR repository ready: {ecr_repo_name}")
@@ -132,6 +137,8 @@ def deploy_ecs_project(
     codebuild_role = get_or_create_codebuild_role()
     create_or_update_codebuild_project(codebuild_role)
 
+    if on_status_change:
+        on_status_change("UPLOADING")
     print("🚀 Starting build from GitHub...")
     build_id = start_build(
         github_url=github_url,
@@ -151,11 +158,15 @@ def deploy_ecs_project(
         on_build_start(build_id)
 
     # Step 4: Wait for build
+    if on_status_change:
+        on_status_change("BUILDING")
     if not wait_for_build(build_id):
         raise Exception("Build failed")
     print("✅ Build completed")
 
     # Step 5: Setup ECS EC2 infrastructure
+    if on_status_change:
+        on_status_change("DEPLOYING")
     print("🚀 Deploying to ECS EC2...")
 
     # 5a: IAM roles

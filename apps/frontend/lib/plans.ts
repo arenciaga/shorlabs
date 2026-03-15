@@ -29,7 +29,7 @@ export const USAGE_PRICING = {
     requests: "$0.60 / 1M Requests",
     compute: "$0.035 / 1K Compute (GB-s)",
     vcpuTime: "$0.000002 per vCPU / sec",
-    memoryTime: "$0.00000433 per GB / sec",
+    memoryTime: "$0.000002165 per GB / sec",
 } as const
 
 export const PLANS: Plan[] = [

@@ -24,13 +24,13 @@ function NewProjectPageInner() {
         {
             id: "web-app",
             name: "Web App",
-            description: "Deploy a web application from a Git repository",
+            description: "Serverless functions that scale to zero — ideal for APIs, websites, and cron jobs",
             href: projectId ? `/new/web-app?project_id=${projectId}` : "/new/web-app",
         },
         {
             id: "web-service",
             name: "Web Service",
-            description: "Deploy a long-running container with WebSocket & persistent connections",
+            description: "Always-on containers for WebSockets, background workers, and long-running processes",
             href: projectId ? `/new/web-service?project_id=${projectId}` : "/new/web-service",
         },
         {

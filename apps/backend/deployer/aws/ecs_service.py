@@ -341,6 +341,15 @@ def create_or_update_ecs_service(
                     taskDefinition=task_definition_arn,
                     desiredCount=desired_count,
                     forceNewDeployment=True,
+                    healthCheckGracePeriodSeconds=120,
+                    deploymentConfiguration={
+                        "maximumPercent": 200,
+                        "minimumHealthyPercent": 100,
+                        "deploymentCircuitBreaker": {
+                            "enable": True,
+                            "rollback": True,
+                        },
+                    },
                 )
                 print(f"✅ ECS service updated: {service_name}")
                 return svc["serviceArn"]
@@ -366,9 +375,14 @@ def create_or_update_ecs_service(
                 "containerPort": ECS_CONTAINER_PORT,
             }
         ],
+        "healthCheckGracePeriodSeconds": 120,
         "deploymentConfiguration": {
             "maximumPercent": 200,
             "minimumHealthyPercent": 100,
+            "deploymentCircuitBreaker": {
+                "enable": True,
+                "rollback": True,
+            },
         },
     }
 
@@ -1037,17 +1051,23 @@ def ensure_auto_scaling_group(
             # on every normal redeploy.
             refresh_started = False
             if instance_type_changed:
+                # Temporarily allow one extra instance so ASG can launch the
+                # new instance BEFORE terminating the old one (zero-downtime).
+                autoscaling.update_auto_scaling_group(
+                    AutoScalingGroupName=asg_name,
+                    MaxSize=max_size + 1,
+                )
                 try:
                     autoscaling.start_instance_refresh(
                         AutoScalingGroupName=asg_name,
                         Strategy="Rolling",
                         Preferences={
-                            "MinHealthyPercentage": 0,
+                            "MinHealthyPercentage": 100,
                             "InstanceWarmup": 120,
                         },
                     )
                     refresh_started = True
-                    print(f"🔄 Instance refresh started (replacing old instances with new type)")
+                    print(f"🔄 Instance refresh started (zero-downtime: new instance launches before old terminates)")
                 except Exception as e:
                     if "in progress" in str(e).lower():
                         refresh_started = True

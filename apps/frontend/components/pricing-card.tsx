@@ -103,26 +103,38 @@ export function PricingCard({
                 )}
             >
                 <div className="flex flex-col gap-4">
-                    {plan.featureGroups.map((group) => (
-                        <div key={group.category}>
-                            <span
-                                className={cn(
-                                    "text-[9px] font-mono tracking-[0.2em] uppercase",
-                                    isHighlighted ? "text-background/40" : "text-muted-foreground"
-                                )}
-                            >
-                                {group.category}
-                            </span>
-                            <div className="mt-2 flex flex-col gap-2.5">
-                                {group.features.map((feature) => (
-                                    <div key={feature.label} className="flex items-start gap-3">
-                                        <Check size={12} strokeWidth={2.5} className="mt-0.5 shrink-0 text-muted-foreground" />
-                                        <span className="text-xs font-mono leading-relaxed">{feature.label}</span>
-                                    </div>
-                                ))}
+                    {plan.featureGroups.map((group) => {
+                        const isAvailable = group.available !== false
+                        return (
+                            <div key={group.category} className={cn(!isAvailable && "opacity-35")}>
+                                <span
+                                    className={cn(
+                                        "text-[9px] font-mono tracking-[0.2em] uppercase",
+                                        isHighlighted ? "text-background/40" : "text-muted-foreground"
+                                    )}
+                                >
+                                    {group.category}
+                                </span>
+                                <div className="mt-2 flex flex-col gap-2.5">
+                                    {group.features.map((feature) => {
+                                        const Icon = feature.isBoolean ? Check : feature.icon
+                                        return (
+                                            <div key={feature.label} className="flex items-start gap-3">
+                                                <Icon
+                                                    size={12}
+                                                    strokeWidth={feature.isBoolean ? 2.5 : 1.5}
+                                                    className="mt-0.5 shrink-0 text-muted-foreground"
+                                                />
+                                                <span className="text-xs font-mono leading-relaxed">
+                                                    {feature.label}
+                                                </span>
+                                            </div>
+                                        )
+                                    })}
+                                </div>
                             </div>
-                        </div>
-                    ))}
+                        )
+                    })}
                 </div>
             </div>
 

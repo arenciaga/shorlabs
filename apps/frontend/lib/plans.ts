@@ -1,13 +1,17 @@
-import { Clock, Cpu, Database, DollarSign, Flame, FolderOpen, Globe, Hammer, HardDrive, type LucideIcon, Server, Zap } from 'lucide-react'
+import { Clock, Cpu, Database, DollarSign, Flame, FolderOpen, Globe, Hammer, HardDrive, type LucideIcon, Minus, Server, Zap } from 'lucide-react'
 
 export interface PlanFeature {
     label: string
     icon: LucideIcon
+    /** If true, feature is a boolean perk (renders a checkmark). Otherwise renders the feature icon. */
+    isBoolean?: boolean
 }
 
 export interface FeatureGroup {
     category: string
     features: PlanFeature[]
+    /** If false, the group is shown grayed out as unavailable. Defaults to true. */
+    available?: boolean
 }
 
 export interface Plan {
@@ -32,19 +36,33 @@ export const PLANS: Plan[] = [
     {
         id: "hobby",
         name: "Hobby",
-        description: "Perfect for personal projects and testing.",
+        description: "Free with fixed limits. Perfect for personal projects and testing.",
         price: "$0",
         period: "/ month",
         featureGroups: [
             {
                 category: "Web Apps",
                 features: [
-                    { label: "3K Requests/Month", icon: Globe },
-                    { label: "1.2K Compute (GB-s)/Month", icon: Zap },
-                    { label: "1 GB Memory", icon: Cpu },
+                    { label: "3K Requests / month included", icon: Globe },
+                    { label: "1.2K Compute (GB-s) / month included", icon: Zap },
+                    { label: "Up to 1 GB Memory", icon: Cpu },
                     { label: "Up to 30s Timeout", icon: Clock },
-                    { label: "1 GB Temporary storage", icon: HardDrive },
+                    { label: "Up to 1 GB Temporary storage", icon: HardDrive },
                     { label: "Standard Builds", icon: Hammer },
+                ],
+            },
+            {
+                category: "Web Services",
+                available: false,
+                features: [
+                    { label: "Not available on Hobby", icon: Minus },
+                ],
+            },
+            {
+                category: "Platform",
+                available: false,
+                features: [
+                    { label: "Not available on Hobby", icon: Minus },
                 ],
             },
         ],
@@ -52,17 +70,11 @@ export const PLANS: Plan[] = [
     {
         id: "plus",
         name: "Plus",
-        description: "Great for growing projects that need more scale.",
+        description: "$5/mo includes $5 usage credit. Pay-as-you-go after.",
         price: "$5",
         period: "/ month",
         trialLabel: "7 day free trial",
         featureGroups: [
-            {
-                category: "Included",
-                features: [
-                    { label: "$5 Included Usage/Month", icon: DollarSign },
-                ],
-            },
             {
                 category: "Web Apps",
                 features: [
@@ -81,10 +93,10 @@ export const PLANS: Plan[] = [
                 ],
             },
             {
-                category: "All Services",
+                category: "Platform",
                 features: [
-                    { label: "Faster Builds", icon: Hammer },
-                    { label: "Zero Cold Starts", icon: Flame },
+                    { label: "Faster Builds", icon: Hammer, isBoolean: true },
+                    { label: "Zero Cold Starts", icon: Flame, isBoolean: true },
                 ],
             },
         ],
@@ -92,17 +104,11 @@ export const PLANS: Plan[] = [
     {
         id: "pro",
         name: "Pro",
-        description: "Built for production workloads and commercial applications.",
+        description: "$20/mo includes $20 usage credit. Pay-as-you-go after.",
         price: "$20",
         period: "/ month",
         highlighted: false,
         featureGroups: [
-            {
-                category: "Included",
-                features: [
-                    { label: "$20 Included Usage/Month", icon: DollarSign },
-                ],
-            },
             {
                 category: "Web Apps",
                 features: [
@@ -121,10 +127,10 @@ export const PLANS: Plan[] = [
                 ],
             },
             {
-                category: "All Services",
+                category: "Platform",
                 features: [
-                    { label: "Faster Builds", icon: Hammer },
-                    { label: "Zero Cold Starts", icon: Flame },
+                    { label: "Faster Builds", icon: Hammer, isBoolean: true },
+                    { label: "Zero Cold Starts", icon: Flame, isBoolean: true },
                 ],
             },
         ],

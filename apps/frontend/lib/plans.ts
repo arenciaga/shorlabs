@@ -90,6 +90,7 @@ export const PLANS: Plan[] = [
                 features: [
                     { label: USAGE_PRICING.vcpuTime, icon: Cpu },
                     { label: USAGE_PRICING.memoryTime, icon: HardDrive },
+                    { label: "Up to 2 GB Memory", icon: Server },
                 ],
             },
             {
@@ -124,6 +125,7 @@ export const PLANS: Plan[] = [
                 features: [
                     { label: USAGE_PRICING.vcpuTime, icon: Cpu },
                     { label: USAGE_PRICING.memoryTime, icon: HardDrive },
+                    { label: "Up to 8 GB Memory", icon: Server },
                 ],
             },
             {

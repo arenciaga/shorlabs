@@ -1,8 +1,13 @@
-import { Clock, Cpu, DollarSign, Flame, FolderOpen, Globe, Hammer, HardDrive, type LucideIcon, Server, Zap } from 'lucide-react'
+import { Clock, Cpu, Database, DollarSign, Flame, FolderOpen, Globe, Hammer, HardDrive, type LucideIcon, Server, Zap } from 'lucide-react'
 
 export interface PlanFeature {
     label: string
     icon: LucideIcon
+}
+
+export interface FeatureGroup {
+    category: string
+    features: PlanFeature[]
 }
 
 export interface Plan {
@@ -13,7 +18,7 @@ export interface Plan {
     period: string
     highlighted?: boolean
     trialLabel?: string
-    features: PlanFeature[]
+    featureGroups: FeatureGroup[]
 }
 
 export const USAGE_PRICING = {
@@ -30,13 +35,18 @@ export const PLANS: Plan[] = [
         description: "Perfect for personal projects and testing.",
         price: "$0",
         period: "/ month",
-        features: [
-            { label: "3K Requests/Month", icon: Globe },
-            { label: "1.2K Compute (GB-s)/Month", icon: Zap },
-            { label: "1 GB Memory", icon: Cpu },
-            { label: "Up to 30s Timeout", icon: Clock },
-            { label: "1 GB Temporary storage", icon: HardDrive },
-            { label: "Standard Builds", icon: Hammer },
+        featureGroups: [
+            {
+                category: "Web Apps",
+                features: [
+                    { label: "3K Requests/Month", icon: Globe },
+                    { label: "1.2K Compute (GB-s)/Month", icon: Zap },
+                    { label: "1 GB Memory", icon: Cpu },
+                    { label: "Up to 30s Timeout", icon: Clock },
+                    { label: "1 GB Temporary storage", icon: HardDrive },
+                    { label: "Standard Builds", icon: Hammer },
+                ],
+            },
         ],
     },
     {
@@ -46,18 +56,37 @@ export const PLANS: Plan[] = [
         price: "$5",
         period: "/ month",
         trialLabel: "7 day free trial",
-        features: [
-            { label: "$5 Included Usage/Month", icon: DollarSign },
-            { label: USAGE_PRICING.requests, icon: Globe },
-            { label: USAGE_PRICING.compute, icon: Zap },
-            { label: "Up to 4 GB Memory", icon: Cpu },
-            { label: "Up to 60s Timeout", icon: Clock },
-            { label: "Up to 2 GB Temporary storage", icon: HardDrive },
-            { label: "Faster Builds", icon: Hammer },
-            { label: "Zero Cold Starts", icon: Flame },
-            { label: "Web Services", icon: Server },
-            { label: USAGE_PRICING.vcpuTime, icon: Cpu },
-            { label: USAGE_PRICING.memoryTime, icon: HardDrive },
+        featureGroups: [
+            {
+                category: "Included",
+                features: [
+                    { label: "$5 Included Usage/Month", icon: DollarSign },
+                ],
+            },
+            {
+                category: "Web Apps",
+                features: [
+                    { label: USAGE_PRICING.requests, icon: Globe },
+                    { label: USAGE_PRICING.compute, icon: Zap },
+                    { label: "Up to 4 GB Memory", icon: Cpu },
+                    { label: "Up to 60s Timeout", icon: Clock },
+                    { label: "Up to 2 GB Temporary storage", icon: HardDrive },
+                ],
+            },
+            {
+                category: "Web Services",
+                features: [
+                    { label: USAGE_PRICING.vcpuTime, icon: Cpu },
+                    { label: USAGE_PRICING.memoryTime, icon: HardDrive },
+                ],
+            },
+            {
+                category: "All Services",
+                features: [
+                    { label: "Faster Builds", icon: Hammer },
+                    { label: "Zero Cold Starts", icon: Flame },
+                ],
+            },
         ],
     },
     {
@@ -66,19 +95,38 @@ export const PLANS: Plan[] = [
         description: "Built for production workloads and commercial applications.",
         price: "$20",
         period: "/ month",
-        highlighted: true,
-        features: [
-            { label: "$20 Included Usage/Month", icon: DollarSign },
-            { label: USAGE_PRICING.requests, icon: Globe },
-            { label: USAGE_PRICING.compute, icon: Zap },
-            { label: "Up to 8 GB Memory", icon: Cpu },
-            { label: "Up to 300s Timeout", icon: Clock },
-            { label: "Up to 8 GB Temporary storage", icon: HardDrive },
-            { label: "Faster Builds", icon: Hammer },
-            { label: "Zero Cold Starts", icon: Flame },
-            { label: "Web Services", icon: Server },
-            { label: USAGE_PRICING.vcpuTime, icon: Cpu },
-            { label: USAGE_PRICING.memoryTime, icon: HardDrive },
+        highlighted: false,
+        featureGroups: [
+            {
+                category: "Included",
+                features: [
+                    { label: "$20 Included Usage/Month", icon: DollarSign },
+                ],
+            },
+            {
+                category: "Web Apps",
+                features: [
+                    { label: USAGE_PRICING.requests, icon: Globe },
+                    { label: USAGE_PRICING.compute, icon: Zap },
+                    { label: "Up to 8 GB Memory", icon: Cpu },
+                    { label: "Up to 300s Timeout", icon: Clock },
+                    { label: "Up to 8 GB Temporary storage", icon: HardDrive },
+                ],
+            },
+            {
+                category: "Web Services",
+                features: [
+                    { label: USAGE_PRICING.vcpuTime, icon: Cpu },
+                    { label: USAGE_PRICING.memoryTime, icon: HardDrive },
+                ],
+            },
+            {
+                category: "All Services",
+                features: [
+                    { label: "Faster Builds", icon: Hammer },
+                    { label: "Zero Cold Starts", icon: Flame },
+                ],
+            },
         ],
     },
 ]

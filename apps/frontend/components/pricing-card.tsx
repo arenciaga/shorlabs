@@ -102,11 +102,25 @@ export function PricingCard({
                     isHighlighted ? "border-background/20" : "border-foreground"
                 )}
             >
-                <div className="flex flex-col gap-3">
-                    {plan.features.map((feature) => (
-                        <div key={feature.label} className="flex items-start gap-3">
-                            <Check size={12} strokeWidth={2.5} className="mt-0.5 shrink-0 text-muted-foreground" />
-                            <span className="text-xs font-mono leading-relaxed">{feature.label}</span>
+                <div className="flex flex-col gap-4">
+                    {plan.featureGroups.map((group) => (
+                        <div key={group.category}>
+                            <span
+                                className={cn(
+                                    "text-[9px] font-mono tracking-[0.2em] uppercase",
+                                    isHighlighted ? "text-background/40" : "text-muted-foreground"
+                                )}
+                            >
+                                {group.category}
+                            </span>
+                            <div className="mt-2 flex flex-col gap-2.5">
+                                {group.features.map((feature) => (
+                                    <div key={feature.label} className="flex items-start gap-3">
+                                        <Check size={12} strokeWidth={2.5} className="mt-0.5 shrink-0 text-muted-foreground" />
+                                        <span className="text-xs font-mono leading-relaxed">{feature.label}</span>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
                     ))}
                 </div>

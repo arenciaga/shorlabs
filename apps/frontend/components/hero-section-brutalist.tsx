@@ -58,7 +58,7 @@ export function HeroSection() {
            Your Full Stack. Fully Serverless.
           </h1>
           <p className="text-xs sm:text-base text-muted-foreground max-w-2xl mb-8 sm:mb-9 leading-relaxed font-mono px-0">
-            Shorlabs provides the infrastructure to deploy serverless web apps and databases, scale instantly, and only pay for what you use.
+            Shorlabs provides the infrastructure to deploy serverless web apps, services, and databases — scale instantly, with usage-based pricing.
           </p>
           <div className="flex w-full max-w-md flex-col sm:flex-row items-stretch sm:items-center justify-start gap-3">
             {!isLoaded ? (

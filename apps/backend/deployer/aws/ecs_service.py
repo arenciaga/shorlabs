@@ -82,22 +82,34 @@ def ensure_ecs_cluster(org_id: str, capacity_provider_name: str = None) -> str:
                 if capacity_provider_name:
                     existing_providers = cluster.get("capacityProviders", [])
                     if capacity_provider_name not in existing_providers:
-                        try:
-                            print(f"🔧 Associating capacity provider {capacity_provider_name} with cluster {cluster_name}")
-                            updated_providers = existing_providers + [capacity_provider_name]
-                            ecs_client.put_cluster_capacity_providers(
-                                cluster=cluster_name,
-                                capacityProviders=updated_providers,
-                                defaultCapacityProviderStrategy=[
-                                    {
-                                        "capacityProvider": capacity_provider_name,
-                                        "weight": 1,
-                                        "base": 1,
-                                    }
-                                ],
-                            )
-                        except Exception as e:
-                            print(f"⚠️ Failed to associate capacity provider: {e}")
+                        print(f"🔧 Associating capacity provider {capacity_provider_name} with cluster {cluster_name}")
+                        updated_providers = existing_providers + [capacity_provider_name]
+                        ecs_client.put_cluster_capacity_providers(
+                            cluster=cluster_name,
+                            capacityProviders=updated_providers,
+                            defaultCapacityProviderStrategy=[
+                                {
+                                    "capacityProvider": capacity_provider_name,
+                                    "weight": 1,
+                                    "base": 1,
+                                }
+                            ],
+                        )
+                    else:
+                        # CP already associated — just update the default strategy
+                        # so this service's CP is used for new tasks
+                        print(f"🔧 Updating default capacity provider strategy to {capacity_provider_name}")
+                        ecs_client.put_cluster_capacity_providers(
+                            cluster=cluster_name,
+                            capacityProviders=existing_providers,
+                            defaultCapacityProviderStrategy=[
+                                {
+                                    "capacityProvider": capacity_provider_name,
+                                    "weight": 1,
+                                    "base": 1,
+                                }
+                            ],
+                        )
                 return cluster["clusterArn"]
             elif status in ("INACTIVE", "DRAINING"):
                 # Stale cluster from a failed cleanup — delete and wait for
@@ -434,7 +446,9 @@ def wait_for_service_stable(cluster_name: str, service_name: str, timeout: int =
 
 def delete_ecs_service(project_name: str, org_id: str) -> bool:
     """
-    Delete an ECS service and deregister its task definitions.
+    Force-delete an ECS service, stop all running tasks, and deregister task definitions.
+
+    Works in any state: running, mid-deployment, pending, draining.
 
     Args:
         project_name: Project name for service lookup
@@ -447,17 +461,40 @@ def delete_ecs_service(project_name: str, org_id: str) -> bool:
     service_name = get_ecs_service_name(project_name)
     cluster_name = get_cluster_name(org_id)
 
+    # Stop all running/pending tasks for this service
     try:
-        # Scale down first
-        print(f"🗑️ Scaling down ECS service: {service_name}")
-        ecs_client.update_service(
-            cluster=cluster_name,
-            service=service_name,
-            desiredCount=0,
-        )
-        time.sleep(5)
+        for status in ["RUNNING", "PENDING"]:
+            task_arns = ecs_client.list_tasks(
+                cluster=cluster_name,
+                serviceName=service_name,
+                desiredStatus=status,
+            ).get("taskArns", [])
+            for task_arn in task_arns:
+                try:
+                    ecs_client.stop_task(
+                        cluster=cluster_name,
+                        task=task_arn,
+                        reason="Service being force-deleted",
+                    )
+                    print(f"  ↳ Stopped task: {task_arn.split('/')[-1]}")
+                except Exception:
+                    pass
+    except Exception:
+        pass  # Service may not exist yet
 
-        # Delete service
+    try:
+        # Scale down
+        print(f"🗑️ Scaling down ECS service: {service_name}")
+        try:
+            ecs_client.update_service(
+                cluster=cluster_name,
+                service=service_name,
+                desiredCount=0,
+            )
+        except Exception:
+            pass  # May fail if service is already draining
+
+        # Force delete service — kills remaining tasks immediately
         ecs_client.delete_service(
             cluster=cluster_name,
             service=service_name,
@@ -466,18 +503,20 @@ def delete_ecs_service(project_name: str, org_id: str) -> bool:
         print(f"✅ ECS service deleted: {service_name}")
     except ecs_client.exceptions.ServiceNotFoundException:
         print(f"⚠️ ECS service not found (already deleted?): {service_name}")
-        return False
     except Exception as e:
         print(f"❌ Failed to delete ECS service: {e}")
-        return False
 
-    # Deregister task definitions
+    # Deregister all task definitions (active and inactive)
     family = get_task_definition_family(project_name)
     try:
-        response = ecs_client.list_task_definitions(familyPrefix=family, status="ACTIVE")
-        for task_def_arn in response.get("taskDefinitionArns", []):
-            ecs_client.deregister_task_definition(taskDefinition=task_def_arn)
-            print(f"  ↳ Deregistered task definition: {task_def_arn}")
+        for status in ["ACTIVE", "INACTIVE"]:
+            response = ecs_client.list_task_definitions(familyPrefix=family, status=status)
+            for task_def_arn in response.get("taskDefinitionArns", []):
+                try:
+                    ecs_client.deregister_task_definition(taskDefinition=task_def_arn)
+                    print(f"  ↳ Deregistered: {task_def_arn.split('/')[-1]}")
+                except Exception:
+                    pass
     except Exception as e:
         print(f"⚠️ Failed to deregister task definitions: {e}")
 
@@ -486,10 +525,11 @@ def delete_ecs_service(project_name: str, org_id: str) -> bool:
 
 def delete_service_infra(project_name: str, org_id: str) -> dict:
     """
-    Delete per-service ECS infrastructure: capacity provider, ASG, and launch template.
+    Force-delete all per-service ECS infrastructure.
 
-    Each service has its own CP/ASG/LT, so deletion is straightforward —
-    no need to check if other services remain.
+    Handles any state: mid-deployment, running, partially created, stuck.
+    Order: deregister container instances → disassociate CP → cancel instance
+    refreshes → force-delete ASG → delete CP → delete launch template.
 
     Args:
         project_name: Service project name (used in resource naming)
@@ -511,86 +551,147 @@ def delete_service_infra(project_name: str, org_id: str) -> dict:
         "capacity_provider_deleted": False,
         "asg_deleted": False,
         "launch_template_deleted": False,
+        "container_instances_deregistered": False,
     }
 
-    print(f"🧹 Deleting service infrastructure for {project_name}...")
+    print(f"🧹 Force-deleting service infrastructure for {project_name}...")
 
-    # 1. Disassociate this service's capacity provider from the cluster
-    try:
-        # Get current cluster capacity providers and remove this one
-        response = ecs_client.describe_clusters(clusters=[cluster_name])
-        clusters = response.get("clusters", [])
-        if clusters:
-            current_providers = clusters[0].get("capacityProviders", [])
-            remaining_providers = [p for p in current_providers if p != cp_name]
-            remaining_strategy = [
-                {"capacityProvider": p, "weight": 1, "base": 1}
-                for p in remaining_providers
-            ]
-            ecs_client.put_cluster_capacity_providers(
-                cluster=cluster_name,
-                capacityProviders=remaining_providers,
-                defaultCapacityProviderStrategy=remaining_strategy,
-            )
-            print(f"  ↳ Disassociated capacity provider {cp_name} from cluster")
-    except Exception as e:
-        print(f"  ⚠️ Could not disassociate capacity provider: {e}")
-
-    # 2. Delete capacity provider
-    try:
-        ecs_client.delete_capacity_provider(capacityProvider=cp_name)
-        print(f"  ✅ Deleted capacity provider: {cp_name}")
-        result["capacity_provider_deleted"] = True
-    except Exception as e:
-        print(f"  ⚠️ Could not delete capacity provider {cp_name}: {e}")
-
-    # 3. Delete ASG (force-terminates EC2 instances for this service)
-    try:
-        autoscaling.delete_auto_scaling_group(
-            AutoScalingGroupName=asg_name,
-            ForceDelete=True,
-        )
-        print(f"  ✅ Deleted ASG (EC2 instances terminating): {asg_name}")
-        result["asg_deleted"] = True
-    except Exception as e:
-        print(f"  ⚠️ Could not delete ASG {asg_name}: {e}")
-
-    # 4. Delete launch template
-    try:
-        ec2.delete_launch_template(LaunchTemplateName=lt_name)
-        print(f"  ✅ Deleted launch template: {lt_name}")
-        result["launch_template_deleted"] = True
-    except Exception as e:
-        print(f"  ⚠️ Could not delete launch template {lt_name}: {e}")
-
-    # 5. Deregister container instances belonging to this service from the cluster
+    # 1. Force-deregister ALL container instances for this service
+    #    (regardless of running/pending tasks — we already stopped them)
     try:
         ci_response = ecs_client.list_container_instances(cluster=cluster_name)
         ci_arns = ci_response.get("containerInstanceArns", [])
         if ci_arns:
-            # Describe to find instances tagged for this service
             ci_details = ecs_client.describe_container_instances(
                 cluster=cluster_name,
                 containerInstances=ci_arns,
             )
             for ci in ci_details.get("containerInstances", []):
                 # Check if this instance belongs to this service's ASG
-                # by checking the ec2 instance tags or just deregister all
-                # that have 0 running tasks (safe — they're orphaned)
-                running = ci.get("runningTasksCount", 0)
-                pending = ci.get("pendingTasksCount", 0)
-                if running == 0 and pending == 0:
+                # by matching the EC2 instance tags
+                ec2_instance_id = ci.get("ec2InstanceId")
+                if ec2_instance_id:
                     try:
-                        ecs_client.deregister_container_instance(
-                            cluster=cluster_name,
-                            containerInstance=ci["containerInstanceArn"],
-                            force=True,
+                        tags_resp = ec2.describe_tags(
+                            Filters=[
+                                {"Name": "resource-id", "Values": [ec2_instance_id]},
+                                {"Name": "key", "Values": ["service"]},
+                                {"Name": "value", "Values": [project_name]},
+                            ]
                         )
+                        if not tags_resp.get("Tags"):
+                            continue  # Not our instance, skip
                     except Exception:
-                        pass
-            print(f"  ✅ Deregistered idle container instances")
+                        pass  # If we can't check tags, deregister anyway
+
+                try:
+                    ecs_client.deregister_container_instance(
+                        cluster=cluster_name,
+                        containerInstance=ci["containerInstanceArn"],
+                        force=True,
+                    )
+                    print(f"  ↳ Force-deregistered container instance: {ci.get('ec2InstanceId', 'unknown')}")
+                except Exception:
+                    pass
+            result["container_instances_deregistered"] = True
     except Exception as e:
         print(f"  ⚠️ Could not clean up container instances: {e}")
+
+    # 2. Disassociate capacity provider from cluster
+    try:
+        response = ecs_client.describe_clusters(clusters=[cluster_name])
+        clusters = response.get("clusters", [])
+        if clusters:
+            current_providers = clusters[0].get("capacityProviders", [])
+            if cp_name in current_providers:
+                remaining_providers = [p for p in current_providers if p != cp_name]
+                remaining_strategy = [
+                    {"capacityProvider": p, "weight": 1, "base": 1}
+                    for p in remaining_providers
+                ]
+                ecs_client.put_cluster_capacity_providers(
+                    cluster=cluster_name,
+                    capacityProviders=remaining_providers,
+                    defaultCapacityProviderStrategy=remaining_strategy,
+                )
+                print(f"  ↳ Disassociated capacity provider {cp_name} from cluster")
+    except Exception as e:
+        print(f"  ⚠️ Could not disassociate capacity provider: {e}")
+
+    # 3. Cancel any in-progress instance refreshes (blocks ASG deletion)
+    try:
+        refreshes = autoscaling.describe_instance_refreshes(
+            AutoScalingGroupName=asg_name,
+        ).get("InstanceRefreshes", [])
+        for refresh in refreshes:
+            if refresh["Status"] in ("Pending", "InProgress"):
+                try:
+                    autoscaling.cancel_instance_refresh(
+                        AutoScalingGroupName=asg_name,
+                    )
+                    print(f"  ↳ Cancelled in-progress instance refresh")
+                    time.sleep(2)
+                except Exception:
+                    pass
+                break
+    except Exception:
+        pass
+
+    # 4. Force-delete ASG (terminates all EC2 instances immediately)
+    try:
+        autoscaling.delete_auto_scaling_group(
+            AutoScalingGroupName=asg_name,
+            ForceDelete=True,
+        )
+        print(f"  ✅ Force-deleted ASG (EC2 instances terminating): {asg_name}")
+        result["asg_deleted"] = True
+    except Exception as e:
+        if "not found" not in str(e).lower():
+            print(f"  ⚠️ Could not delete ASG {asg_name}: {e}")
+
+    # 5. Delete capacity provider (may need a moment after disassociation)
+    for attempt in range(3):
+        try:
+            ecs_client.delete_capacity_provider(capacityProvider=cp_name)
+            print(f"  ✅ Deleted capacity provider: {cp_name}")
+            result["capacity_provider_deleted"] = True
+            break
+        except Exception as e:
+            if "not found" in str(e).lower() or "does not exist" in str(e).lower():
+                break
+            if attempt < 2:
+                time.sleep(3)
+            else:
+                print(f"  ⚠️ Could not delete capacity provider {cp_name}: {e}")
+
+    # 6. Delete launch template (all versions)
+    try:
+        ec2.delete_launch_template(LaunchTemplateName=lt_name)
+        print(f"  ✅ Deleted launch template: {lt_name}")
+        result["launch_template_deleted"] = True
+    except Exception as e:
+        if "not found" not in str(e).lower():
+            print(f"  ⚠️ Could not delete launch template {lt_name}: {e}")
+
+    # 7. Directly terminate any EC2 instances tagged for this service
+    #    (safety net in case ASG ForceDelete didn't catch them all)
+    try:
+        instances_resp = ec2.describe_instances(
+            Filters=[
+                {"Name": "tag:service", "Values": [project_name]},
+                {"Name": "tag:managed-by", "Values": ["shorlabs"]},
+                {"Name": "instance-state-name", "Values": ["running", "pending", "stopping", "stopped"]},
+            ]
+        )
+        instance_ids = []
+        for reservation in instances_resp.get("Reservations", []):
+            for inst in reservation.get("Instances", []):
+                instance_ids.append(inst["InstanceId"])
+        if instance_ids:
+            ec2.terminate_instances(InstanceIds=instance_ids)
+            print(f"  ✅ Terminated {len(instance_ids)} orphaned EC2 instance(s): {', '.join(instance_ids)}")
+    except Exception as e:
+        print(f"  ⚠️ Could not terminate orphaned instances: {e}")
 
     print(f"🧹 Service infrastructure cleanup complete for {project_name}")
     return result
@@ -788,7 +889,7 @@ def ensure_launch_template(
     instance_profile_arn: str,
     security_group_id: str,
     instance_type: str = None,
-) -> str:
+) -> tuple:
     """
     Create or update an EC2 launch template for ECS container instances.
 
@@ -806,7 +907,7 @@ def ensure_launch_template(
         instance_type: EC2 instance type (default from config)
 
     Returns:
-        Launch template ID
+        Tuple of (launch_template_id, instance_type_changed: bool)
     """
     ec2 = get_ec2_client()
     instance_type = instance_type or DEFAULT_INSTANCE_TYPE
@@ -847,6 +948,22 @@ echo "ECS_ENABLE_TASK_ENI=true" >> /etc/ecs/ecs.config
         templates = response.get("LaunchTemplates", [])
         if templates:
             lt_id = templates[0]["LaunchTemplateId"]
+
+            # Check if instance type changed by reading the current default version
+            instance_type_changed = False
+            try:
+                ver_resp = ec2.describe_launch_template_versions(
+                    LaunchTemplateId=lt_id,
+                    Versions=["$Default"],
+                )
+                current_data = ver_resp["LaunchTemplateVersions"][0]["LaunchTemplateData"]
+                old_instance_type = current_data.get("InstanceType", "")
+                if old_instance_type != instance_type:
+                    instance_type_changed = True
+                    print(f"🔄 Instance type changing: {old_instance_type} → {instance_type}")
+            except Exception:
+                pass
+
             print(f"🔧 Updating launch template: {lt_name}")
             ec2.create_launch_template_version(
                 LaunchTemplateId=lt_id,
@@ -858,7 +975,7 @@ echo "ECS_ENABLE_TASK_ENI=true" >> /etc/ecs/ecs.config
                 DefaultVersion="$Latest",
             )
             print(f"✅ Launch template updated: {lt_name} ({lt_id})")
-            return lt_id
+            return lt_id, instance_type_changed
     except ec2.exceptions.ClientError:
         pass
 
@@ -869,7 +986,7 @@ echo "ECS_ENABLE_TASK_ENI=true" >> /etc/ecs/ecs.config
     )
     lt_id = response["LaunchTemplate"]["LaunchTemplateId"]
     print(f"✅ Launch template created: {lt_name} ({lt_id})")
-    return lt_id
+    return lt_id, False  # Fresh create, no instance type change
 
 
 def ensure_auto_scaling_group(
@@ -877,7 +994,8 @@ def ensure_auto_scaling_group(
     launch_template_id: str,
     subnet_ids: list,
     max_size: int = 1,
-) -> str:
+    instance_type_changed: bool = False,
+) -> tuple:
     """
     Create or update an Auto Scaling Group for ECS container instances.
 
@@ -889,9 +1007,10 @@ def ensure_auto_scaling_group(
         launch_template_id: EC2 launch template ID
         subnet_ids: VPC subnet IDs for instance placement
         max_size: Maximum number of instances
+        instance_type_changed: If True, triggers instance refresh to replace running instances
 
     Returns:
-        ASG name
+        Tuple of (asg_name, instance_refresh_started: bool)
     """
     autoscaling = get_autoscaling_client()
     asg_name = f"{ECS_ASG_PREFIX}-{project_name}"
@@ -913,8 +1032,30 @@ def ensure_auto_scaling_group(
                 MaxSize=max_size,
                 VPCZoneIdentifier=",".join(subnet_ids),
             )
+            # Only trigger instance refresh when the instance type actually
+            # changed — otherwise we'd needlessly replace running instances
+            # on every normal redeploy.
+            refresh_started = False
+            if instance_type_changed:
+                try:
+                    autoscaling.start_instance_refresh(
+                        AutoScalingGroupName=asg_name,
+                        Strategy="Rolling",
+                        Preferences={
+                            "MinHealthyPercentage": 0,
+                            "InstanceWarmup": 120,
+                        },
+                    )
+                    refresh_started = True
+                    print(f"🔄 Instance refresh started (replacing old instances with new type)")
+                except Exception as e:
+                    if "in progress" in str(e).lower():
+                        refresh_started = True
+                        print(f"🔄 Instance refresh already in progress")
+                    else:
+                        print(f"⚠️ Could not start instance refresh: {e}")
             print(f"✅ ASG updated: {asg_name}")
-            return asg_name
+            return asg_name, refresh_started
     except Exception:
         pass
 
@@ -960,7 +1101,54 @@ def ensure_auto_scaling_group(
             else:
                 raise Exception(f"ASG {asg_name} still pending delete after 2 minutes")
     print(f"✅ ASG created: {asg_name}")
-    return asg_name
+    return asg_name, False  # No instance refresh needed on fresh create
+
+
+def wait_for_instance_refresh(asg_name: str, timeout: int = 300):
+    """
+    Wait for an ASG instance refresh to complete.
+
+    The new EC2 instance must be running and registered with ECS before
+    we can update the ECS service to use the new task definition.
+
+    Args:
+        asg_name: Auto Scaling Group name
+        timeout: Maximum wait time in seconds (default 5 minutes)
+    """
+    autoscaling = get_autoscaling_client()
+    start_time = time.time()
+
+    print(f"⏳ Waiting for instance refresh on {asg_name}...")
+
+    while time.time() - start_time < timeout:
+        try:
+            response = autoscaling.describe_instance_refreshes(
+                AutoScalingGroupName=asg_name,
+                MaxRecords=1,
+            )
+            refreshes = response.get("InstanceRefreshes", [])
+            if not refreshes:
+                print(f"✅ No active instance refresh (already complete)")
+                return
+
+            refresh = refreshes[0]
+            status = refresh.get("Status", "")
+
+            if status == "Successful":
+                print(f"✅ Instance refresh complete")
+                return
+            elif status in ("Cancelled", "Failed", "RollbackSuccessful", "RollbackFailed"):
+                print(f"⚠️ Instance refresh ended with status: {status}")
+                return
+            else:
+                pct = refresh.get("PercentageComplete", 0)
+                print(f"  ⏳ Instance refresh {status} ({pct}% complete)...")
+        except Exception as e:
+            print(f"  ⚠️ Error checking instance refresh: {e}")
+
+        time.sleep(15)
+
+    print(f"⚠️ Instance refresh did not complete within {timeout}s, proceeding anyway")
 
 
 def ensure_ec2_capacity_provider(project_name: str, asg_name: str) -> str:

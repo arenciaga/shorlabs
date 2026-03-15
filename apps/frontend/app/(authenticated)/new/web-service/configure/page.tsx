@@ -35,7 +35,7 @@ import { EnvironmentVariablesEditor, EnvironmentVariablesSecurityNote, type EnvV
 import { StartCommandInput } from "@/components/StartCommandInput"
 import { trackEvent } from "@/lib/amplitude"
 import { useIsPro } from "@/hooks/use-is-pro"
-import { EC2_COMPUTE_OPTIONS, DEFAULT_COMPUTE_INDEX } from "@/lib/compute-options"
+import { EC2_COMPUTE_OPTIONS, DEFAULT_COMPUTE_INDEX, hasAccessToPlan } from "@/lib/compute-options"
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 
@@ -58,7 +58,7 @@ function ConfigureWebServiceContent() {
     const searchParams = useSearchParams()
     const { getToken, orgId } = useAuth()
     const { signOut } = useClerk()
-    const { isPro, isLoaded: isPlanLoaded } = useIsPro()
+    const { isPro, currentPlan, isLoaded: isPlanLoaded } = useIsPro()
 
     const repoFullName = searchParams.get("repo") || ""
     const isPrivateRepo = searchParams.get("private") === "true"
@@ -512,28 +512,38 @@ function ConfigureWebServiceContent() {
                                 Choose the CPU and memory allocation for your container. Your app must listen on port 8080.
                             </p>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                {EC2_COMPUTE_OPTIONS.map((option, index) => (
-                                    <button
-                                        key={index}
-                                        onClick={() => setSelectedCompute(index)}
-                                        className={`flex items-center gap-3 p-4 border rounded-none transition-all text-left ${
-                                            selectedCompute === index
-                                                ? "border-zinc-900 bg-zinc-50 ring-1 ring-zinc-900"
-                                                : "border-zinc-200 hover:border-zinc-400"
-                                        }`}
-                                    >
-                                        <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
-                                            selectedCompute === index ? "border-zinc-900 bg-zinc-900" : "border-zinc-300"
-                                        }`}>
-                                            {selectedCompute === index && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
-                                        </div>
-                                        <div>
-                                            <p className="text-sm font-medium text-zinc-900">
-                                                {option.cpu / 1024} vCPU / {option.memory >= 1024 ? `${option.memory / 1024} GB` : `${option.memory} MB`}
-                                            </p>
-                                        </div>
-                                    </button>
-                                ))}
+                                {EC2_COMPUTE_OPTIONS.map((option, index) => {
+                                    const isLocked = !hasAccessToPlan(currentPlan ?? "hobby", option.minPlan)
+                                    return (
+                                        <button
+                                            key={index}
+                                            onClick={() => !isLocked && setSelectedCompute(index)}
+                                            className={`relative flex items-center gap-3 p-4 border rounded-none transition-all text-left ${
+                                                selectedCompute === index
+                                                    ? "border-zinc-900 bg-zinc-50 ring-1 ring-zinc-900"
+                                                    : isLocked
+                                                        ? "border-zinc-200 bg-zinc-50/50 opacity-75 cursor-not-allowed"
+                                                        : "border-zinc-200 hover:border-zinc-400"
+                                            }`}
+                                        >
+                                            {option.badge && (
+                                                <span className="absolute -top-2 -right-2 bg-zinc-900 text-white text-xs font-medium px-2 py-0.5 rounded-full">
+                                                    {option.badge}
+                                                </span>
+                                            )}
+                                            <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                                                selectedCompute === index ? "border-zinc-900 bg-zinc-900" : "border-zinc-300"
+                                            }`}>
+                                                {selectedCompute === index && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                                            </div>
+                                            <div>
+                                                <p className={`text-sm font-medium ${isLocked ? 'text-zinc-500' : 'text-zinc-900'}`}>
+                                                    {option.cpu / 1024} vCPU / {option.memory >= 1024 ? `${option.memory / 1024} GB` : `${option.memory} MB`}
+                                                </p>
+                                            </div>
+                                        </button>
+                                    )
+                                })}
                             </div>
                         </div>
                     </div>

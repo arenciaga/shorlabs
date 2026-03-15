@@ -59,6 +59,8 @@ export function ComputeTab({
                             onMemoryChange(memory)
                         }
                     }}
+                    plan={currentPlan as "hobby" | "plus" | "pro" ?? "hobby"}
+                    onUpgradeClick={onUpgradeClick}
                 />
             ) : (
                 <ComputeSettings

@@ -29,6 +29,7 @@ from .aws import (
     ensure_ec2_security_group,
     ensure_launch_template,
     ensure_auto_scaling_group,
+    wait_for_instance_refresh,
     ensure_ec2_capacity_provider,
     get_default_vpc_and_subnets,
     get_ecs_service_name,
@@ -170,18 +171,25 @@ def deploy_ecs_project(
 
     # 5d: Setup per-service EC2 infrastructure (launch template → ASG → capacity provider)
     cluster_name = get_cluster_name(org_id)
-    launch_template_id = ensure_launch_template(
+    launch_template_id, instance_type_changed = ensure_launch_template(
         project_name=project_name,
         cluster_name=cluster_name,
         instance_profile_arn=instance_profile_arn,
         security_group_id=ec2_sg_id,
         instance_type=instance_type,
     )
-    asg_name = ensure_auto_scaling_group(
+    asg_name, instance_refresh_started = ensure_auto_scaling_group(
         project_name=project_name,
         launch_template_id=launch_template_id,
         subnet_ids=subnet_ids,
+        instance_type_changed=instance_type_changed,
     )
+
+    # If instance type changed, wait for the new EC2 instance to be ready
+    # before updating the ECS service — otherwise the task can't be placed
+    if instance_refresh_started:
+        wait_for_instance_refresh(asg_name)
+
     capacity_provider_name = ensure_ec2_capacity_provider(
         project_name=project_name,
         asg_name=asg_name,
@@ -262,53 +270,93 @@ def delete_ecs_resources(
     org_id: Optional[str] = None,
 ) -> dict:
     """
-    Delete all AWS resources for an ECS project.
+    Force-delete ALL AWS resources for an ECS project.
+
+    Works in any state: mid-deployment, running, partially created.
+    If target_group_arn or listener_rule_arn are not provided, attempts
+    to find them by naming convention.
 
     Args:
         github_url: GitHub repository URL
         function_name: The stored project name (for resource lookup)
-        target_group_arn: ARN of the ALB target group
-        listener_rule_arn: ARN of the ALB listener rule
+        target_group_arn: ARN of the ALB target group (looked up if missing)
+        listener_rule_arn: ARN of the ALB listener rule (looked up if missing)
+        org_id: Organization ID for cluster lookup
 
     Returns:
         Dict with deletion status
     """
+    import boto3
+
     if function_name:
         project_name = function_name
-        print(f"🗑️ Deleting ECS resources using stored name: {project_name}")
+        print(f"🗑️ Force-deleting ECS resources using stored name: {project_name}")
     else:
         project_name = extract_project_name(github_url)
-        print(f"🗑️ Deleting ECS resources using derived name: {project_name}")
+        print(f"🗑️ Force-deleting ECS resources using derived name: {project_name}")
 
-    # Delete listener rule first (before target group)
+    if not org_id:
+        raise ValueError("org_id is required for ECS resource deletion")
+
+    # If target group ARN is missing, try to find it by name
+    if not target_group_arn:
+        try:
+            elbv2 = boto3.client("elbv2")
+            tg_name = f"sl-tg-{project_name[:24]}"
+            resp = elbv2.describe_target_groups(Names=[tg_name])
+            tgs = resp.get("TargetGroups", [])
+            if tgs:
+                target_group_arn = tgs[0]["TargetGroupArn"]
+                print(f"  ↳ Found target group by name: {tg_name}")
+        except Exception:
+            pass
+
+    # If listener rule ARN is missing, try to find it via target group
+    if not listener_rule_arn and target_group_arn:
+        try:
+            elbv2 = boto3.client("elbv2")
+            # Find the ALB listener
+            albs = elbv2.describe_load_balancers(Names=["shorlabs-alb"]).get("LoadBalancers", [])
+            if albs:
+                listeners = elbv2.describe_listeners(LoadBalancerArn=albs[0]["LoadBalancerArn"]).get("Listeners", [])
+                for listener in listeners:
+                    rules = elbv2.describe_rules(ListenerArn=listener["ListenerArn"]).get("Rules", [])
+                    for rule in rules:
+                        for action in rule.get("Actions", []):
+                            if action.get("TargetGroupArn") == target_group_arn:
+                                listener_rule_arn = rule["RuleArn"]
+                                print(f"  ↳ Found listener rule for target group")
+                                break
+        except Exception:
+            pass
+
+    # 1. Delete listener rule first (before target group)
     rule_deleted = False
     if listener_rule_arn:
         rule_deleted = delete_listener_rule(listener_rule_arn)
 
-    # Delete ECS service (scales down then deletes)
-    print("🗑️ Deleting ECS service...")
-    if not org_id:
-        raise ValueError("org_id is required for ECS resource deletion")
+    # 2. Force-delete ECS service (stops all tasks)
+    print("🗑️ Force-deleting ECS service...")
     ecs_deleted = delete_ecs_service(project_name, org_id)
 
-    # Delete target group (after ECS service is gone)
+    # 3. Delete target group (after ECS service is gone)
     tg_deleted = False
     if target_group_arn:
         tg_deleted = delete_target_group(target_group_arn)
 
-    # Delete ECR repository
+    # 4. Delete ECR repository
     print("🗑️ Deleting ECR repository...")
     ecr_deleted = delete_ecr_repository(get_ecr_repo_name(project_name))
 
-    # Delete CloudWatch log group
+    # 5. Delete CloudWatch log group
     print("🗑️ Deleting ECS log group...")
     logs_deleted = delete_ecs_log_group(project_name)
 
-    # Clean up per-service infra (capacity provider, ASG, launch template)
-    print("🧹 Cleaning up service infrastructure...")
+    # 6. Force-delete per-service infra (CP, ASG, LT, EC2 instances)
+    print("🧹 Force-cleaning service infrastructure...")
     infra_cleanup = delete_service_infra(project_name, org_id)
 
-    print(f"🗑️ Deletion complete - ECS: {ecs_deleted}, ECR: {ecr_deleted}, "
+    print(f"🗑️ Force-deletion complete - ECS: {ecs_deleted}, ECR: {ecr_deleted}, "
           f"TG: {tg_deleted}, Rule: {rule_deleted}, Logs: {logs_deleted}, "
           f"Infra cleanup: {infra_cleanup}")
 

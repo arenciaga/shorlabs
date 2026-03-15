@@ -106,8 +106,8 @@ class CreateWebServiceProjectRequest(BaseModel):
     root_directory: Optional[str] = "./"
     env_vars: Optional[dict] = None
     start_command: str
-    cpu: Optional[int] = 256
-    memory: Optional[int] = 512
+    cpu: Optional[int] = 2048
+    memory: Optional[int] = 1024
 
 class AddServiceRequest(BaseModel):
     """Add a new service to an existing project."""
@@ -987,8 +987,8 @@ async def create_web_service_project(
         commit_info = await fetch_latest_commit(github_token, request.github_repo)
 
     root_directory = request.root_directory or "./"
-    cpu = request.cpu or 256
-    memory = request.memory or 512
+    cpu = request.cpu or 2048
+    memory = request.memory or 1024
 
     # 1. Create project container
     project = create_project(
@@ -1088,8 +1088,8 @@ async def add_service_to_project(
         if github_token:
             commit_info = await fetch_latest_commit(github_token, request.github_repo)
 
-        cpu = request.cpu or 256
-        memory = request.memory or 512
+        cpu = request.cpu or 2048
+        memory = request.memory or 1024
 
         service = create_service(
             user_id=user_id,
@@ -1302,8 +1302,8 @@ async def get_project_details(
                 "env_vars": svc.get("env_vars", {}),
                 "start_command": svc.get("start_command", ""),
                 "root_directory": svc.get("root_directory", "./"),
-                "cpu": svc.get("cpu", 256),
-                "memory": svc.get("memory", 512),
+                "cpu": svc.get("cpu", 2048),
+                "memory": svc.get("memory", 1024),
                 "ecs_service_name": svc.get("ecs_service_name"),
             })
 
@@ -2215,8 +2215,8 @@ async def redeploy_project(
     env_vars = svc.get("env_vars", {})
 
     if svc_type == "web-service":
-        cpu = int(svc.get("cpu", 256))
-        memory = int(svc.get("memory", 512))
+        cpu = int(svc.get("cpu", 2048))
+        memory = int(svc.get("memory", 1024))
         send_ecs_deployment_to_sqs(
             sid,
             svc["github_url"],

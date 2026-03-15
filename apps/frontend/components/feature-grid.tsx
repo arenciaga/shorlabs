@@ -15,7 +15,7 @@ const FEATURES = [
   {
     icon: Layers,
     title: "Multi-Service Projects",
-    description: "Combine web apps and databases in one project.",
+    description: "Combine web apps, services, and databases in one project.",
   },
   {
     icon: Radio,
@@ -29,8 +29,8 @@ const FEATURES = [
   },
   {
     icon: Zap,
-    title: "Serverless",
-    description: "Scales to zero. Pay only for what you use.",
+    title: "Serverless & Always-On",
+    description: "From scale-to-zero to dedicated instances.",
   },
   {
     icon: Globe,

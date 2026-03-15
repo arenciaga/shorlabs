@@ -655,6 +655,20 @@ def _run_ecs_deployment_sync(
         print(f"❌ ECS deployment failed: {e}")
         traceback.print_exc()
 
+        # Best-effort cleanup of partially created AWS resources to prevent
+        # orphaned EC2 instances, ASGs, target groups, etc. from billing.
+        print("🧹 Cleaning up orphaned resources from failed deployment...")
+        try:
+            # Derive project_name the same way the orchestrator does
+            cleanup_function_name = f"{extract_project_name(github_url)}-{service_id[:8]}"
+            delete_ecs_resources(
+                github_url=github_url,
+                function_name=cleanup_function_name,
+                org_id=org_id,
+            )
+        except Exception as cleanup_err:
+            print(f"⚠️ Cleanup failed (manual intervention may be needed): {cleanup_err}")
+
 
 def send_ecs_deployment_to_sqs(
     service_id: str,

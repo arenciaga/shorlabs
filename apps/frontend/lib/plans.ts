@@ -1,4 +1,4 @@
-import { Clock, Cpu, DollarSign, Flame, FolderOpen, Globe, Hammer, HardDrive, type LucideIcon, Zap } from 'lucide-react'
+import { Clock, Cpu, DollarSign, Flame, FolderOpen, Globe, Hammer, HardDrive, type LucideIcon, Server, Zap } from 'lucide-react'
 
 export interface PlanFeature {
     label: string
@@ -19,6 +19,8 @@ export interface Plan {
 export const USAGE_PRICING = {
     requests: "$0.60 / 1M Requests",
     compute: "$0.035 / 1K Compute (GB-s)",
+    vcpuTime: "$0.0000085 per vCPU / sec",
+    memoryTime: "$0.00000433 per GB / sec",
 } as const
 
 export const PLANS: Plan[] = [
@@ -53,6 +55,9 @@ export const PLANS: Plan[] = [
             { label: "Up to 2 GB Temporary storage", icon: HardDrive },
             { label: "Faster Builds", icon: Hammer },
             { label: "Zero Cold Starts", icon: Flame },
+            { label: "Web Services", icon: Server },
+            { label: USAGE_PRICING.vcpuTime, icon: Cpu },
+            { label: USAGE_PRICING.memoryTime, icon: HardDrive },
         ],
     },
     {
@@ -71,6 +76,9 @@ export const PLANS: Plan[] = [
             { label: "Up to 8 GB Temporary storage", icon: HardDrive },
             { label: "Faster Builds", icon: Hammer },
             { label: "Zero Cold Starts", icon: Flame },
+            { label: "Web Services", icon: Server },
+            { label: USAGE_PRICING.vcpuTime, icon: Cpu },
+            { label: USAGE_PRICING.memoryTime, icon: HardDrive },
         ],
     },
 ]

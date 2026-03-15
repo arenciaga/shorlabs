@@ -188,81 +188,83 @@ def deploy_ecs_project(
         instance_type_changed=instance_type_changed,
     )
 
-    # If instance type changed, wait for the new EC2 instance to be ready
-    # and registered with ECS before updating the service
-    if instance_refresh_started:
-        wait_for_instance_refresh(asg_name)
-        wait_for_ecs_instance_ready(cluster_name)
+    try:
+        # If instance type changed, wait for the new EC2 instance to be ready
+        # and registered with ECS before updating the service
+        if instance_refresh_started:
+            wait_for_instance_refresh(asg_name)
+            wait_for_ecs_instance_ready(cluster_name)
 
-    capacity_provider_name = ensure_ec2_capacity_provider(
-        project_name=project_name,
-        asg_name=asg_name,
-    )
+        capacity_provider_name = ensure_ec2_capacity_provider(
+            project_name=project_name,
+            asg_name=asg_name,
+        )
 
-    # 5e: Ensure ECS cluster with capacity provider
-    cluster_arn = ensure_ecs_cluster(org_id, capacity_provider_name=capacity_provider_name)
+        # 5e: Ensure ECS cluster with capacity provider
+        cluster_arn = ensure_ecs_cluster(org_id, capacity_provider_name=capacity_provider_name)
 
-    # 5f: Register task definition
-    image_uri = f"{ecr_repo_uri}:latest"
-    task_def_arn = register_task_definition(
-        project_name=project_name,
-        image_uri=image_uri,
-        cpu=cpu,
-        memory=task_memory,
-        execution_role_arn=execution_role_arn,
-        env_vars=env_vars,
-    )
+        # 5f: Register task definition
+        image_uri = f"{ecr_repo_uri}:latest"
+        task_def_arn = register_task_definition(
+            project_name=project_name,
+            image_uri=image_uri,
+            cpu=cpu,
+            memory=task_memory,
+            execution_role_arn=execution_role_arn,
+            env_vars=env_vars,
+        )
 
-    # 5f: Create target group
-    target_group_arn = create_target_group(project_name, vpc_id)
+        # 5f: Create target group
+        target_group_arn = create_target_group(project_name, vpc_id)
 
-    # 5g: Setup ALB and listener rule
-    alb_info = ensure_shared_alb(subnet_ids, alb_sg_id)
-    host_header = f"{subdomain}.shorlabs.com" if subdomain else f"{project_name}.shorlabs.com"
-    
-    # Get the old target group ARN before updating the listener rule (for cleanup)
-    old_target_group_arn = get_target_group_for_host(alb_info["https_listener_arn"], host_header)
-    
-    listener_rule_arn = create_listener_rule(
-        listener_arn=alb_info["https_listener_arn"],
-        target_group_arn=target_group_arn,
-        host_header=host_header,
-    )
-    
-    # Clean up old target group if this is a redeployment
-    if old_target_group_arn and old_target_group_arn != target_group_arn:
-        print(f"🧹 Cleaning up old target group from previous deployment...")
-        delete_target_group(old_target_group_arn)
+        # 5g: Setup ALB and listener rule
+        alb_info = ensure_shared_alb(subnet_ids, alb_sg_id)
+        host_header = f"{subdomain}.shorlabs.com" if subdomain else f"{project_name}.shorlabs.com"
 
-    # 5i: Create or update ECS service
-    service_arn = create_or_update_ecs_service(
-        project_name=project_name,
-        cluster_name=cluster_name,
-        task_definition_arn=task_def_arn,
-        target_group_arn=target_group_arn,
-        subnets=subnet_ids,
-        security_group_id=ecs_sg_id,
-        capacity_provider_name=capacity_provider_name,
-    )
+        # Get the old target group ARN before updating the listener rule (for cleanup)
+        old_target_group_arn = get_target_group_for_host(alb_info["https_listener_arn"], host_header)
 
-    # Step 6: Wait for service to stabilize
-    ecs_service_name = get_ecs_service_name(project_name)
-    wait_for_service_stable(cluster_name, ecs_service_name)
+        listener_rule_arn = create_listener_rule(
+            listener_arn=alb_info["https_listener_arn"],
+            target_group_arn=target_group_arn,
+            host_header=host_header,
+        )
 
-    # Step 7: Restore ASG max_size if it was temporarily bumped for zero-downtime swap.
-    # MaxSize=1 is sufficient — AWS auto-adjusts DesiredCapacity down to match MaxSize.
-    # Do NOT set DesiredCapacity manually — ECS managed scaling owns that value and will
-    # fight manual overrides (AWS docs explicitly warn against this).
-    if instance_type_changed:
-        try:
-            asg_name_full = f"{ECS_ASG_PREFIX}-{project_name}"
-            get_autoscaling_client().update_auto_scaling_group(
-                AutoScalingGroupName=asg_name_full,
-                MaxSize=1,
-            )
-            print(f"✅ ASG max_size restored to 1")
-        except Exception as e:
-            print(f"⚠️ Could not restore ASG max_size: {e}")
+        # Clean up old target group if this is a redeployment
+        if old_target_group_arn and old_target_group_arn != target_group_arn:
+            print(f"🧹 Cleaning up old target group from previous deployment...")
+            delete_target_group(old_target_group_arn)
+
+        # 5i: Create or update ECS service
+        service_arn = create_or_update_ecs_service(
+            project_name=project_name,
+            cluster_name=cluster_name,
+            task_definition_arn=task_def_arn,
+            target_group_arn=target_group_arn,
+            subnets=subnet_ids,
+            security_group_id=ecs_sg_id,
+            capacity_provider_name=capacity_provider_name,
+        )
+
+        # Step 6: Wait for service to stabilize
+        ecs_service_name = get_ecs_service_name(project_name)
+        wait_for_service_stable(cluster_name, ecs_service_name)
+
+    finally:
+        # Always restore ASG max_size if it was temporarily bumped for zero-downtime
+        # swap during instance refresh. MaxSize=1 is sufficient — AWS auto-adjusts
+        # DesiredCapacity down to match MaxSize. Without this, a failed deploy leaves
+        # the ASG at MaxSize=2 forever (double instance cost).
+        if instance_refresh_started:
+            try:
+                asg_name_full = f"{ECS_ASG_PREFIX}-{project_name}"
+                get_autoscaling_client().update_auto_scaling_group(
+                    AutoScalingGroupName=asg_name_full,
+                    MaxSize=1,
+                )
+                print(f"✅ ASG max_size restored to 1")
+            except Exception as e:
+                print(f"⚠️ Could not restore ASG max_size: {e}")
 
     service_url = f"https://{host_header}"
 

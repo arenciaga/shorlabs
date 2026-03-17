@@ -65,18 +65,14 @@ export function useIsPro() {
     const scheduledPlanLabel: "Hobby" | "Plus" | "Pro" =
         scheduledPlanId === "pro" ? "Pro" : scheduledPlanId === "plus" ? "Plus" : "Hobby"
 
-    /** Display label: "Hobby" | "Plus" | "Plus Trial" | "Pro" | "Pro Trial" */
-    const planLabel: "Hobby" | "Plus" | "Plus Trial" | "Pro" | "Pro Trial" =
+    /** Display label: "Hobby" | "Plus" | "Pro" */
+    const planLabel: "Hobby" | "Plus" | "Pro" =
         currentPlan === "hobby"
             ? "Hobby"
             : currentPlan === "pro"
-                ? isTrialing
-                    ? "Pro Trial"
-                    : "Pro"
+                ? "Pro"
                 : currentPlan === "plus"
-                    ? isTrialing
-                        ? "Plus Trial"
-                        : "Plus"
+                    ? "Plus"
                     : "Hobby"
 
     const proProduct = currentPlan === "pro" ? activeProduct : null

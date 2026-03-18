@@ -115,6 +115,8 @@ def start_build(
     
     if runtime == "nodejs":
         template_path = templates_dir / "Dockerfile.node"
+    elif runtime == "go":
+        template_path = templates_dir / "Dockerfile.go"
     else:  # python
         template_path = templates_dir / "Dockerfile"
     
@@ -126,6 +128,9 @@ def start_build(
         # Node.js: always use /start.sh which handles monorepos,
         # package manager detection, and workspace start scripts
         cmd_json = '["/start.sh"]'
+    elif runtime == "go":
+        # Go: binary is built as ./server in the Dockerfile
+        cmd_json = '["./server"]'
     else:
         # Python: use the user's start command
         cmd_parts = start_command.split()
@@ -154,6 +159,8 @@ def start_build(
     # Read buildspec template
     if runtime == "nodejs":
         buildspec_template_path = templates_dir / "buildspec.node.yml"
+    elif runtime == "go":
+        buildspec_template_path = templates_dir / "buildspec.go.yml"
     else:  # python
         buildspec_template_path = templates_dir / "buildspec.yml"
 

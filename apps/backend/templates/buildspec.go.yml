@@ -1,0 +1,32 @@
+version: 0.2
+phases:
+  pre_build:
+    commands:
+      - echo "Cloning repository from GitHub..."
+      - set -e && git clone --depth 1 https://x-access-token:$GITHUB_TOKEN@github.com/{{REPO_PATH}}.git repo
+      - |
+        set -e
+        cd repo
+        echo "Creating Dockerfile for Go..."
+        cat > Dockerfile << 'DOCKERFILE_EOF'
+{{DOCKERFILE_CONTENT}}
+        DOCKERFILE_EOF
+      - echo "Logging in to Amazon ECR..."
+      - aws ecr get-login-password --region {{AWS_REGION}} | docker login --username AWS --password-stdin {{AWS_ACCOUNT_ID}}.dkr.ecr.{{AWS_REGION}}.amazonaws.com
+  build:
+    commands:
+      - |
+        set -e
+        echo "Building Docker image..."
+        docker build --build-arg APP_DIR={{ROOT_DIRECTORY}} {{BUILD_ARGS}} -t {{ECR_REPO_URI}}:latest .
+  post_build:
+    commands:
+      - |
+        if [ "$CODEBUILD_BUILD_SUCCEEDING" = "1" ]; then
+          echo "Pushing Docker image to ECR..."
+          docker push {{ECR_REPO_URI}}:latest
+          echo "Build completed successfully"
+        else
+          echo "BUILD FAILED — skipping push"
+          exit 1
+        fi

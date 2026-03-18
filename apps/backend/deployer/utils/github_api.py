@@ -38,10 +38,14 @@ def detect_runtime_from_github(github_url: str, github_token: str, root_director
     if path_prefix:
         path_prefix = f"{path_prefix}/"
     
+    # Check for Go indicators
+    if _file_exists(owner, repo, f"{path_prefix}go.mod", headers):
+        return "go"
+
     # Check for Node.js indicators
     if _file_exists(owner, repo, f"{path_prefix}package.json", headers):
         return "nodejs"
-    
+
     # Check for Python indicators
     python_files = [
         f"{path_prefix}requirements.txt",

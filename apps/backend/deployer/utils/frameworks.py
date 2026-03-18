@@ -84,6 +84,62 @@ FRAMEWORKS = [
         },
         "start_command": "uvicorn {module}:app --host 0.0.0.0 --port 8080",
     },
+    # Go Frameworks
+    {
+        "name": "Gin",
+        "runtime": "go",
+        "detectors": {
+            "files": ["go.mod"],
+            "match_content": r"github\.com/gin-gonic/gin",
+        },
+        "start_command": "./server",
+    },
+    {
+        "name": "Echo",
+        "runtime": "go",
+        "detectors": {
+            "files": ["go.mod"],
+            "match_content": r"github\.com/labstack/echo",
+        },
+        "start_command": "./server",
+    },
+    {
+        "name": "Fiber",
+        "runtime": "go",
+        "detectors": {
+            "files": ["go.mod"],
+            "match_content": r"github\.com/gofiber/fiber",
+        },
+        "start_command": "./server",
+    },
+    {
+        "name": "Chi",
+        "runtime": "go",
+        "detectors": {
+            "files": ["go.mod"],
+            "match_content": r"github\.com/go-chi/chi",
+        },
+        "start_command": "./server",
+    },
+    {
+        "name": "Gorilla Mux",
+        "runtime": "go",
+        "detectors": {
+            "files": ["go.mod"],
+            "match_content": r"github\.com/gorilla/mux",
+        },
+        "start_command": "./server",
+    },
+    # Generic Go (fallback for any go.mod project)
+    {
+        "name": "Go",
+        "runtime": "go",
+        "detectors": {
+            "files": ["go.mod"],
+            "match_content": None,  # Just check go.mod exists
+        },
+        "start_command": "./server",
+    },
     # Node.js Frameworks - CHECK BEFORE PYTHON GENERIC FALLBACK
     {
         "name": "Next.js",

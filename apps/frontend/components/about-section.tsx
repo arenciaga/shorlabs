@@ -141,6 +141,7 @@ export function AboutSection() {
             <video
               ref={videoRef}
               className="w-full h-full object-cover absolute inset-0"
+              controls
               muted
               playsInline
               preload="auto"

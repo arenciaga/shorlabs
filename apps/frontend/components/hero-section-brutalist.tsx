@@ -90,6 +90,7 @@ export function HeroSection() {
             <video
               ref={videoRef}
               className="w-full h-auto block"
+              controls
               muted
               playsInline
               preload="metadata"

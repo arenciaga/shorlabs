@@ -145,7 +145,7 @@ export function AboutSection() {
               playsInline
               preload="auto"
             >
-              <source src="/demo.mp4" type="video/mp4" />
+              <source src="/demoo.mp4" type="video/mp4" />
             </video>
           </div>
         </div>

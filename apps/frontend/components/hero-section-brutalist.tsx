@@ -58,7 +58,7 @@ export function HeroSection() {
            Ship Backends Like You Ship Frontends.
           </h1>
           <p className="text-xs sm:text-base text-muted-foreground max-w-2xl mb-8 sm:mb-9 leading-relaxed font-mono px-0">
-            Push to GitHub. We build, containerize, and deploy your backend — Go, Python, Node.js, anything. No ECS pipelines. No YAML. Production in seconds.
+            Vercel for your backend. Push to GitHub — we build, containerize, and deploy your Go, Python, Node.js, or any Dockerized service. No ECS pipelines. No YAML. Production in seconds.
           </p>
           <div className="flex w-full max-w-md flex-col sm:flex-row items-stretch sm:items-center justify-start gap-3">
             {!isLoaded ? (

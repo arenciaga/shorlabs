@@ -17,16 +17,16 @@ const STEPS = [
     title: "Push and deploy",
     description:
       "Set your env vars, push to main, and we handle the rest — Docker build, container orchestration, production URL. Done.",
-    start: 11,
-    end: 26,
+    start: 22,
+    end: 40,
   },
   {
     number: "03",
     title: "Monitor & scale",
     description:
       "Stream real-time logs, add custom domains, manage databases — all from one dashboard. Scale to zero or scale to millions.",
-    start: 57,
-    end: 999,
+    start: 40,
+    end: 55,
   },
 ]
 

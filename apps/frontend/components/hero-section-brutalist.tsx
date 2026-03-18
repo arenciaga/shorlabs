@@ -55,7 +55,7 @@ export function HeroSection() {
             className="font-mono sm:text-xl lg:text-2xl xl:text-4xl tracking-tight text-foreground mb-5 font-bold uppercase leading-[0.95]"
             style={{ letterSpacing: "-0.01em" }}
           >
-           Your Backend Deserves a Deploy Button.
+           Ship Backends Like You Ship Frontends.
           </h1>
           <p className="text-xs sm:text-base text-muted-foreground max-w-2xl mb-8 sm:mb-9 leading-relaxed font-mono px-0">
             Push to GitHub. We build, containerize, and deploy your backend — Go, Python, Node.js, anything. No ECS pipelines. No YAML. Production in seconds.

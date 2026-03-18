@@ -1,6 +1,6 @@
 import { ImageResponse } from "next/og";
 
-export const alt = "Shorlabs: Your Backend Deserves a Deploy Button.";
+export const alt = "Shorlabs: Ship Backends Like You Ship Frontends.";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -41,7 +41,7 @@ export default function Image() {
             letterSpacing: "-0.02em",
           }}
         >
-          Your Backend Deserves a Deploy Button.
+          Ship Backends Like You Ship Frontends.
         </div>
         <div
           style={{

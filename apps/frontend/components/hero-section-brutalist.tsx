@@ -16,8 +16,8 @@ export function HeroSection() {
     const video = videoRef.current
     if (!video) return
 
-    const startTime = 30
-    const endTime = 54
+    const startTime = 0
+    const endTime = 43
 
     const handleTimeUpdate = () => {
       if (video.currentTime >= endTime) {

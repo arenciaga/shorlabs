@@ -4,18 +4,18 @@ import { GitBranch, Database, Layers, Radio, Globe, Lock, Container, Zap } from 
 const FEATURES = [
   {
     icon: GitBranch,
-    title: "GitHub Import",
-    description: "Connect your repo and deploy with one click.",
+    title: "Push-to-Deploy",
+    description: "Connect GitHub. Push to main. Your backend is live.",
   },
   {
-    icon: Database,
-    title: "Managed Databases",
-    description: "Serverless PostgreSQL with auto-scaling.",
+    icon: Container,
+    title: "Auto-Containerized",
+    description: "We detect your framework and build your Docker image. Zero config.",
   },
   {
-    icon: Layers,
-    title: "Multi-Service Projects",
-    description: "Combine web apps, services, and databases in one project.",
+    icon: Lock,
+    title: "Secrets & Env Vars",
+    description: "Inject environment variables and secrets at build and runtime.",
   },
   {
     icon: Radio,
@@ -23,24 +23,24 @@ const FEATURES = [
     description: "Stream build and runtime logs as they happen.",
   },
   {
-    icon: Container,
-    title: "Containerized",
-    description: "Auto-packaged in Docker. Zero config.",
-  },
-  {
     icon: Zap,
     title: "Serverless & Always-On",
-    description: "From scale-to-zero to dedicated instances.",
+    description: "From scale-to-zero to dedicated instances. You pick.",
   },
   {
     icon: Globe,
-    title: "Custom Domains",
-    description: "Add your domain with automatic SSL.",
+    title: "Custom Domains & SSL",
+    description: "Point your domain. TLS provisioned automatically.",
   },
   {
-    icon: Lock,
-    title: "Database Explorer",
-    description: "Manage tables, columns, and data from the UI.",
+    icon: Database,
+    title: "Managed Databases",
+    description: "Serverless PostgreSQL when you need a data layer.",
+  },
+  {
+    icon: Layers,
+    title: "Multi-Service Projects",
+    description: "APIs, workers, databases — one project, one dashboard.",
   },
 ]
 

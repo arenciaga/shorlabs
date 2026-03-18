@@ -5,37 +5,37 @@ import { getAllPosts } from "@/lib/blog";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = {
-  title: "Shorlabs Blog | Deployment, Cloud Cost Optimization, and Growth Playbooks",
+  title: "Shorlabs Blog | Backend Deployment, DevOps Automation, and Infrastructure Playbooks",
   description:
-    "Practical guides for indie builders, startups, and enterprise teams to reduce cloud costs, deploy faster, and scale reliably with modern backend and full-stack workflows.",
+    "Practical guides for developers deploying backends, APIs, and microservices — reduce DevOps overhead, ship faster, and scale with push-to-deploy workflows.",
   alternates: {
     canonical: "/blog",
   },
   openGraph: {
-    title: "Shorlabs Blog | Deployment, Cloud Cost Optimization, and Growth Playbooks",
+    title: "Shorlabs Blog | Backend Deployment, DevOps Automation, and Infrastructure Playbooks",
     description:
-      "Practical guides for indie builders, startups, and enterprise teams to reduce cloud costs, deploy faster, and scale reliably with modern backend and full-stack workflows.",
+      "Practical guides for developers deploying backends, APIs, and microservices — reduce DevOps overhead, ship faster, and scale with push-to-deploy workflows.",
     url: "https://www.shorlabs.com/blog",
     type: "website",
     siteName: "Shorlabs",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Shorlabs Blog | Deployment, Cloud Cost Optimization, and Growth Playbooks",
+    title: "Shorlabs Blog | Backend Deployment, DevOps Automation, and Infrastructure Playbooks",
     description:
-      "Practical guides for indie builders, startups, and enterprise teams to reduce cloud costs, deploy faster, and scale reliably with modern backend and full-stack workflows.",
+      "Practical guides for developers deploying backends, APIs, and microservices — reduce DevOps overhead, ship faster, and scale with push-to-deploy workflows.",
   },
   keywords: [
-    "deployment tutorials",
-    "cloud cost optimization",
-    "serverless backend",
+    "backend deployment tutorials",
+    "deploy API guide",
+    "push to deploy backend",
     "FastAPI deployment",
     "Django deployment",
-    "Flask deployment",
-    "startup infrastructure",
-    "enterprise deployment",
-    "SaaS scaling",
-    "developer growth",
+    "Express deployment",
+    "Go backend deployment",
+    "Docker deployment",
+    "DevOps automation",
+    "serverless backend",
     "Shorlabs",
   ],
 };
@@ -57,7 +57,7 @@ export default function Blog() {
     "@type": "Blog",
     name: "Shorlabs Blog",
     description:
-      "Practical guides for indie builders, startups, and enterprise teams to reduce cloud costs, deploy faster, and scale reliably with modern backend and full-stack workflows.",
+      "Practical guides for developers deploying backends, APIs, and microservices — reduce DevOps overhead, ship faster, and scale with push-to-deploy workflows.",
     url: "https://www.shorlabs.com/blog",
     publisher: {
       "@type": "Organization",

@@ -5,7 +5,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "Shorlabs",
     short_name: "Shorlabs",
     description:
-      "Shorlabs provides the infrastructure to deploy serverless web apps and databases, scale instantly, and only pay for what you use.",
+      "Push to GitHub, deploy your backend. Shorlabs is the push-to-deploy platform for Go, Python, Node.js, and any Dockerized service.",
     start_url: "/",
     display: "standalone",
     background_color: "#ffffff",

@@ -66,16 +66,16 @@ const FastifyIcon = () => (
 const CustomCommandsIcon = () => <Terminal className="h-3.5 w-3.5 text-foreground" />
 
 const FRAMEWORKS: FrameworkItem[] = [
-  { name: "NEXT.JS", icon: NextJsIcon },
   { name: "FASTAPI", icon: FastAPIIcon },
   { name: "EXPRESS", icon: ExpressIcon },
-  { name: "HONO", icon: HonoIcon },
-  { name: "FLASK", icon: FlaskIcon },
   { name: "DJANGO", icon: DjangoIcon },
+  { name: "FLASK", icon: FlaskIcon },
+  { name: "HONO", icon: HonoIcon },
   { name: "NESTJS", icon: NestJsIcon },
-  { name: "NODE.JS", icon: NodeIcon },
   { name: "FASTIFY", icon: FastifyIcon },
-  { name: "CUSTOM COMMANDS", icon: CustomCommandsIcon },
+  { name: "NODE.JS", icon: NodeIcon },
+  { name: "NEXT.JS", icon: NextJsIcon },
+  { name: "DOCKERFILE", icon: CustomCommandsIcon },
 ]
 
 function LogoBlock({ framework }: { framework: FrameworkItem }) {
@@ -100,7 +100,7 @@ export function GlitchMarquee() {
       <div className="mx-auto w-full max-w-7xl">
         <div className="flex items-center gap-3 sm:gap-4 mb-6 sm:mb-8">
           <span className="text-[10px] tracking-[0.2em] uppercase text-muted-foreground whitespace-nowrap">
-            {"// FRAMEWORKS: SUPPORTED"}
+            {"// BACKENDS: SUPPORTED"}
           </span>
           <Separator className="flex-1" />
           <span className="text-[10px] tracking-[0.2em] uppercase text-muted-foreground whitespace-nowrap">008</span>

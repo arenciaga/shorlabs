@@ -1,6 +1,6 @@
 import { ImageResponse } from "next/og";
 
-export const alt = "Shorlabs: Your Full Stack. Fully Serverless.";
+export const alt = "Shorlabs: Your Backend Deserves a Deploy Button.";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -41,7 +41,7 @@ export default function Image() {
             letterSpacing: "-0.02em",
           }}
         >
-          Your Full Stack. Fully Serverless.
+          Your Backend Deserves a Deploy Button.
         </div>
         <div
           style={{
@@ -52,8 +52,8 @@ export default function Image() {
             maxWidth: "800px",
           }}
         >
-          Deploy serverless web apps and databases, scale instantly, and only
-          pay for what you use.
+          Push to GitHub. We containerize and deploy your Go, Python, or
+          Node.js backend. Production in seconds.
         </div>
       </div>
     ),

@@ -31,7 +31,7 @@ export function PricingSection() {
             Select your plan
           </h2>
           <p className="text-xs sm:text-sm font-mono text-muted-foreground leading-relaxed max-w-md">
-            Usage-based pricing with a free Hobby tier. Upgrade only when you need more limits.
+            Start free. Pay only when your backends need more compute, memory, or build minutes.
           </p>
         </div>
 

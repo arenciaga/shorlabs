@@ -49,16 +49,16 @@ export function HeroSection() {
       <div className="mx-auto w-full max-w-6xl">
         <div className="flex flex-col items-start text-left">
           <Badge variant="outline" className="mb-6 rounded-none font-mono text-[10px] tracking-[0.2em]">
-            Open Source
+            Push to Deploy
           </Badge>
           <h1
             className="font-mono sm:text-xl lg:text-2xl xl:text-4xl tracking-tight text-foreground mb-5 font-bold uppercase leading-[0.95]"
             style={{ letterSpacing: "-0.01em" }}
           >
-           Your Full Stack. Fully Serverless.
+           Your Backend Deserves a Deploy Button.
           </h1>
           <p className="text-xs sm:text-base text-muted-foreground max-w-2xl mb-8 sm:mb-9 leading-relaxed font-mono px-0">
-            Shorlabs provides the infrastructure to deploy serverless web apps, services, and databases — scale instantly, with usage-based pricing.
+            Push to GitHub. We build, containerize, and deploy your backend — Go, Python, Node.js, anything. No ECS pipelines. No YAML. Production in seconds.
           </p>
           <div className="flex w-full max-w-md flex-col sm:flex-row items-stretch sm:items-center justify-start gap-3">
             {!isLoaded ? (

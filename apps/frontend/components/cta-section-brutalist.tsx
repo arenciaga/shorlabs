@@ -23,11 +23,11 @@ const CtaSection = () => {
           </span>
 
           <h2 className="text-2xl sm:text-3xl md:text-4xl font-mono font-bold uppercase tracking-tight text-foreground leading-[0.95] sm:whitespace-nowrap">
-            Deploy your full stack today.
+            Deploy your backend in 30 seconds.
           </h2>
 
           <p className="mt-4 text-muted-foreground max-w-md leading-relaxed text-xs sm:text-sm font-mono">
-            Web apps, databases, and everything in between. Start building with serverless infrastructure that scales with you.
+            Connect GitHub. Push your code. Get a production URL. It's that simple.
           </p>
 
           <div className="mt-8 flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
@@ -58,7 +58,7 @@ const CtaSection = () => {
           </div>
 
           <p className="mt-8 text-[10px] sm:text-xs text-muted-foreground font-mono tracking-[0.1em] uppercase">
-            Free tier included • No credit card required
+            Free tier included • No credit card required • Works with any Dockerfile
           </p>
         </div>
       </div>

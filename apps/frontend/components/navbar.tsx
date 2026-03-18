@@ -3,7 +3,6 @@
 import Link from "next/link"
 import Image from "next/image"
 import { useAuth } from "@clerk/nextjs"
-import { BookDemoButton } from "@/components/BookDemoButton"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import {
@@ -72,9 +71,9 @@ export function Navbar() {
               </Button>
             )}
             <Separator orientation="vertical" className="hidden md:block h-5 bg-border" />
-            <BookDemoButton className="bg-foreground text-background h-9 px-3 sm:px-4 text-[10px] sm:text-xs font-mono tracking-widest uppercase whitespace-nowrap">
-              Book Demo
-            </BookDemoButton>
+            <Link href="/sign-in" className="inline-flex items-center justify-center bg-foreground text-background h-9 px-3 sm:px-4 text-[10px] sm:text-xs font-mono tracking-widest uppercase whitespace-nowrap hover:bg-foreground/90 transition-colors">
+              Deploy Now
+            </Link>
           </div>
 
           <div className="flex lg:hidden items-center gap-2 shrink-0">
@@ -123,9 +122,9 @@ export function Navbar() {
                     </Button>
                   </SheetClose>
 
-                  <BookDemoButton className="mt-2 w-full rounded-none bg-foreground text-background font-mono text-xs tracking-widest uppercase">
-                    Book Demo
-                  </BookDemoButton>
+                  <Link href="/sign-in" className="mt-2 w-full rounded-none bg-foreground text-background font-mono text-xs tracking-widest uppercase inline-flex items-center justify-center h-10 hover:bg-foreground/90 transition-colors">
+                    Deploy Now
+                  </Link>
                 </div>
               </SheetContent>
             </Sheet>

@@ -6,25 +6,25 @@ import { Separator } from "@/components/ui/separator"
 const STEPS = [
   {
     number: "01",
-    title: "Create your project",
+    title: "Connect your repo",
     description:
-      "Start with a web app, database, or both. Connect GitHub or provision PostgreSQL—your choice, one click.",
+      "Link your GitHub repository. We detect Go, Python, Node.js, FastAPI, Express — any backend framework.",
     start: 4,
     end: 11,
   },
   {
     number: "02",
-    title: "Configure & deploy",
+    title: "Push and deploy",
     description:
-      "Set environment variables, choose compute resources, and deploy. Your app containerizes automatically, your database scales on demand.",
+      "Set your env vars, push to main, and we handle the rest — Docker build, container orchestration, production URL. Done.",
     start: 11,
     end: 26,
   },
   {
     number: "03",
-    title: "Manage everything",
+    title: "Monitor & scale",
     description:
-      "Get instant production URLs. Add custom domains, stream real-time logs, manage database tables—all from one dashboard.",
+      "Stream real-time logs, add custom domains, manage databases — all from one dashboard. Scale to zero or scale to millions.",
     start: 57,
     end: 999,
   },

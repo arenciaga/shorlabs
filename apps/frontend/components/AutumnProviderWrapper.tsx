@@ -48,7 +48,7 @@ export function AutumnProviderWrapper({ children }: { children: React.ReactNode 
     const { getToken } = useAuth()
 
     // Stable reference so SWRConfig doesn't re-create the provider on every render
-    const provider = useCallback(localStorageProvider, [])
+    const provider = useCallback(() => localStorageProvider(), [])
 
     return (
         <SWRConfig

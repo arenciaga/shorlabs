@@ -138,6 +138,7 @@ export function useProjectDetail(id: string) {
         } finally {
             setLoading(false)
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [getToken, signOut, id, orgId])
 
     const handleDeleteProject = async () => {

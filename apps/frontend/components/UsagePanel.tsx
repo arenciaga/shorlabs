@@ -23,7 +23,7 @@ export function UsagePanel({ onUpgrade }: UsagePanelProps) {
     const { usage, loading: usageLoading, error: usageError, isValidating } = useUsage()
     const { isPro, planLabel } = useIsPro()
     const [mounted, setMounted] = useState(false)
-    useEffect(() => { setMounted(true) }, [])
+    useEffect(() => { setTimeout(() => setMounted(true), 0) }, [])
 
     // Don't render anything meaningful until mounted (prevents hydration mismatch)
     // and until we have data (prevents showing wrong layout)

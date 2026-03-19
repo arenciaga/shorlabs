@@ -144,8 +144,8 @@ export function DatabaseConfigTab({ service, projectId, onRefresh }: DatabaseCon
             onRefresh()
             setTimeout(() => setSuccess(false), 3000)
             startPollingClusterStatus()
-        } catch (err: any) {
-            const msg = err.message || "Failed to update database compute"
+        } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : "Failed to update database compute"
             if (msg.includes("currently")) {
                 setModifying(true)
                 startPollingClusterStatus()

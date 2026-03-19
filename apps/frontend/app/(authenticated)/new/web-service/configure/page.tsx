@@ -63,7 +63,6 @@ function ConfigureWebServiceContent() {
     const repoFullName = searchParams.get("repo") || ""
     const isPrivateRepo = searchParams.get("private") === "true"
     const existingProjectId = searchParams.get("project_id")
-    const isAddService = !!existingProjectId
     const [, repoName] = repoFullName.split("/")
 
     const [projectName, setProjectName] = useState(repoName || "")

@@ -290,11 +290,14 @@ function SettingsPageInner() {
                                             {/* Account Info */}
                                             <div className="flex items-center gap-3">
                                                 {connection.avatar_url ? (
-                                                    <img
-                                                        src={connection.avatar_url}
-                                                        alt={connection.username || 'GitHub'}
-                                                        className="w-12 h-12 rounded-full border border-zinc-200"
-                                                    />
+                                                    <>
+                                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                        <img
+                                                            src={connection.avatar_url}
+                                                            alt={connection.username || 'GitHub'}
+                                                            className="w-12 h-12 rounded-full border border-zinc-200"
+                                                        />
+                                                    </>
                                                 ) : (
                                                     <div className="w-12 h-12 rounded-full bg-zinc-100 flex items-center justify-center">
                                                         <Github className="h-6 w-6 text-zinc-400" />

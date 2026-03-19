@@ -1,4 +1,4 @@
-import { Clock, Cpu, Database, DollarSign, Flame, FolderOpen, Globe, Hammer, HardDrive, type LucideIcon, Minus, Server, Zap } from 'lucide-react'
+import { Clock, Cpu, Flame, Globe, Hammer, HardDrive, type LucideIcon, Minus, Server, Zap } from 'lucide-react'
 
 export interface PlanFeature {
     label: string

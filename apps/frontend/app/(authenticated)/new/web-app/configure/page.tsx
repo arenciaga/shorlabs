@@ -19,10 +19,7 @@ import {
     Globe,
     Code2,
     Cpu,
-    Clock,
-    Check,
     Sparkles,
-    HardDrive,
     Lock
 } from "lucide-react"
 import Link from "next/link"
@@ -75,7 +72,6 @@ function ConfigureProjectContent() {
     const repoFullName = searchParams.get("repo") || ""
     const isPrivateRepo = searchParams.get("private") === "true"
     const existingProjectId = searchParams.get("project_id")
-    const isAddService = !!existingProjectId
     const [, repoName] = repoFullName.split("/")
 
     const [projectName, setProjectName] = useState(repoName || "")
@@ -181,7 +177,7 @@ function ConfigureProjectContent() {
             console.error("Failed to fetch directory:", err)
             return []
         }
-    }, [getToken, signOut, repoFullName])
+    }, [getToken, signOut, repoFullName, orgId])
 
     const openDirectoryPicker = async () => {
         setShowDirPicker(true)
@@ -275,7 +271,7 @@ function ConfigureProjectContent() {
         } finally {
             setDetectingFramework(false)
         }
-    }, [repoFullName, getToken])
+    }, [repoFullName, getToken, orgId])
 
     // Detect framework on mount and when root directory changes
     useEffect(() => {

@@ -120,7 +120,7 @@ export function CustomDomains({
         }
     }
 
-    const fetchDomainInstructions = async (domain: string) => {
+    const fetchDomainInstructions = useCallback(async (domain: string) => {
         try {
             const token = await getToken()
             const url = new URL(`${API_BASE_URL}/api/projects/${projectId}/domains/${domain}/status`)
@@ -143,7 +143,7 @@ export function CustomDomains({
         } catch (err) {
             console.error("Failed to fetch domain instructions:", err)
         }
-    }
+    }, [getToken, orgId, projectId])
 
     const handleRemoveDomain = async (domain: string) => {
         setRemovingDomain(domain)
@@ -268,7 +268,7 @@ export function CustomDomains({
                 fetchDomainInstructions(d.domain)
             }
         }
-    }, [customDomains])
+    }, [customDomains, domainResponses, fetchDomainInstructions])
 
 
     const statusBadge = {
@@ -419,14 +419,14 @@ export function CustomDomains({
                                                                     <div className="bg-amber-100 border border-amber-200 rounded-lg p-2.5 mb-3">
                                                                         <p className="text-xs font-semibold text-amber-900 mb-1">Apex Domain</p>
                                                                         <p className="text-xs text-amber-800 leading-relaxed">
-                                                                            Most DNS providers (like GoDaddy) don't allow CNAME records for apex domains. 
-                                                                            If your provider doesn't support CNAME flattening, add <span className="font-mono font-semibold">www.{d.domain}</span> as a CNAME instead, then forward {d.domain} to www.{d.domain}.
+                                                                            Most DNS providers (like GoDaddy) don&apos;t allow CNAME records for apex domains. 
+                                                                            If your provider doesn&apos;t support CNAME flattening, add <span className="font-mono font-semibold">www.{d.domain}</span> as a CNAME instead, then forward {d.domain} to www.{d.domain}.
                                                                         </p>
                                                                     </div>
                                                                 )}
                                                                 
                                                                 <p className="text-xs text-amber-700 mb-3">
-                                                                    Add the following DNS record at your domain registrar. We'll detect it automatically.
+                                                                    Add the following DNS record at your domain registrar. We&apos;ll detect it automatically.
                                                                 </p>
                                                                 
                                                                 <div className="bg-white rounded-lg border border-amber-200 overflow-hidden mb-3">

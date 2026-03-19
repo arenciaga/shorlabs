@@ -82,16 +82,7 @@ const normalizeUrl = (rawUrl: string | null) => {
     return /^https?:\/\//i.test(rawUrl) ? rawUrl : `https://${rawUrl}`
 }
 
-const getProjectHost = (projectUrl: string | null) => {
-    const normalized = normalizeUrl(projectUrl)
-    if (!normalized) return null
 
-    try {
-        return new URL(normalized).hostname
-    } catch {
-        return null
-    }
-}
 
 const getWebsiteIconUrl = (projectUrl: string | null) => {
     const normalized = normalizeUrl(projectUrl)
@@ -112,6 +103,7 @@ function ProjectAvatar({ projectId, projectName, projectUrl }: { projectId: stri
     if (websiteIconUrl && !iconLoadError) {
         return (
             <div className="w-10 h-10 shrink-0 rounded-full overflow-hidden bg-white border border-zinc-200">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                     src={websiteIconUrl}
                     alt={`${projectName} website icon`}
@@ -135,17 +127,14 @@ function ProjectAvatar({ projectId, projectName, projectUrl }: { projectId: stri
 
 export default function ProjectsPage() {
     const { getToken, isLoaded, orgId } = useAuth()
-    const { isPro, planLabel } = useIsPro()
+    useIsPro()
     const { usage, loading: usageLoading, isValidating: usageValidating } = useUsage()
     const { signOut } = useClerk()
     const [searchQuery, setSearchQuery] = useState("")
     const [projects, setProjects] = useState<Project[]>([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
-    const [mounted, setMounted] = useState(false)
     const { isOpen: upgradeOpen, openUpgradeModal, closeUpgradeModal } = useUpgradeModal()
-
-    useEffect(() => { setMounted(true) }, [])
 
 
 

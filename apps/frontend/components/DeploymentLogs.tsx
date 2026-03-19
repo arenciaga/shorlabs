@@ -102,7 +102,7 @@ export function DeploymentLogs({
     const [logs, setLogs] = useState<LogEntry[]>([])
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
-    const [currentPhase, setCurrentPhase] = useState<string>("QUEUED")
+    const [currentPhase] = useState<string>("QUEUED")
     const [isStreaming, setIsStreaming] = useState(false)
     const streamingRef = useRef(false)
 

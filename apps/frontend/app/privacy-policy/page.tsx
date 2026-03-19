@@ -17,7 +17,7 @@ export default function PrivacyPolicy() {
           <p className="lead">Last Updated: March 19, 2026</p>
 
           <p>
-            Welcome to Shorlabs. Ship Software in Peace. This Privacy Policy outlines how Shorlabs ("we", "us", "our") collects, uses, protects, and handles your personal information when you use our Platform-as-a-Service (PaaS) and related services at shorlabs.com.
+            Welcome to Shorlabs. Ship Software in Peace. This Privacy Policy outlines how Shorlabs (&quot;we&quot;, &quot;us&quot;, &quot;our&quot;) collects, uses, protects, and handles your personal information when you use our Platform-as-a-Service (PaaS) and related services at shorlabs.com.
           </p>
 
           <h2>1. Information We Collect</h2>
@@ -34,7 +34,7 @@ export default function PrivacyPolicy() {
           <ul>
             <li>Authenticate and secure your account.</li>
             <li>Provision infrastructure, build your applications, and stream logs.</li>
-            <li>Monitor platform scaling, flexible compute usage, and bill you according to our "pay per request" model.</li>
+            <li>Monitor platform scaling, flexible compute usage, and bill you according to our &quot;pay per request&quot; model.</li>
             <li>Communicate platform updates, downtime alerts, or legal changes.</li>
             <li>Enhance security and prevent fraud or abuse of our systems.</li>
           </ul>
@@ -50,14 +50,14 @@ export default function PrivacyPolicy() {
           </ul>
 
           <h2>4. Data Security</h2>
-          <p>We employ "Privacy by Design" principles and industry-standard security practices. Our database and cloud resources are protected by restrictive IAM roles, encrypted at rest, and accessed exclusively over secure connections (HTTPS/TLS). While we use robust protocols (such as AWS KMS and secure secrets management), no method of transmission over the Internet is 100% secure.</p>
+          <p>We employ &quot;Privacy by Design&quot; principles and industry-standard security practices. Our database and cloud resources are protected by restrictive IAM roles, encrypted at rest, and accessed exclusively over secure connections (HTTPS/TLS). While we use robust protocols (such as AWS KMS and secure secrets management), no method of transmission over the Internet is 100% secure.</p>
 
           <h2>5. Your Data Rights (GDPR & CCPA)</h2>
           <p>Depending on your location, you may have rights regarding your personal data, including:</p>
           <ul>
             <li><strong>Right to Access:</strong> You can request a copy of your personal data currently held by us.</li>
             <li><strong>Right to Rectification:</strong> You can update or correct inaccuracies in your account.</li>
-            <li><strong>Right to Erasure ("Right to be Forgotten"):</strong> You can request the deletion of your account and associated personal data. Upon termination, code and logs will be permanently deleted from our servers.</li>
+            <li><strong>Right to Erasure (&quot;Right to be Forgotten&quot;):</strong> You can request the deletion of your account and associated personal data. Upon termination, code and logs will be permanently deleted from our servers.</li>
             <li><strong>Right to Data Portability:</strong> You can request export of your personal data in a structured, commonly used format.</li>
           </ul>
 

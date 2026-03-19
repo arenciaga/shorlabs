@@ -1,6 +1,6 @@
 'use client'
 
-import { Check, Cpu, Clock, HardDrive } from 'lucide-react'
+import { Check } from 'lucide-react'
 
 type PlanTier = "hobby" | "plus" | "pro"
 

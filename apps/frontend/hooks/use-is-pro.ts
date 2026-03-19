@@ -29,7 +29,7 @@ function productMatchesPlan(product: { id: unknown; status?: string }, planId: s
 }
 
 export function useIsPro() {
-    const { customer, isLoading } = useCustomer()
+    const { customer } = useCustomer()
 
     const products = customer?.products ?? []
     const hasCustomerData = !!customer

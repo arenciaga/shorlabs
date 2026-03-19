@@ -21,6 +21,7 @@ export function GitHubIcon(props: SVGProps<SVGSVGElement>) {
 
 export function PostgreSQLIcon(props: Omit<ImgHTMLAttributes<HTMLImageElement>, "src" | "alt">) {
     return (
+        /* eslint-disable-next-line @next/next/no-img-element */
         <img
             src="/postgresql.svg"
             alt="PostgreSQL"

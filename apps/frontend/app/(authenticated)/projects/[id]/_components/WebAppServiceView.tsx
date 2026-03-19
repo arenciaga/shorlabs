@@ -32,12 +32,10 @@ export function WebAppServiceView({
     service,
     project,
     hook,
-    projectId,
 }: {
     service: Service
     project: { project_id: string; name: string }
     hook: ReturnType<typeof useProjectDetail>
-    projectId: string
 }) {
     const deployments = service.deployments || []
     const isBuilding = !["LIVE", "FAILED"].includes(service.status)

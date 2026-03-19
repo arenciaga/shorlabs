@@ -107,8 +107,8 @@ function NewDatabaseContent() {
             })
 
             router.push(`/projects/${result.project_id}`)
-        } catch (err: any) {
-            setError(err.message || "Failed to create database")
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : "Failed to create database")
             setDeploying(false)
         }
     }

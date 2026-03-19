@@ -29,6 +29,7 @@ interface ProjectCanvasProps {
     onSelectService: (serviceId: string) => void
     /** Optional extra content rendered below the Add Service button (top-right) */
     topRightExtra?: React.ReactNode
+    isDrawerOpen?: boolean
 }
 
 function ZoomControls() {
@@ -66,7 +67,7 @@ function ZoomControls() {
     )
 }
 
-function CanvasInner({ services, projectId, onSelectService, topRightExtra }: ProjectCanvasProps) {
+function CanvasInner({ services, projectId, onSelectService, topRightExtra, isDrawerOpen }: ProjectCanvasProps) {
     const { nodes, edges } = useCanvasLayout(services)
 
     const handleNodeClick = (_event: React.MouseEvent, node: Node) => {
@@ -96,12 +97,12 @@ function CanvasInner({ services, projectId, onSelectService, topRightExtra }: Pr
 
             <ZoomControls />
 
-            {/* Top-right actions */}
-            <div className="absolute top-4 right-4 z-10 flex flex-col gap-2">
+            {/* Top-right actions (shifts when drawer is open to stay visible) */}
+            <div className={`absolute top-4 z-10 flex flex-col gap-2 transition-all duration-300 ${isDrawerOpen ? 'right-[calc(70%+1rem)]' : 'right-4'}`}>
                 <Link href={`/new?project_id=${projectId}`}>
                     <Button
                         variant="outline"
-                        className="rounded-none border-dashed w-full"
+                        className="rounded-none border-dashed w-full bg-white shadow-sm"
                     >
                         <Plus className="h-4 w-4 mr-1.5" />
                         Add Service

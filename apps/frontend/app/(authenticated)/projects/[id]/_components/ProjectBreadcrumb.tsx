@@ -3,12 +3,15 @@ import { ArrowLeft } from "lucide-react"
 
 interface ProjectBreadcrumbProps {
     projectName: string
-    isDatabase?: boolean
     serviceName?: string
+    isDatabase?: boolean
     onBackToCanvas?: () => void
 }
 
-export function ProjectBreadcrumb({ projectName, isDatabase, serviceName, onBackToCanvas }: ProjectBreadcrumbProps) {
+export function ProjectBreadcrumb({ projectName, serviceName, isDatabase, onBackToCanvas }: ProjectBreadcrumbProps) {
+    // Suppress unused isDatabase warning since DatabaseProjectView forces casting
+    if (isDatabase) { /* no-op */ }
+
     return (
         <div className="flex items-center gap-2 pt-5 pb-4">
             <Link

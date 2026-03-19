@@ -1,9 +1,6 @@
 import {
     Clock,
     GitBranch,
-    CheckCircle2,
-    XCircle,
-    Loader2,
 } from "lucide-react"
 import { DeploymentLogs } from "@/components/DeploymentLogs"
 import type { Deployment, ProjectCompat } from "./types"

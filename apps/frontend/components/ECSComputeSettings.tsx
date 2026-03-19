@@ -1,6 +1,6 @@
 'use client'
 
-import { Check, Cpu, Lock } from 'lucide-react'
+import { Cpu, Lock } from 'lucide-react'
 import { EC2_COMPUTE_OPTIONS, hasAccessToPlan } from '@/lib/compute-options'
 import type { PlanTier } from '@/lib/compute-options'
 

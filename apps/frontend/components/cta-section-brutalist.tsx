@@ -27,7 +27,7 @@ const CtaSection = () => {
           </h2>
 
           <p className="mt-4 text-muted-foreground max-w-md leading-relaxed text-xs sm:text-sm font-mono">
-            Connect GitHub. Push your code. Get a production URL. It's that simple.
+            Connect GitHub. Push your code. Get a production URL. It&apos;s that simple.
           </p>
 
           <div className="mt-8 flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">

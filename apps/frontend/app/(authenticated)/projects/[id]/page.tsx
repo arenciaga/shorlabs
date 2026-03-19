@@ -31,7 +31,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     const prevServiceCount = useRef(serviceCount)
     useEffect(() => {
         if (serviceCount < prevServiceCount.current && prevServiceCount.current > 0) {
-            setDetailOpen(false)
+            setTimeout(() => setDetailOpen(false), 0)
         }
         prevServiceCount.current = serviceCount
     }, [serviceCount])
@@ -127,6 +127,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                             services={services}
                             projectId={project.project_id}
                             onSelectService={handleCanvasSelect}
+                            isDrawerOpen={detailOpen}
                             topRightExtra={services.length === 0 ? (
                                 <DeleteProjectDialog
                                     projectName={project.name}
@@ -156,7 +157,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                             {activeService.service_type === "database" ? (
                                 <DatabaseServiceView service={activeService} hook={hook} />
                             ) : (
-                                <WebAppServiceView service={activeService} project={project} hook={hook} projectId={id} />
+                                <WebAppServiceView service={activeService} project={project} hook={hook} />
                             )}
                         </div>
                     </SheetContent>

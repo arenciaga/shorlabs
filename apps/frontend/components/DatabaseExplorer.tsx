@@ -83,14 +83,14 @@ export function DatabaseExplorer({ projectId, orgId, projectStatus }: DatabaseEx
 
     // Initial load gate — hides all UI until first successful schema+table load
     const [initialLoaded, setInitialLoaded] = useState(false)
-    const [initialLoading, setInitialLoading] = useState(false)
+
     const [initialLoadError, setInitialLoadError] = useState<string | null>(null)
     const retryCountRef = useRef(0)
     const maxRetries = 3
     const mountedRef = useRef(true)
 
     // Loading / error
-    const [loadingSchemas, setLoadingSchemas] = useState(false)
+    const [loadingSchemas] = useState(false)
     const [loadingTables, setLoadingTables] = useState(false)
     const [loadingColumns, setLoadingColumns] = useState(false)
     const [loadingData, setLoadingData] = useState(false)
@@ -112,27 +112,7 @@ export function DatabaseExplorer({ projectId, orgId, projectStatus }: DatabaseEx
     const [droppingColumn, setDroppingColumn] = useState<string | null>(null)
     const [droppingColumnLoading, setDroppingColumnLoading] = useState(false)
 
-    const loadSchemas = useCallback(async () => {
-        if (!orgId) return
-        setLoadingSchemas(true)
-        setError(null)
-        try {
-            const token = await getToken()
-            if (!token) return
-            const result = await fetchDatabaseSchemas(token, projectId, orgId)
-            setSchemas(result.schemas)
-            if (result.schemas.length > 0) {
-                const hasPublic = result.schemas.some(s => s.schema_name === "public")
-                if (!hasPublic) {
-                    setSelectedSchema(result.schemas[0].schema_name)
-                }
-            }
-        } catch (e) {
-            setError(e instanceof Error ? e.message : "Failed to load schemas")
-        } finally {
-            setLoadingSchemas(false)
-        }
-    }, [getToken, projectId, orgId])
+
 
     const loadTables = useCallback(async (schema: string) => {
         if (!orgId) return
@@ -183,7 +163,7 @@ export function DatabaseExplorer({ projectId, orgId, projectStatus }: DatabaseEx
     // Initial load with retry — fetches schemas + tables in one go
     const performInitialLoad = useCallback(async () => {
         if (!orgId) return
-        setInitialLoading(true)
+
         setInitialLoadError(null)
 
         const attempt = async (): Promise<boolean> => {
@@ -221,7 +201,7 @@ export function DatabaseExplorer({ projectId, orgId, projectStatus }: DatabaseEx
                 if (mountedRef.current) {
                     retryCountRef.current = 0
                     setInitialLoaded(true)
-                    setInitialLoading(false)
+
                 }
                 return
             }
@@ -233,7 +213,7 @@ export function DatabaseExplorer({ projectId, orgId, projectStatus }: DatabaseEx
 
         if (mountedRef.current) {
             setInitialLoadError("Could not connect to the database. It may be waking up from a cold start.")
-            setInitialLoading(false)
+
         }
     }, [getToken, projectId, orgId])
 

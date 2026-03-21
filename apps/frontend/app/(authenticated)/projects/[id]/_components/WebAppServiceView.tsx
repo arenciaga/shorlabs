@@ -154,6 +154,7 @@ export function WebAppServiceView({
                         deleteDialogOpen={hook.deleteDialogOpen}
                         onDeleteDialogOpenChange={hook.setDeleteDialogOpen}
                         onDelete={() => hook.handleDeleteService(service.service_id)}
+                        serviceStatus={service.status}
                     />
                 )}
             </div>

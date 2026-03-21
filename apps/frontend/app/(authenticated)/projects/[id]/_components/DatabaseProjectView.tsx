@@ -7,7 +7,7 @@ import { DatabaseConnectionDetails } from "./DatabaseConnectionDetails"
 import { DatabaseConfigTab } from "./DatabaseConfigTab"
 import { DatabaseSecurityTab } from "./DatabaseSecurityTab"
 import { DeleteProjectDialog } from "./DeleteProjectDialog"
-import { STATUS_CONFIG } from "./constants"
+import { STATUS_CONFIG, isTransitionalStatus } from "./constants"
 import type { UseProjectDetailReturn } from "./useProjectDetail"
 
 const DB_TABS = [
@@ -170,6 +170,8 @@ export function DatabaseProjectView({ hook }: DatabaseProjectViewProps) {
                                                     onDelete={hook.handleDeleteProject}
                                                     entityLabel="Delete Database"
                                                     description={<>This will permanently delete <strong>{project.name}</strong> and all its data.</>}
+                                                    disabled={isTransitionalStatus(service.status)}
+                                                    disabledReason="Cannot delete while database is provisioning. Please wait for the operation to complete."
                                                 />
                                             </div>
                                         </div>

@@ -2272,6 +2272,13 @@ async def redeploy_project(
     }
 
 
+# Statuses where a service is mid-operation and must not be deleted.
+TRANSITIONAL_STATUSES = frozenset({
+    "PENDING", "CLONING", "PREPARING", "UPLOADING",
+    "BUILDING", "DEPLOYING", "PROVISIONING", "DELETING",
+})
+
+
 def _delete_single_service(svc: dict):
     """Shared helper: delete one service and its AWS resources."""
     sid = svc["service_id"]
@@ -2316,6 +2323,13 @@ async def delete_service_endpoint(
     if not svc:
         raise HTTPException(status_code=404, detail="Service not found")
 
+    svc_status = svc.get("status", "")
+    if svc_status in TRANSITIONAL_STATUSES:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Cannot delete service while it is {svc_status.lower()}. Please wait for the operation to complete.",
+        )
+
     print(f"🗑️ DELETE SERVICE: project_id={project_id}, service_id={service_id}")
 
     mode = _delete_single_service(svc)
@@ -2353,6 +2367,15 @@ async def delete_project_endpoint(
     print(f"🗑️ DELETE PROJECT: project_id={project_id}")
 
     services = list_services(project_id, org_id=org_id)
+
+    blocked = [s for s in services if s.get("status", "") in TRANSITIONAL_STATUSES]
+    if blocked:
+        names = ", ".join(s.get("name", s.get("service_id", "unknown")) for s in blocked)
+        raise HTTPException(
+            status_code=409,
+            detail=f"Cannot delete project while services are in progress: {names}. Please wait for all operations to complete.",
+        )
+
     for svc in services:
         _delete_single_service(svc)
 

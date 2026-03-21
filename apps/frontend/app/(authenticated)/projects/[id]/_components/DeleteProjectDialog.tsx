@@ -24,6 +24,10 @@ interface DeleteProjectDialogProps {
     entityLabel?: string
     /** Description text for the dialog */
     description?: ReactNode
+    /** When true, the trigger button is disabled and the dialog cannot open */
+    disabled?: boolean
+    /** Message shown below the button when disabled */
+    disabledReason?: string
 }
 
 export function DeleteProjectDialog({
@@ -34,11 +38,14 @@ export function DeleteProjectDialog({
     onDelete,
     entityLabel = "Delete Project",
     description,
+    disabled,
+    disabledReason,
 }: DeleteProjectDialogProps) {
     const [confirmProjectName, setConfirmProjectName] = useState("")
     const [confirmPhrase, setConfirmPhrase] = useState("")
 
     const handleOpenChange = (newOpen: boolean) => {
+        if (disabled && newOpen) return
         if (!newOpen) {
             setConfirmProjectName("")
             setConfirmPhrase("")
@@ -49,13 +56,19 @@ export function DeleteProjectDialog({
     return (
         <AlertDialog open={open} onOpenChange={handleOpenChange}>
             <AlertDialogTrigger asChild>
-                <Button
-                    variant="outline"
-                    className="text-red-600 border-red-200 hover:bg-red-50 rounded-full"
-                >
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    {entityLabel}
-                </Button>
+                <div className="flex flex-col items-start gap-1">
+                    <Button
+                        variant="outline"
+                        className="text-red-600 border-red-200 hover:bg-red-50 rounded-full"
+                        disabled={disabled}
+                    >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        {entityLabel}
+                    </Button>
+                    {disabled && disabledReason && (
+                        <p className="text-xs text-zinc-500">{disabledReason}</p>
+                    )}
+                </div>
             </AlertDialogTrigger>
             <AlertDialogContent className="max-w-md rounded-none">
                 <AlertDialogHeader>

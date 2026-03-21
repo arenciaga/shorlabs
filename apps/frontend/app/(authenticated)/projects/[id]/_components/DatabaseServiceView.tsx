@@ -5,7 +5,7 @@ import { DatabaseConnectionDetails } from "./DatabaseConnectionDetails"
 import { DatabaseConfigTab } from "./DatabaseConfigTab"
 import { DatabaseSecurityTab } from "./DatabaseSecurityTab"
 import { DeleteProjectDialog } from "./DeleteProjectDialog"
-import { STATUS_CONFIG } from "./constants"
+import { STATUS_CONFIG, isTransitionalStatus } from "./constants"
 import type { UseProjectDetailReturn } from "./useProjectDetail"
 import type { Service } from "./types"
 
@@ -185,6 +185,8 @@ export function DatabaseServiceView({ service, hook }: DatabaseServiceViewProps)
                                             onDelete={() => hook.handleDeleteService(service.service_id)}
                                             entityLabel="Delete Database"
                                             description={<>This will permanently delete the database <strong>{service.name || "Database"}</strong> and all its data.</>}
+                                            disabled={isTransitionalStatus(service.status)}
+                                            disabledReason="Cannot delete while database is provisioning. Please wait for the operation to complete."
                                         />
                                     </div>
                                 </div>

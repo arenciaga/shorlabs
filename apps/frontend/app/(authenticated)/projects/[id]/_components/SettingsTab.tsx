@@ -2,6 +2,7 @@ import React from "react"
 import { StartCommandInput } from "@/components/StartCommandInput"
 import { EnvironmentVariablesEditor } from "@/components/EnvironmentVariablesEditor"
 import { DeleteProjectDialog } from "./DeleteProjectDialog"
+import { isTransitionalStatus } from "./constants"
 import type { ProjectCompat } from "./types"
 
 interface SettingsTabProps {
@@ -29,6 +30,8 @@ interface SettingsTabProps {
     onDelete: () => void
     deleteEntityLabel?: string
     deleteDescription?: React.ReactNode
+    /** Current service status — used to block deletion during transitional states */
+    serviceStatus?: string
 }
 
 export function SettingsTab({
@@ -53,7 +56,9 @@ export function SettingsTab({
     onDelete,
     deleteEntityLabel,
     deleteDescription,
+    serviceStatus,
 }: SettingsTabProps) {
+    const deletionBlocked = isTransitionalStatus(serviceStatus)
     return (
         <div className="space-y-6">
             {/* Start Command */}
@@ -101,6 +106,8 @@ export function SettingsTab({
                             onDelete={onDelete}
                             entityLabel={deleteEntityLabel || "Delete Service"}
                             description={deleteDescription || <>This will permanently delete <strong>{project.name}</strong> and all its deployments.</>}
+                            disabled={deletionBlocked}
+                            disabledReason="Cannot delete while service is building/deploying. Please wait for the operation to complete."
                         />
                     </div>
                 </div>

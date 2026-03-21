@@ -15,3 +15,13 @@ export const STATUS_CONFIG: Record<string, { dot: string; label: string; color: 
 
 // Include PENDING as the first step so users can see that a redeploy has been queued
 export const BUILD_STEPS = ["PENDING", "CLONING", "PREPARING", "UPLOADING", "BUILDING", "DEPLOYING"]
+
+// Statuses where a service is mid-operation and must not be deleted.
+export const TRANSITIONAL_STATUSES = new Set([
+    "PENDING", "CLONING", "PREPARING", "UPLOADING",
+    "BUILDING", "DEPLOYING", "PROVISIONING", "DELETING",
+])
+
+export function isTransitionalStatus(status: string | undefined): boolean {
+    return !!status && TRANSITIONAL_STATUSES.has(status)
+}

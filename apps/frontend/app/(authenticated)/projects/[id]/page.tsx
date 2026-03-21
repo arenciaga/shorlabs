@@ -113,7 +113,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
 
     return (
         <>
-            <div className="h-screen bg-white flex flex-col overflow-hidden">
+            <div className="h-[calc(100vh-56px)] bg-white flex flex-col overflow-hidden">
                 {/* Canvas — always rendered */}
                 {isMobile ? (
                     <MobileServiceGrid

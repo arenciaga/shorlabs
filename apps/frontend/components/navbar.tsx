@@ -14,6 +14,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet"
 import { Menu } from "lucide-react"
+import { BookDemoButton } from "@/components/BookDemoButton"
 
 export function Navbar() {
   const { isSignedIn } = useAuth()
@@ -71,9 +72,12 @@ export function Navbar() {
               </Button>
             )}
             <Separator orientation="vertical" className="hidden md:block h-5 bg-border" />
-            <Link href="/sign-in" className="inline-flex items-center justify-center bg-foreground text-background h-9 px-3 sm:px-4 text-[10px] sm:text-xs font-mono tracking-widest uppercase whitespace-nowrap hover:bg-foreground/90 transition-colors">
-              Deploy Now
-            </Link>
+            <BookDemoButton
+              className="h-9 px-3 sm:px-4 text-[10px] sm:text-xs font-mono tracking-widest uppercase rounded-none whitespace-nowrap"
+              size="sm"
+            >
+              Book a Demo
+            </BookDemoButton>
           </div>
 
           <div className="flex lg:hidden items-center gap-2 shrink-0">
@@ -122,9 +126,11 @@ export function Navbar() {
                     </Button>
                   </SheetClose>
 
-                  <Link href="/sign-in" className="mt-2 w-full rounded-none bg-foreground text-background font-mono text-xs tracking-widest uppercase inline-flex items-center justify-center h-10 hover:bg-foreground/90 transition-colors">
-                    Deploy Now
-                  </Link>
+                  <BookDemoButton
+                    className="mt-2 w-full rounded-none font-mono text-xs tracking-widest uppercase h-10"
+                  >
+                    Book a Demo
+                  </BookDemoButton>
                 </div>
               </SheetContent>
             </Sheet>

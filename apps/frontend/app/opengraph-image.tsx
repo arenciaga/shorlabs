@@ -1,60 +1,30 @@
 import { ImageResponse } from "next/og";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 
 export const alt = "Shorlabs: Ship Backends Like You Ship Frontends.";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
-export default function Image() {
+export default async function Image() {
+  const imageData = await readFile(join(process.cwd(), "public", "Main.png"));
+  const base64 = imageData.toString("base64");
+
   return new ImageResponse(
     (
       <div
         style={{
-          background: "linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%)",
           width: "100%",
           height: "100%",
           display: "flex",
-          flexDirection: "column",
-          justifyContent: "center",
-          padding: "80px",
         }}
       >
-        <div
-          style={{
-            fontSize: 24,
-            color: "#888",
-            marginBottom: 24,
-            display: "flex",
-            letterSpacing: "0.15em",
-            textTransform: "uppercase" as const,
-          }}
-        >
-          www.shorlabs.com
-        </div>
-        <div
-          style={{
-            fontSize: 64,
-            fontWeight: 700,
-            color: "#ffffff",
-            lineHeight: 1.1,
-            marginBottom: 32,
-            display: "flex",
-            letterSpacing: "-0.02em",
-          }}
-        >
-          Ship Backends Like You Ship Frontends.
-        </div>
-        <div
-          style={{
-            fontSize: 24,
-            color: "#aaa",
-            display: "flex",
-            lineHeight: 1.5,
-            maxWidth: "800px",
-          }}
-        >
-          Push to GitHub. We containerize and deploy your Go, Python, or
-          Node.js backend. Production in seconds.
-        </div>
+        <img
+          src={`data:image/png;base64,${base64}`}
+          width={1200}
+          height={630}
+          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+        />
       </div>
     ),
     { ...size }

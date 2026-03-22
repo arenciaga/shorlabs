@@ -10,6 +10,8 @@ from fastapi import APIRouter, Request, HTTPException
 from svix.webhooks import Webhook, WebhookVerificationError
 import resend
 
+from api.services.secrets import get_env_vars_for_service
+
 
 def _json_safe_env_vars(env_vars: dict) -> dict:
     """Convert DynamoDB types (e.g. Decimal) to JSON-serializable types."""
@@ -144,7 +146,7 @@ async def github_webhook(request: Request):
 
         root_directory = svc.get("root_directory") or "./"
         start_command = svc.get("start_command") or "uvicorn main:app --host 0.0.0.0 --port 8080"
-        env_vars = _json_safe_env_vars(svc.get("env_vars") or {})
+        env_vars = get_env_vars_for_service(svc)
         github_url = svc.get("github_url") or f"https://github.com/{full_name}"
 
         # Route to appropriate deployment function based on service type

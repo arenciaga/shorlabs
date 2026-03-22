@@ -40,16 +40,21 @@ def filter_env_vars(env_vars: dict) -> tuple[dict, list]:
     """
     if not env_vars:
         return {}, []
-    
+
+    import re
+    valid_key = re.compile(r'^[a-zA-Z_][a-zA-Z0-9_]*$')
+
     filtered = {}
     skipped = []
-    
+
     for key, value in env_vars.items():
         if key.upper().startswith(RESERVED_ENV_PREFIXES) or key.upper() in RESERVED_ENV_VARS:
             skipped.append(key)
+        elif not valid_key.match(key):
+            skipped.append(key)
         else:
             filtered[key] = value
-    
+
     return filtered, skipped
 
 

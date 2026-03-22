@@ -42,6 +42,7 @@ from deployer.aws import (
     get_lambda_logs,
     get_ecs_logs,
 )
+from api.services.secrets import put_env_vars, get_env_vars_for_service
 from deployer.aws.rds import get_cluster_secret, get_cluster_security_group_ids, get_security_group_rules, modify_aurora_cluster_scaling, _normalize_serverless_v2_capacity
 from api.db.pg_explorer import (
     list_schemas as pg_list_schemas,
@@ -878,6 +879,10 @@ async def create_new_project(
         ephemeral_storage=ephemeral_storage,
     )
 
+    if request.env_vars:
+        arn = put_env_vars(request.organization_id, project["project_id"], service["service_id"], request.env_vars)
+        update_service(service["service_id"], {"secret_arn": arn})
+
     # 3. Start deployment via SQS queue
     send_deployment_to_sqs(
         service["service_id"],
@@ -1031,6 +1036,10 @@ async def create_web_service_project(
         memory=memory,
     )
 
+    if request.env_vars:
+        arn = put_env_vars(request.organization_id, project["project_id"], service["service_id"], request.env_vars)
+        update_service(service["service_id"], {"secret_arn": arn})
+
     # 3. Start ECS deployment via SQS
     send_ecs_deployment_to_sqs(
         service["service_id"],
@@ -1122,6 +1131,9 @@ async def add_service_to_project(
             cpu=cpu,
             memory=memory,
         )
+        if request.env_vars:
+            arn = put_env_vars(org_id, project_id, service["service_id"], request.env_vars)
+            update_service(service["service_id"], {"secret_arn": arn})
         send_ecs_deployment_to_sqs(
             service["service_id"],
             github_url,
@@ -1159,6 +1171,9 @@ async def add_service_to_project(
             timeout=request.timeout or 30,
             ephemeral_storage=request.ephemeral_storage or 512,
         )
+        if request.env_vars:
+            arn = put_env_vars(org_id, project_id, service["service_id"], request.env_vars)
+            update_service(service["service_id"], {"secret_arn": arn})
         send_deployment_to_sqs(
             service["service_id"],
             github_url,
@@ -1316,7 +1331,7 @@ async def get_project_details(
                 "subdomain": svc.get("subdomain"),
                 "custom_url": svc.get("custom_url"),
                 "ecr_repo": svc.get("ecr_repo"),
-                "env_vars": svc.get("env_vars", {}),
+                "env_vars": get_env_vars_for_service(svc),
                 "start_command": svc.get("start_command", ""),
                 "root_directory": svc.get("root_directory", "./"),
                 "cpu": svc.get("cpu", 2048),
@@ -1360,7 +1375,7 @@ async def get_project_details(
                 "subdomain": svc.get("subdomain"),
                 "custom_url": svc.get("custom_url"),
                 "ecr_repo": svc.get("ecr_repo"),
-                "env_vars": svc.get("env_vars", {}),
+                "env_vars": get_env_vars_for_service(svc),
                 "start_command": svc.get("start_command", ""),
                 "root_directory": svc.get("root_directory", "./"),
                 "memory": svc.get("memory", 1024),
@@ -2104,13 +2119,15 @@ async def update_project_env_vars(
 ):
     """Update service environment variables."""
     svc = _resolve_service(org_id, project_id, service_id)
-    
-    updated = update_service(svc["service_id"], {"env_vars": request.env_vars})
-    
+    sid = svc["service_id"]
+
+    arn = put_env_vars(org_id, project_id, sid, request.env_vars)
+    update_service(sid, {"secret_arn": arn})
+
     return {
         "project_id": project_id,
-        "service_id": svc["service_id"],
-        "env_vars": updated.get("env_vars", {}),
+        "service_id": sid,
+        "env_vars": request.env_vars,
         "message": "Environment variables updated. Redeploy to apply changes.",
     }
 
@@ -2229,7 +2246,7 @@ async def redeploy_project(
 
     root_directory = svc.get("root_directory", "./")
     start_command = svc.get("start_command", "uvicorn main:app --host 0.0.0.0 --port 8080")
-    env_vars = svc.get("env_vars", {})
+    env_vars = get_env_vars_for_service(svc)
 
     if svc_type == "web-service":
         cpu = int(svc.get("cpu", 2048))

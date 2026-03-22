@@ -500,7 +500,7 @@ def create_service(
             "github_repo": github_repo,
             "function_url": None,
             "ecr_repo": None,
-            "env_vars": env_vars or {},
+            "secret_arn": None,
             "root_directory": root_directory,
             "start_command": start_command,
             "subdomain": subdomain,
@@ -617,6 +617,14 @@ def delete_service(service_id: str) -> bool:
         with deployments_table.batch_writer() as batch:
             for d in deployments:
                 batch.delete_item(Key={"project_id": d["project_id"], "SK": d["SK"]})
+
+    # Delete env vars from Secrets Manager
+    from api.services.secrets import delete_env_vars
+    delete_env_vars(
+        service.get("organization_id", ""),
+        service.get("project_id", ""),
+        service_id,
+    )
 
     # Delete the service item
     services_table.delete_item(Key={"PK": service["PK"], "SK": service["SK"]})

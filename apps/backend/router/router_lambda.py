@@ -31,8 +31,8 @@ dynamodb_config = Config(
 )
 dynamodb = boto3.resource('dynamodb', config=dynamodb_config)
 
-# Projects table for subdomain lookup; domains table for custom domain lookup
-TABLE_NAME = os.environ.get('DYNAMODB_TABLE', 'shorlabs-projects')
+# Services table for subdomain lookup; domains table for custom domain lookup
+SERVICES_TABLE_NAME = os.environ.get('SERVICES_TABLE', 'shorlabs-services')
 DOMAINS_TABLE_NAME = os.environ.get('DOMAINS_TABLE', 'shorlabs-domains')
 DOMAIN_ITEM_SK = 'META'
 SHORLABS_DOMAIN = 'shorlabs.com'
@@ -158,18 +158,17 @@ def _proxy_to_external(request: dict, external_domain: str) -> dict:
 
 def _lookup_project_by_subdomain(subdomain: str) -> dict | None:
     """
-    Look up project by subdomain in DynamoDB.
+    Look up service by subdomain in the shorlabs-services table.
 
     Uses a table scan with filter - for production scale, add a GSI on subdomain.
     """
     try:
-        table = dynamodb.Table(TABLE_NAME)
+        table = dynamodb.Table(SERVICES_TABLE_NAME)
 
         response = table.scan(
-            FilterExpression="subdomain = :sd AND begins_with(SK, :sk_prefix)",
+            FilterExpression="subdomain = :sd",
             ExpressionAttributeValues={
                 ":sd": subdomain,
-                ":sk_prefix": "PROJECT#",
             },
             ProjectionExpression="function_url, subdomain, #st, service_type, alb_dns_name",
             ExpressionAttributeNames={"#st": "status"},

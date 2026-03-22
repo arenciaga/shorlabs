@@ -36,11 +36,20 @@ export const metadata: Metadata = {
     siteName: "Shorlabs",
     locale: "en_US",
     type: "website",
+    images: [
+      {
+        url: "/Main.png",
+        width: 1200,
+        height: 630,
+        alt: "Shorlabs",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
     title: homepageTitle,
     description: homepageDescription,
+    images: ["/Main.png"],
   },
   robots: {
     index: true,

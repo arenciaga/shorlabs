@@ -16,6 +16,7 @@ from boto3.dynamodb.conditions import Key
 
 # Table names
 TABLE_NAME = os.environ.get("DYNAMODB_TABLE", "shorlabs-projects")
+SERVICES_TABLE_NAME = os.environ.get("SERVICES_TABLE", "shorlabs-services")
 DEPLOYMENTS_TABLE_NAME = os.environ.get("DEPLOYMENTS_TABLE", "shorlabs-deployments")
 DOMAINS_TABLE_NAME = os.environ.get("DOMAINS_TABLE", "shorlabs-domains")
 
@@ -145,6 +146,50 @@ def get_or_create_deployments_table():
     return table
 
 
+def get_or_create_services_table():
+    """
+    Get or create the dedicated services table.
+
+    Schema:
+      - PK: ORG#{org_id} (HASH)
+      - SK: PROJECT#{project_id}#SERVICE#{service_id} (RANGE)
+      - GSI service-id-index: lookup by service_id
+    """
+    try:
+        table = dynamodb.Table(SERVICES_TABLE_NAME)
+        table.load()
+        return table
+    except dynamodb.meta.client.exceptions.ResourceNotFoundException:
+        pass
+
+    print(f"📦 Creating DynamoDB services table: {SERVICES_TABLE_NAME}")
+    table = dynamodb.create_table(
+        TableName=SERVICES_TABLE_NAME,
+        KeySchema=[
+            {"AttributeName": "PK", "KeyType": "HASH"},
+            {"AttributeName": "SK", "KeyType": "RANGE"},
+        ],
+        AttributeDefinitions=[
+            {"AttributeName": "PK", "AttributeType": "S"},
+            {"AttributeName": "SK", "AttributeType": "S"},
+            {"AttributeName": "service_id", "AttributeType": "S"},
+        ],
+        GlobalSecondaryIndexes=[
+            {
+                "IndexName": "service-id-index",
+                "KeySchema": [
+                    {"AttributeName": "service_id", "KeyType": "HASH"},
+                ],
+                "Projection": {"ProjectionType": "ALL"},
+            },
+        ],
+        BillingMode="PAY_PER_REQUEST",
+    )
+    table.wait_until_exists()
+    print(f"✅ Created DynamoDB table: {SERVICES_TABLE_NAME}")
+    return table
+
+
 def generate_project_id() -> str:
     """Generate a unique project ID."""
     return uuid.uuid4().hex[:12]
@@ -214,25 +259,24 @@ def generate_unique_subdomain(project_name: str) -> str:
 
 def get_project_by_subdomain(subdomain: str) -> Optional[dict]:
     """
-    Look up a project by its subdomain.
-    
+    Look up a service by its subdomain.
+
     Used by the Lambda@Edge router to resolve subdomain -> Lambda URL.
-    
+
     Args:
         subdomain: The subdomain to look up (e.g., "my-project")
-        
+
     Returns:
-        Project dict if found, None otherwise
+        Service dict if found, None otherwise
     """
-    table = get_or_create_table()
-    
-    # Scan for projects with matching subdomain
-    # Note: In production with many projects, use a GSI on subdomain
+    table = get_or_create_services_table()
+
+    # Scan for services with matching subdomain
+    # Note: In production with many services, use a GSI on subdomain
     response = table.scan(
-        FilterExpression="subdomain = :sd AND begins_with(SK, :sk_prefix)",
+        FilterExpression="subdomain = :sd",
         ExpressionAttributeValues={
             ":sd": subdomain,
-            ":sk_prefix": "PROJECT#",
         },
     )
     items = response.get("Items", [])
@@ -282,13 +326,7 @@ def get_project(project_id: str) -> Optional[dict]:
         KeyConditionExpression=Key("project_id").eq(project_id),
     )
     items = response.get("Items", [])
-    # Filter for project container items (SK = PROJECT#<id>, NOT PROJECT#<id>#SERVICE#...)
-    project_items = [
-        i for i in items
-        if i.get("SK", "").startswith("PROJECT#")
-        and "#SERVICE#" not in i.get("SK", "")
-    ]
-    return project_items[0] if project_items else None
+    return items[0] if items else None
 
 
 def get_project_by_key(org_id: str, project_id: str) -> Optional[dict]:
@@ -313,8 +351,8 @@ def list_projects(org_id: str) -> list:
     """
     List all projects (containers) for an organization.
 
-    Returns only project container items (entity_type="project").
-    Service items nested under projects are excluded.
+    Services now live in the separate shorlabs-services table,
+    so all items returned here are project containers.
     """
     table = get_or_create_table()
 
@@ -322,12 +360,7 @@ def list_projects(org_id: str) -> list:
         KeyConditionExpression=Key("PK").eq(f"ORG#{org_id}")
         & Key("SK").begins_with("PROJECT#"),
     )
-    # Filter to container items only (SK = PROJECT#<id>, not PROJECT#<id>#SERVICE#...)
-    items = response.get("Items", [])
-    return [
-        i for i in items
-        if "#SERVICE#" not in i.get("SK", "")
-    ]
+    return response.get("Items", [])
 
 
 def update_project(project_id: str, updates: dict) -> Optional[dict]:
@@ -364,6 +397,7 @@ def delete_project(project_id: str) -> bool:
         return False
 
     projects_table = get_or_create_table()
+    services_table = get_or_create_services_table()
     deployments_table = get_or_create_deployments_table()
 
     # Delete all services under this project (and their associated resources)
@@ -383,8 +417,8 @@ def delete_project(project_id: str) -> bool:
             with deployments_table.batch_writer() as batch:
                 for d in svc_deployments:
                     batch.delete_item(Key={"project_id": d["project_id"], "SK": d["SK"]})
-        # Delete the service item itself
-        projects_table.delete_item(Key={"PK": svc["PK"], "SK": svc["SK"]})
+        # Delete the service item from services table
+        services_table.delete_item(Key={"PK": svc["PK"], "SK": svc["SK"]})
 
     # Delete the project container itself
     projects_table.delete_item(Key={"PK": project["PK"], "SK": project["SK"]})
@@ -433,7 +467,7 @@ def create_service(
     - "web-app": Lambda deployment from GitHub repo
     - "database": Aurora Serverless v2 PostgreSQL database
     """
-    table = get_or_create_table()
+    table = get_or_create_services_table()
     service_id = generate_service_id()
     now = datetime.utcnow().isoformat()
 
@@ -489,7 +523,7 @@ def list_services(project_id: str, org_id: str = None) -> list:
     If org_id is provided, uses direct query (efficient).
     Otherwise falls back to GSI lookup to find the org first.
     """
-    table = get_or_create_table()
+    table = get_or_create_services_table()
 
     if org_id:
         response = table.query(
@@ -509,20 +543,12 @@ def list_services(project_id: str, org_id: str = None) -> list:
 
 def get_service(service_id: str) -> Optional[dict]:
     """
-    Get a service by its service_id using the project-id-index GSI.
-
-    NOTE: Services also have project_id indexed in the GSI, but their
-    SK contains #SERVICE#, which distinguishes them from project containers.
-    We search by service_id instead, which is also stored as a top-level attribute.
+    Get a service by its service_id using the service-id-index GSI.
     """
-    table = get_or_create_table()
-    # Scan with filter — works for now; add a GSI on service_id if this becomes a bottleneck
-    response = table.scan(
-        FilterExpression="service_id = :sid AND entity_type = :et",
-        ExpressionAttributeValues={
-            ":sid": service_id,
-            ":et": "service",
-        },
+    table = get_or_create_services_table()
+    response = table.query(
+        IndexName="service-id-index",
+        KeyConditionExpression=Key("service_id").eq(service_id),
     )
     items = response.get("Items", [])
     return items[0] if items else None
@@ -532,7 +558,7 @@ def get_service_by_key(org_id: str, project_id: str, service_id: str) -> Optiona
     """
     Get a service by its composite key (efficient O(1) GetItem).
     """
-    table = get_or_create_table()
+    table = get_or_create_services_table()
     response = table.get_item(
         Key={
             "PK": f"ORG#{org_id}",
@@ -549,7 +575,7 @@ def update_service(service_id: str, updates: dict) -> Optional[dict]:
     if not service:
         return None
 
-    table = get_or_create_table()
+    table = get_or_create_services_table()
     updates["updated_at"] = datetime.utcnow().isoformat()
 
     update_expr = "SET " + ", ".join(f"#{k} = :{k}" for k in updates.keys())
@@ -574,7 +600,7 @@ def delete_service(service_id: str) -> bool:
     if not service:
         return False
 
-    projects_table = get_or_create_table()
+    services_table = get_or_create_services_table()
     deployments_table = get_or_create_deployments_table()
 
     # Delete domains
@@ -593,7 +619,7 @@ def delete_service(service_id: str) -> bool:
                 batch.delete_item(Key={"project_id": d["project_id"], "SK": d["SK"]})
 
     # Delete the service item
-    projects_table.delete_item(Key={"PK": service["PK"], "SK": service["SK"]})
+    services_table.delete_item(Key={"PK": service["PK"], "SK": service["SK"]})
     return True
 
 
@@ -605,11 +631,9 @@ def list_all_org_services(org_id: str, service_type: str = None) -> list:
     Useful for org-wide operations like webhook matching, quota enforcement,
     and usage aggregation where you need every service regardless of project.
     """
-    table = get_or_create_table()
+    table = get_or_create_services_table()
     response = table.query(
         KeyConditionExpression=Key("PK").eq(f"ORG#{org_id}"),
-        FilterExpression="entity_type = :et",
-        ExpressionAttributeValues={":et": "service"},
     )
     items = response.get("Items", [])
     if service_type:
@@ -619,7 +643,10 @@ def list_all_org_services(org_id: str, service_type: str = None) -> list:
 
 def get_project_with_services(project_id: str, org_id: str = None) -> Optional[dict]:
     """
-    Get a project container plus all its services in a single query.
+    Get a project container plus all its services.
+
+    Queries the projects table for the project container and the
+    services table for associated services.
 
     Returns: {"project": {...}, "services": [{...}, ...]}
     """
@@ -629,28 +656,13 @@ def get_project_with_services(project_id: str, org_id: str = None) -> Optional[d
             return None
         org_id = project["organization_id"]
 
-    table = get_or_create_table()
-    response = table.query(
-        KeyConditionExpression=(
-            Key("PK").eq(f"ORG#{org_id}")
-            & Key("SK").begins_with(f"PROJECT#{project_id}")
-        ),
-    )
-    items = response.get("Items", [])
-    if not items:
-        return None
-
-    project_item = None
-    service_items = []
-    for item in items:
-        sk = item.get("SK", "")
-        if "#SERVICE#" in sk:
-            service_items.append(item)
-        elif sk == f"PROJECT#{project_id}":
-            project_item = item
-
+    # Get project from projects table
+    project_item = get_project_by_key(org_id, project_id)
     if not project_item:
         return None
+
+    # Get services from services table
+    service_items = list_services(project_id, org_id=org_id)
 
     return {
         "project": project_item,

@@ -98,7 +98,7 @@ function CanvasInner({ services, projectId, onSelectService, topRightExtra, isDr
             <ZoomControls />
 
             {/* Top-right actions (shifts when drawer is open to stay visible) */}
-            <div className={`absolute top-4 z-10 flex flex-col gap-2 transition-all duration-300 ${isDrawerOpen ? 'right-[calc(70%+1rem)]' : 'right-4'}`}>
+            <div className="absolute top-4 right-4 z-10 flex flex-col gap-2">
                 <Link href={`/new?project_id=${projectId}`}>
                     <Button
                         variant="outline"
